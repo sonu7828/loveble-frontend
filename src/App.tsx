@@ -65,7 +65,7 @@ import { OwnerOnly } from "./components/staff/OwnerOnly.tsx";
 import AdminFinances from "./pages/admin/AdminFinances.tsx";
 import AdminAudit from "./pages/admin/AdminAudit.tsx";
 import AdminAuditReport from "./pages/admin/AdminAuditReport.tsx";
-import StaffMarketing from "./pages/staff/StaffMarketing.tsx";
+
 import Feedback from "./pages/patient/Feedback.tsx";
 import StaffFeedback from "./pages/staff/StaffFeedback.tsx";
 import PhotoUpload from "./pages/patient/PhotoUpload.tsx";
@@ -94,8 +94,7 @@ import SafetyHub from "./pages/staff/clinical/SafetyHub.tsx";
 import StaffMessages from "./pages/staff/StaffMessages.tsx";
 import StaffCosignQueue from "./pages/staff/StaffCosignQueue.tsx";
 import AdminNoShowCharges from "./pages/admin/AdminNoShowCharges.tsx";
-import StaffPerks from "./pages/staff/StaffPerks.tsx";
-import StaffQuickPhrases from "./pages/staff/StaffQuickPhrases.tsx";
+
 // StaffOutcomes is rendered inside StaffReports as a tab — direct route redirects there.
 import StaffMySchedule from "./pages/staff/StaffMySchedule.tsx";
 import AdminClinicalTemplates from "./pages/admin/AdminClinicalTemplates.tsx";
@@ -111,7 +110,7 @@ import AdminToxFollowup from "./pages/admin/AdminToxFollowup.tsx";
 import ChartNotesIndex from "./pages/staff/clinical/ChartNotesIndex.tsx";
 import GFEIndex from "./pages/staff/clinical/GFEIndex.tsx";
 import AdminVendors from "./pages/admin/AdminVendors.tsx";
-import StaffBreachReport from "./pages/staff/StaffBreachReport.tsx";
+import AdminBreachReport from "./pages/admin/AdminBreachReport.tsx";
 import AdminHipaaPolicies from "./pages/admin/AdminHipaaPolicies.tsx";
 import AdminSecurityOfficer from "./pages/admin/AdminSecurityOfficer.tsx";
 import AdminModelApplications from "./pages/admin/AdminModelApplications.tsx";
@@ -192,7 +191,7 @@ const App = () => (
             <Route path="security-officer" element={<AdminSecurityOfficer />} />
             <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
             <Route path="compliance/admin" element={<ComplianceAdmin />} />
-            <Route path="breach-report" element={<StaffBreachReport />} />
+            <Route path="breach-report" element={<AdminBreachReport />} />
             <Route path="me" element={<StaffMyProfile />} />
             <Route path="help" element={<StaffHelp />} />
           </Route>
