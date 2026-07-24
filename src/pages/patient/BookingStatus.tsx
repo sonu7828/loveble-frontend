@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ApiClient } from "@/services/api";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
