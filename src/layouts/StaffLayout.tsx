@@ -86,7 +86,7 @@ export default function StaffLayout() {
   const pendingCount = usePendingBookings(!!user && (isAdmin || isScheduler || isReceptionist || isStaff));
   const [unreadSms] = useState(0);
 
-  // Medical Director and Staff navigation groups
+  // Medical Director, Security Officer, and Staff navigation groups
   const staffGroups: Group[] = useMemo(() => {
     if (isMedicalDirector) {
       return [
@@ -150,66 +150,148 @@ export default function StaffLayout() {
       ];
     }
 
+    if (isPrivacyOfficer) {
+      return [
+        {
+          key: "sec_dashboard",
+          label: "Dashboard",
+          icon: LayoutDashboard,
+          show: true,
+          children: [
+            { to: "/staff/security-officer", label: "Dashboard", icon: LayoutDashboard },
+          ],
+        },
+        {
+          key: "sec_audit",
+          label: "Audit Logs",
+          icon: HistoryIcon,
+          show: true,
+          children: [
+            { to: "/staff/audit-report", label: "Audit Logs", icon: HistoryIcon },
+          ],
+        },
+        {
+          key: "sec_hipaa",
+          label: "HIPAA Compliance",
+          icon: BookOpen,
+          show: true,
+          children: [
+            { to: "/staff/hipaa-policies", label: "HIPAA Compliance", icon: BookOpen },
+          ],
+        },
+        {
+          key: "sec_incidents",
+          label: "Security Incidents",
+          icon: ShieldAlert,
+          show: true,
+          children: [
+            { to: "/staff/breach-report", label: "Security Incidents", icon: ShieldAlert },
+          ],
+        },
+        {
+          key: "sec_access",
+          label: "Access Management",
+          icon: Laptop,
+          show: true,
+          children: [
+            { to: "/staff/vendors?tab=devices", label: "Access Management", icon: Laptop },
+          ],
+        },
+        {
+          key: "sec_reports",
+          label: "Reports",
+          icon: BarChart3,
+          show: true,
+          children: [
+            { to: "/staff/reports", label: "Reports", icon: BarChart3 },
+          ],
+        },
+        {
+          key: "sec_settings",
+          label: "Settings",
+          icon: Settings,
+          show: true,
+          children: [
+            { to: "/staff/me", label: "Settings", icon: Settings },
+          ],
+        },
+      ];
+    }
+
     const canClinical = isNP || isStaff;
     return [
       {
-        key: "today",
-        label: "Today",
-        icon: Sun,
+        key: "staff_dashboard",
+        label: "Dashboard",
+        icon: LayoutDashboard,
         show: true,
-        badge: pendingCount + unreadSms,
         children: [
-          { to: "/staff/today", label: "Today", icon: Sun },
-          { to: "/staff/inbox", label: "Booking Requests", icon: Inbox, badge: pendingCount },
+          { to: "/staff/today", label: "Dashboard", icon: LayoutDashboard },
+        ],
+      },
+      {
+        key: "staff_patients",
+        label: "Patients",
+        icon: UserCircle2,
+        show: true,
+        children: [
+          { to: "/staff/clients", label: "Patients", icon: UserCircle2 },
+        ],
+      },
+      {
+        key: "staff_appts",
+        label: "Appointments",
+        icon: CalIcon,
+        show: true,
+        children: [
+          { to: "/staff/calendar", label: "Appointments", icon: CalIcon },
+        ],
+      },
+      {
+        key: "staff_notes",
+        label: "Clinical Notes",
+        icon: FileText,
+        show: true,
+        children: [
+          { to: "/staff/clinical", label: "Clinical Notes", icon: FileText },
+        ],
+      },
+      {
+        key: "staff_rx",
+        label: "Prescriptions",
+        icon: Pill,
+        show: true,
+        children: [
+          { to: "/staff/orders?tab=rx", label: "Prescriptions", icon: Pill },
+        ],
+      },
+      {
+        key: "staff_tasks",
+        label: "Tasks",
+        icon: Inbox,
+        show: true,
+        badge: pendingCount,
+        children: [
+          { to: "/staff/inbox", label: "Tasks", icon: Inbox, badge: pendingCount },
+        ],
+      },
+      {
+        key: "staff_messages",
+        label: "Messages",
+        icon: MessageSquare,
+        show: true,
+        badge: unreadSms,
+        children: [
           { to: "/staff/messages", label: "Messages", icon: MessageSquare, badge: unreadSms },
         ],
       },
       {
-        key: "schedule",
-        label: "Schedule",
-        icon: CalIcon,
+        key: "staff_settings",
+        label: "Settings",
+        icon: Settings,
         show: true,
         children: [
-          { to: "/staff/calendar", label: "Calendar", icon: CalIcon },
-          { to: "/staff/my-schedule", label: "My Schedule", icon: CalIcon },
-          { to: "/staff/time-clock", label: "Time Clock", icon: Clock },
-        ],
-      },
-      {
-        key: "clients",
-        label: "Clients",
-        icon: UserCircle2,
-        show: true,
-        children: [
-          { to: "/staff/clients", label: "All Clients", icon: UserCircle2 },
-        ],
-      },
-
-      {
-        key: "security_officer",
-        label: "Security & Compliance",
-        icon: ShieldCheck,
-        show: isPrivacyOfficer,
-        children: [
-          { to: "/staff/security-officer", label: "Security Operations Center", icon: ShieldCheck },
-          { to: "/staff/hipaa-policies", label: "HIPAA Policy Approval", icon: BookOpen },
-          { to: "/staff/audit-report", label: "Audit & PHI Access Logs", icon: HistoryIcon },
-          { to: "/staff/breach-report", label: "Incident & Breach Reports", icon: ShieldAlert },
-          { to: "/staff/vendors?tab=devices", label: "Device Inventory & Encryption", icon: Laptop },
-          { to: "/staff/vendors", label: "Vendor Management & BAAs", icon: Building2 },
-        ],
-      },
-      {
-        key: "clinical",
-        label: "Clinical",
-        icon: Stethoscope,
-        show: canClinical,
-        children: [
-          { to: "/staff/clinical", label: "Charts", icon: Stethoscope },
-          { to: "/staff/clinical/cosign", label: "Cosign Queue", icon: ShieldCheck },
-          { to: "/staff/clinical/safety", label: "Safety & Protocols", icon: ShieldAlert },
-          { to: "/staff/compliance", label: "My Compliance", icon: ShieldCheck },
-          { to: "/staff/inventory", label: "Inventory & Supplies", icon: Boxes },
+          { to: "/staff/me", label: "Settings", icon: Settings },
         ],
       },
     ];
