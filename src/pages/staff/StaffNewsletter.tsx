@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,7 @@ export default function StaffNewsletter() {
   const draftWithAi = async () => {
     if (!prompt.trim()) { toast.error("Tell the AI what this newsletter is about"); return; }
     setDrafting(true);
-    const { data, error } = await supabase.functions.invoke("ai-draft-newsletter", {
+    const { data, error } = await ApiClient.post("ai-draft-newsletter", {
       body: { prompt, generateImage: genImage },
     });
     setDrafting(false);
@@ -67,7 +67,7 @@ export default function StaffNewsletter() {
     if (!user) throw new Error("Not signed in");
     if (!subject.trim() || !body.trim()) { toast.error("Subject and body are required"); return null; }
     const slug = `newsletter-${Date.now()}`;
-    const { data, error } = await supabase.from("marketing_campaigns").insert({
+    const { data, error } = await apiQuery("marketing_campaigns").insert({
       slug,
       name: `Newsletter · ${subject.slice(0, 60)}`,
       subject,
@@ -92,7 +92,7 @@ export default function StaffNewsletter() {
     setAudienceSize(null);
     const id = await createCampaign();
     if (!id) { setChecking(false); return; }
-    const { data, error } = await supabase.functions.invoke("run-marketing-campaign", {
+    const { data, error } = await ApiClient.post("run-marketing-campaign", {
       body: { campaignId: id, dryRun: true },
     });
     setChecking(false);
@@ -110,7 +110,7 @@ export default function StaffNewsletter() {
     setSending(true);
     const id = await createCampaign();
     if (!id) { setSending(false); return; }
-    const { data, error } = await supabase.functions.invoke("run-marketing-campaign", {
+    const { data, error } = await ApiClient.post("run-marketing-campaign", {
       body: { campaignId: id, dryRun: false },
     });
     setSending(false);

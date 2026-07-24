@@ -2,7 +2,7 @@
 // Mode: create (?appointment=<id> or ?client=<email>&category=<cat>) or view (/staff/clinical/notes/:id)
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { openPdf } from "@/lib/openPdf";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -128,7 +128,7 @@ async function hydrateAppointmentServices(
   const serviceIds = Array.from(new Set(orderedRows.map((r) => r.service_id as string)));
   if (!serviceIds.length) return [];
 
-  const { data: services } = await supabase
+  const { data: services } = await apiQuery
     .from("services")
     .select("id, name, service_categories(name)")
     .in("id", serviceIds);
@@ -355,7 +355,7 @@ export default function ChartNoteEditor() {
         post_assessment: postAssessment,
         followup_weeks: followupWeeks,
       };
-      const { data, error } = await supabase.functions.invoke("ai-draft-soap", { body: payload });
+      const { data, error } = await ApiClient.post("ai-draft-soap", { body: payload });
       if (error) throw error;
       const draft = (data as any)?.draft?.trim?.() ?? "";
       if (!draft) { toast.error("AI returned an empty draft. Try again."); return; }
@@ -371,7 +371,7 @@ export default function ChartNoteEditor() {
   const [customPhrases, setCustomPhrases] = useState<Array<{ category: string; phrase: string }>>([]);
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("quick_phrases")
+      const { data } = await apiQuery("quick_phrases")
         .select("category, phrase").eq("is_active", true).order("sort_order");
       if (data) setCustomPhrases(data as any);
     })();
@@ -384,7 +384,7 @@ export default function ChartNoteEditor() {
     if (!client.email) { setPreviousNeuroPoints([]); return; }
     let cancel = false;
     (async () => {
-      const { data: prev } = await supabase
+      const { data: prev } = await apiQuery
         .from("clinical_notes")
         .select("id")
         .ilike("client_email", client.email)
@@ -394,7 +394,7 @@ export default function ChartNoteEditor() {
         .limit(1)
         .maybeSingle();
       if (!prev?.id || cancel) return;
-      const { data: d } = await supabase
+      const { data: d } = await apiQuery
         .from("clinical_note_neurotoxin")
         .select("injection_map")
         .eq("clinical_note_id", prev.id)
@@ -425,7 +425,7 @@ export default function ChartNoteEditor() {
     if (isViewMode || !user) return;
     let cancel = false;
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("staff_profiles")
         .select("saved_signature_png, saved_signature_name")
         .eq("user_id", user.id)
@@ -449,7 +449,7 @@ export default function ChartNoteEditor() {
 
   async function persistSavedSignature(png: string, name: string) {
     if (!user || !png || !name) return;
-    await supabase
+    await apiQuery
       .from("staff_profiles")
       .update({
         saved_signature_png: png,
@@ -527,7 +527,7 @@ export default function ChartNoteEditor() {
       return;
     }
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("chart_note_templates")
         .select("body")
         .eq("category", category)
@@ -555,16 +555,16 @@ export default function ChartNoteEditor() {
     const draftId = sp.get("draft");
     (async () => {
       if (!user) return;
-      const { data: sprof } = await supabase.from("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
+      const { data: sprof } = await apiQuery("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
       if (sprof?.full_name) { setProviderName(sprof.full_name); setSigFullName(sprof.full_name); }
 
       if (appointmentId) {
-        const { data: appt } = await supabase.from("appointments").select("*").eq("id", appointmentId).maybeSingle();
+        const { data: appt } = await apiQuery("appointments").select("*").eq("id", appointmentId).maybeSingle();
         if (appt) {
           let dobVal = appt.client_dob ?? "";
           // Fallback: lookup DOB from client_profiles by email when appointment lacks it
           if (!dobVal && appt.client_email) {
-            const { data: cp } = await supabase
+            const { data: cp } = await apiQuery
               .from("client_profiles")
               .select("dob")
               .ilike("email", appt.client_email)
@@ -580,7 +580,7 @@ export default function ChartNoteEditor() {
           // Load ALL services on this appointment (multi-service support).
           // Do this in two queries because appointment_services may not expose
           // embedded service relationships in the API.
-          const { data: aps } = await supabase
+          const { data: aps } = await apiQuery
             .from("appointment_services")
             .select("appointment_id, service_id, display_order")
             .eq("appointment_id", appointmentId)
@@ -599,7 +599,7 @@ export default function ChartNoteEditor() {
             if (apptDate && appt.client_email) {
               const dayStart = `${apptDate}T00:00:00.000Z`;
               const dayEnd = `${apptDate}T23:59:59.999Z`;
-              const { data: sameDay } = await supabase
+              const { data: sameDay } = await apiQuery
                 .from("appointments")
                 .select("id, service_id")
                 .ilike("client_email", appt.client_email)
@@ -615,7 +615,7 @@ export default function ChartNoteEditor() {
                 if (!seen.has(s.id)) { seen.add(s.id); svcRows.push(s); }
               }
               if (siblingIds.length) {
-                const { data: sibAps } = await supabase
+                const { data: sibAps } = await apiQuery
                   .from("appointment_services")
                   .select("appointment_id, service_id, display_order")
                   .in("appointment_id", siblingIds);
@@ -631,7 +631,7 @@ export default function ChartNoteEditor() {
 
           // Load already-saved notes for this appointment so we can mark them done
           const noteAppointmentIds = Array.from(new Set([appointmentId, ...svcRows.map(s => s.appointmentId).filter((v): v is string => !!v)]));
-          const { data: existing } = await supabase
+          const { data: existing } = await apiQuery
             .from("clinical_notes")
             .select("id, service_name, appointment_id")
             .in("appointment_id", noteAppointmentIds);
@@ -697,7 +697,7 @@ export default function ChartNoteEditor() {
     const draftId = sp.get("draft");
     if (isViewMode || !user || (!appointmentId && !draftId)) return;
     (async () => {
-      let query = supabase
+      let query = apiQuery
         .from("clinical_notes")
         .select("*")
         .eq("status", "draft")
@@ -723,9 +723,9 @@ export default function ChartNoteEditor() {
     // Delete photos in storage too
     const paths = [...(resumableDraft.photo_pre_paths ?? []), ...(resumableDraft.photo_post_paths ?? [])];
     if (paths.length) {
-      try { await supabase.storage.from("clinical-photos").remove(paths); } catch { /* ignore */ }
+      try { await ApiClient.remove(paths); } catch { /* ignore */ }
     }
-    await supabase.from("clinical_notes").delete().eq("id", resumableDraft.id);
+    await apiQuery("clinical_notes").delete().eq("id", resumableDraft.id);
     setResumableDraft(null);
     toast.success("Draft discarded");
   }
@@ -757,7 +757,7 @@ export default function ChartNoteEditor() {
       photo_pre_paths: extra.photo_pre_paths ?? photoPrePaths,
       photo_post_paths: extra.photo_post_paths ?? photoPostPaths,
     };
-    const { error } = await supabase.from("clinical_notes").upsert(payload, { onConflict: "id" });
+    const { error } = await apiQuery("clinical_notes").upsert(payload, { onConflict: "id" });
     if (error) { console.warn("draft upsert failed", error); return; }
     setDraftRowExists(true);
   }
@@ -785,7 +785,7 @@ export default function ChartNoteEditor() {
   useEffect(() => {
     if (isViewMode || !client.email || !category) return;
     (async () => {
-      const { data: prev } = await supabase
+      const { data: prev } = await apiQuery
         .from("clinical_notes")
         .select("id, category, service_name, provider_name, created_at, status")
         .ilike("client_email", client.email)
@@ -811,7 +811,7 @@ export default function ChartNoteEditor() {
       energy: "clinical_note_energy",
       wellness: "clinical_note_wellness",
     };
-    const { data: prev } = await supabase
+    const { data: prev } = await apiQuery
       .from("clinical_notes")
       .select("id")
       .ilike("client_email", client.email)
@@ -821,7 +821,7 @@ export default function ChartNoteEditor() {
       .limit(1)
       .maybeSingle();
     if (!prev?.id) { toast.error("Could not find last chart"); return; }
-    const { data: dRaw } = await supabase
+    const { data: dRaw } = await apiQuery
       .from(tableMap[lastVisit.category as Exclude<Category, "consult">] as any)
       .select("*")
       .eq("clinical_note_id", prev.id)
@@ -885,7 +885,7 @@ export default function ChartNoteEditor() {
   }
 
   async function loadGfeFor(email: string) {
-    const { data } = await supabase.from("gfe_records")
+    const { data } = await apiQuery("gfe_records")
       .select("id, expires_at, signed_at, np_name, allergies, allergies_other, current_medications, current_medications_other")
       .ilike("client_email", email).order("signed_at", { ascending: false }).limit(1).maybeSingle();
     setGfe(data ?? null);
@@ -897,7 +897,7 @@ export default function ChartNoteEditor() {
   useEffect(() => {
     if (!isViewMode || !id) return;
     (async () => {
-      const { data: n, error } = await supabase.from("clinical_notes").select("*").eq("id", id).maybeSingle();
+      const { data: n, error } = await apiQuery("clinical_notes").select("*").eq("id", id).maybeSingle();
       if (error || !n) { toast.error("Note not found"); navigate(-1); return; }
       // Draft notes should resume in edit mode, not the read-only view (which renders the
       // category template with example imagery and confuses providers mid-chart).
@@ -928,9 +928,9 @@ export default function ChartNoteEditor() {
       const detailTable = tableMap[n.category as Category];
       const [{ data: d }, { data: s }] = await Promise.all([
         detailTable
-          ? supabase.from(detailTable as any).select("*").eq("clinical_note_id", id).maybeSingle()
+          ? apiQuery(detailTable as any).select("*").eq("clinical_note_id", id).maybeSingle()
           : Promise.resolve({ data: null } as any),
-        supabase.from("clinical_note_signatures").select("*").eq("clinical_note_id", id).order("signed_at"),
+        apiQuery("clinical_note_signatures").select("*").eq("clinical_note_id", id).order("signed_at"),
       ]);
       setDetail(d);
       setSigs(s ?? []);
@@ -1105,7 +1105,7 @@ export default function ChartNoteEditor() {
     // Consultation SOAP notes have no product/lot detail row.
     if (noteCategory === "consult") return { error: null } as any;
     if (noteCategory === "neurotoxin") {
-      return supabase.from("clinical_note_neurotoxin").upsert({
+      return apiQuery("clinical_note_neurotoxin").upsert({
         clinical_note_id: noteId,
         product: neuro.product, lot_number: neuro.lot_number, expiration_date: neuro.expiration_date,
         dilution: neuro.dilution,
@@ -1117,7 +1117,7 @@ export default function ChartNoteEditor() {
       } as any, upsertOpts);
     }
     if (noteCategory === "filler") {
-      return supabase.from("clinical_note_filler").upsert({
+      return apiQuery("clinical_note_filler").upsert({
         clinical_note_id: noteId, product: filler.product, syringes_used: filler.syringes_used,
         lot_entries: filler.lots as any, areas: filler.areas, technique: filler.technique,
         delivery: filler.delivery, needle_gauge: filler.needle_gauge, anesthetic: filler.anesthetic,
@@ -1128,7 +1128,7 @@ export default function ChartNoteEditor() {
       } as any, upsertOpts);
     }
     if (noteCategory === "energy") {
-      return supabase.from("clinical_note_energy").upsert({
+      return apiQuery("clinical_note_energy").upsert({
         clinical_note_id: noteId, device: energy.device,
         device_serial: energy.device_serial.trim() || null,
         lot_number: energy.lot_number.trim() || null,
@@ -1139,7 +1139,7 @@ export default function ChartNoteEditor() {
         site_map: (energyPoints.length ? energyPoints : null) as any,
       } as any, upsertOpts);
     }
-    return supabase.from("clinical_note_wellness").upsert({
+    return apiQuery("clinical_note_wellness").upsert({
       clinical_note_id: noteId, service_type: wellness.service_type, product: wellness.product || null,
       dose: wellness.dose || null, strength: wellness.strength || null,
       layers: wellness.layers ? Number(wellness.layers) : null,
@@ -1255,7 +1255,7 @@ export default function ChartNoteEditor() {
           cosigned_at: null,
           locked_at: null,
         };
-        const writer = supabase.from("clinical_notes");
+        const writer = apiQuery("clinical_notes");
         const { error: nErr } = (isFirstService && draftRowExists)
           ? await writer.upsert(draftPayload, { onConflict: "id" })
           : await writer.insert(draftPayload);
@@ -1277,13 +1277,13 @@ export default function ChartNoteEditor() {
             consumptions.push({ lot: wellnessLot, qty: 1, unit: wellnessLot.unit || "dose" });
           }
           for (const c of consumptions) {
-            const { error: cErr } = await supabase.rpc("consume_lot", {
+            const { error: cErr } = await apiQuery("consume_lot", {
               _lot_id: c.lot.id, _qty: c.qty,
               _ref_type: "clinical_note", _ref_id: noteId,
               _notes: `Chart ${noteCategory} — ${c.lot.product_name}`,
             });
             if (cErr) { console.warn("consume_lot failed", cErr); continue; }
-            await supabase.from("chart_lot_consumption").insert({
+            await apiQuery("chart_lot_consumption").insert({
               clinical_note_id: noteId, lot_id: c.lot.id,
               qty: c.qty, unit: c.unit, category: noteCategory,
               consumed_at: new Date().toISOString(),
@@ -1293,12 +1293,12 @@ export default function ChartNoteEditor() {
           console.warn("Inventory decrement skipped:", consumeErr);
         }
 
-        await supabase.from("clinical_note_signatures").insert({
+        await apiQuery("clinical_note_signatures").insert({
           clinical_note_id: noteId,
           signer_user_id: user!.id, signer_staff_id: staffId, signer_name: sigFullName,
           signer_role: "provider", signature_png: sigPng, user_agent: ua,
         });
-        const { error: signErr } = await supabase.from("clinical_notes").update({
+        const { error: signErr } = await apiQuery("clinical_notes").update({
           status: notePayload.status,
           signed_at: notePayload.signed_at,
           cosigned_at: notePayload.cosigned_at,
@@ -1306,7 +1306,7 @@ export default function ChartNoteEditor() {
           requires_cosign: notePayload.requires_cosign,
         }).eq("id", noteId);
         if (signErr) throw signErr;
-        await supabase.from("clinical_audit_log").insert({
+        await apiQuery("clinical_audit_log").insert({
           actor_user_id: user!.id, actor_name: providerName,
           resource_type: "clinical_note", resource_id: noteId,
           action: "sign", user_agent: ua,
@@ -1346,7 +1346,7 @@ export default function ChartNoteEditor() {
         let consultCompleted = false;
         if (allConsult && appointmentId && !requiresCosign) {
           try {
-            const { error: mcErr } = await supabase.functions.invoke("mark-appointment-complete", {
+            const { error: mcErr } = await ApiClient.post("mark-appointment-complete", {
               body: { appointmentId },
             });
             if (!mcErr) consultCompleted = true;
@@ -1372,16 +1372,16 @@ export default function ChartNoteEditor() {
     setSaving(true);
     try {
       const ua = navigator.userAgent;
-      await supabase.from("clinical_note_signatures").insert({
+      await apiQuery("clinical_note_signatures").insert({
         clinical_note_id: note.id, signer_user_id: user!.id, signer_staff_id: staffId,
         signer_name: sigFullName, signer_role: "cosigner",
         signature_png: sigPng, user_agent: ua,
       });
-      await supabase.from("clinical_notes").update({
+      await apiQuery("clinical_notes").update({
         status: "cosigned", cosigned_at: new Date().toISOString(),
         locked_at: new Date().toISOString(),
       }).eq("id", note.id);
-      await supabase.from("clinical_audit_log").insert({
+      await apiQuery("clinical_audit_log").insert({
         actor_user_id: user!.id, actor_name: sigFullName,
         resource_type: "clinical_note", resource_id: note.id, action: "cosign", user_agent: ua,
       });
@@ -1394,7 +1394,7 @@ export default function ChartNoteEditor() {
     if (!note) return;
     setPdfBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-clinical-pdf", {
+      const { data, error } = await ApiClient.post("generate-clinical-pdf", {
         body: { kind: "note", id: note.id },
       });
       if (error) throw error;
@@ -1671,7 +1671,7 @@ export default function ChartNoteEditor() {
                 variant="outline"
                 onClick={async () => {
                   try {
-                    await supabase.functions.invoke("notify-np-gfe-needed", {
+                    await ApiClient.post("notify-np-gfe-needed", {
                       body: { clientEmail: client.email, firstName: client.first, lastName: client.last },
                     });
                     toast.success("Nurse practitioner notified");
@@ -2659,7 +2659,7 @@ function ReadonlyClinicalPhotos({ kind, paths }: { kind: string; paths: string[]
     (async () => {
       const next: Record<string, string> = {};
       for (const p of paths) {
-        const { data } = await supabase.storage.from("clinical-photos").createSignedUrl(p, 60 * 60);
+        const { data } = await ApiClient.createSignedUrl(p, 60 * 60);
         if (data?.signedUrl) next[p] = data.signedUrl;
       }
       if (!cancelled) setPreviews(next);
@@ -2704,7 +2704,7 @@ function AddendumsPanel({
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase
+    const { data } = await apiQuery
       .from("clinical_note_addendums")
       .select("*").eq("clinical_note_id", noteId).order("created_at", { ascending: true });
     setItems(data ?? []);
@@ -2747,7 +2747,7 @@ function AddendumsPanel({
       const attestationBody = sigMode === "typed"
         ? `${body.trim()}\n\n— Signed via typed signature (UETA / 21 CFR §11.200). Author attests this typed name has the same legal effect as a handwritten signature.`
         : body.trim();
-      const { error } = await supabase.from("clinical_note_addendums").insert({
+      const { error } = await apiQuery("clinical_note_addendums").insert({
         clinical_note_id: noteId,
         author_user_id: currentUserId,
         author_name: name.trim(),
@@ -2757,7 +2757,7 @@ function AddendumsPanel({
         signature_png: signaturePng,
       });
       if (error) throw error;
-      await supabase.from("clinical_audit_log").insert({
+      await apiQuery("clinical_audit_log").insert({
         actor_user_id: currentUserId, actor_name: name.trim(),
         resource_type: "clinical_note", resource_id: noteId,
         action: "addendum_created", user_agent: ua,
@@ -2876,7 +2876,7 @@ function ClinicalPhotos({
     (async () => {
       const next: Record<string, string> = {};
       for (const p of paths) {
-        const { data } = await supabase.storage.from("clinical-photos").createSignedUrl(p, 600);
+        const { data } = await ApiClient.createSignedUrl(p, 600);
         if (data?.signedUrl) next[p] = data.signedUrl;
       }
       if (!cancelled) setPreviews(next);
@@ -2906,7 +2906,7 @@ function ClinicalPhotos({
         if (!/^image\//.test(f.type)) { toast.error(`${f.name}: must be an image`); continue; }
         const ext = (f.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
         const key = `${noteId}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error } = await supabase.storage.from("clinical-photos").upload(key, f, {
+        const { error } = await ApiClient.upload(key, f, {
           contentType: f.type, upsert: false,
         });
         if (error) { toast.error(`${f.name}: ${error.message}`); continue; }
@@ -2917,7 +2917,7 @@ function ClinicalPhotos({
   }
 
   async function remove(key: string) {
-    await supabase.storage.from("clinical-photos").remove([key]);
+    await ApiClient.remove([key]);
     onChange(paths.filter(p => p !== key));
   }
 
@@ -2983,7 +2983,7 @@ function ReadonlyBeforeAfterCompare({
     let cancelled = false;
     (async () => {
       if (!prePaths.length || !postPaths.length) { setPair(null); return; }
-      const { data: meta } = await supabase
+      const { data: meta } = await apiQuery
         .from("clinical_photo_meta")
         .select("storage_path, angle, is_shared_with_patient")
         .in("storage_path", [...prePaths, ...postPaths]);
@@ -2998,8 +2998,8 @@ function ReadonlyBeforeAfterCompare({
       }
       const sharedOk = (byPath.get(bPath)?.shared ?? false) && (byPath.get(aPath)?.shared ?? false);
       const [b, a] = await Promise.all([
-        supabase.storage.from("clinical-photos").createSignedUrl(bPath, 600),
-        supabase.storage.from("clinical-photos").createSignedUrl(aPath, 600),
+        ApiClient.createSignedUrl(bPath, 600),
+        ApiClient.createSignedUrl(aPath, 600),
       ]);
       if (!cancelled && b.data?.signedUrl && a.data?.signedUrl) {
         setPair({ beforeUrl: b.data.signedUrl, afterUrl: a.data.signedUrl, sharedOk });
@@ -3071,7 +3071,7 @@ function ConsultCompleteButton({ appointmentId }: { appointmentId: string }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from("appointments").select("status").eq("id", appointmentId).maybeSingle();
+      const { data } = await apiQuery("appointments").select("status").eq("id", appointmentId).maybeSingle();
       if (!cancelled) setStatus((data as any)?.status ?? null);
     })();
     return () => { cancelled = true; };
@@ -3089,7 +3089,7 @@ function ConsultCompleteButton({ appointmentId }: { appointmentId: string }) {
   const complete = async () => {
     setBusy(true);
     try {
-      const { error } = await supabase.functions.invoke("mark-appointment-complete", {
+      const { error } = await ApiClient.post("mark-appointment-complete", {
         body: { appointmentId },
       });
       if (error) throw error;

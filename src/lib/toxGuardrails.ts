@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ApiClient } from "@/services/api";
 
 export type ToxGuardrail = {
   product: string;
@@ -17,13 +17,10 @@ export function useToxGuardrails(product: string | null | undefined) {
     if (!product) { setRows([]); return; }
     if (cache.has(product)) { setRows(cache.get(product)!); return; }
     (async () => {
-      const { data, error } = await supabase
-        .from("tox_zone_guardrails")
-        .select("product, zone, min_units, typical_units, max_units")
-        .eq("product", product);
-      if (!error && data) {
-        cache.set(product, data as ToxGuardrail[]);
-        setRows(data as ToxGuardrail[]);
+      const res = await ApiClient.get<ToxGuardrail[]>(`/clinical/tox-guardrails?product=${encodeURIComponent(product)}`);
+      if (res.data) {
+        cache.set(product, res.data);
+        setRows(res.data);
       }
     })();
   }, [product]);

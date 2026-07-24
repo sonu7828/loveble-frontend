@@ -2,7 +2,7 @@
 // Shows: AE rate by injector, AE rate by product, recovery curves (avg swelling/
 // bruising/pain by day_offset per product), and photo-share rate.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, TrendingUp, AlertTriangle, Image as ImgIcon, Users } from "lucide-react";
 import { subDays } from "date-fns";
@@ -34,7 +34,7 @@ export function ClinicalOutcomesPanel() {
     (async () => {
       setBusy(true);
       const from = subDays(new Date(), days).toISOString();
-      const { data: res, error } = await supabase.rpc("get_outcomes_summary", {
+      const { data: res, error } = await apiQuery("get_outcomes_summary", {
         _from: from,
         _to: new Date().toISOString(),
         _location_id: null,

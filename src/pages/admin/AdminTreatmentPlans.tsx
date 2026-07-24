@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,8 +33,8 @@ export default function AdminTreatmentPlans() {
   const load = async () => {
     setLoading(true);
     const [{ data: t }, { data: s }] = await Promise.all([
-      (supabase as any).from("treatment_plan_templates").select("*").order("name"),
-      supabase.from("services").select("id,name").eq("is_active", true).order("name"),
+      (apiQuery as any).from("treatment_plan_templates").select("*").order("name"),
+      apiQuery("services").select("id,name").eq("is_active", true).order("name"),
     ]);
     setItems(t ?? []);
     setServices(s ?? []);
@@ -61,8 +61,8 @@ export default function AdminTreatmentPlans() {
       is_active: editing.is_active,
     };
     const q = editing.id
-      ? (supabase as any).from("treatment_plan_templates").update(payload).eq("id", editing.id)
-      : (supabase as any).from("treatment_plan_templates").insert(payload);
+      ? (apiQuery as any).from("treatment_plan_templates").update(payload).eq("id", editing.id)
+      : (apiQuery as any).from("treatment_plan_templates").insert(payload);
     const { error } = await q;
     if (error) return toast.error(error.message);
     toast.success("Saved");

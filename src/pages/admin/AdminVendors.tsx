@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -278,7 +278,7 @@ function VendorTab() {
     setLoading(true);
     let remoteVendors: Vendor[] = [];
     try {
-      const { data, error } = await supabase.from("vendors" as any).select("*").order("name");
+      const { data, error } = await apiQuery("vendors" as any).select("*").order("name");
       if (!error && data) remoteVendors = (data as any) as Vendor[];
     } catch (e) {}
 
@@ -333,11 +333,11 @@ function VendorTab() {
     };
 
     if (form.id) {
-      try { await supabase.from("vendors" as any).update(payload).eq("id", form.id); } catch (e) {}
+      try { await apiQuery("vendors" as any).update(payload).eq("id", form.id); } catch (e) {}
       const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
       localStorage.setItem("rka_demo_vendors", JSON.stringify(local.map(v => v.id === form.id ? { ...v, ...payload } : v)));
     } else {
-      try { await supabase.from("vendors" as any).insert(payload); } catch (e) {}
+      try { await apiQuery("vendors" as any).insert(payload); } catch (e) {}
       const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
       local.push({ id: `vendor-${Date.now()}`, ...payload });
       localStorage.setItem("rka_demo_vendors", JSON.stringify(local));
@@ -351,7 +351,7 @@ function VendorTab() {
 
   async function remove(id: string) {
     if (!(await confirmDialog({ title: "Delete vendor?", description: "This will remove the vendor from your inventory records. This action cannot be undone.", destructive: true, confirmLabel: "Delete Vendor" }))) return;
-    try { await supabase.from("vendors" as any).delete().eq("id", id); } catch (e) {}
+    try { await apiQuery("vendors" as any).delete().eq("id", id); } catch (e) {}
     const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
     localStorage.setItem("rka_demo_vendors", JSON.stringify(local.filter(v => v.id !== id)));
     toast({ title: "Vendor deleted" });
@@ -612,7 +612,7 @@ function DeviceTab() {
     ];
 
     try {
-      const { data } = await supabase.from("staff_profiles").select("full_name, title");
+      const { data } = await apiQuery("staff_profiles").select("full_name, title");
       if (data) {
         data.forEach((s: any) => {
           if (s.full_name && !list.some((x) => x.name.toLowerCase() === s.full_name.toLowerCase())) {

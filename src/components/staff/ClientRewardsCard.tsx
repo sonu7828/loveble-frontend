@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Sparkles, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -42,13 +42,13 @@ export function ClientRewardsCard({ clientEmail }: { clientEmail: string }) {
       setLoading(true);
       const email = clientEmail.toLowerCase().trim();
       const [bal, led, s] = await Promise.all([
-        supabase.rpc("get_points_balance", { _client_email: email }),
-        supabase.from("client_points_ledger" as any)
+        apiQuery("get_points_balance", { _client_email: email }),
+        apiQuery("client_points_ledger" as any)
           .select("id, delta, reason, notes, created_at")
           .ilike("client_email", email)
           .order("created_at", { ascending: false })
           .limit(50),
-        supabase.from("client_points_settings" as any).select("*").eq("id", true).maybeSingle(),
+        apiQuery("client_points_settings" as any).select("*").eq("id", true).maybeSingle(),
       ]);
       if (cancelled) return;
       setBalance(Number(bal.data ?? 0));

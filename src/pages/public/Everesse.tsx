@@ -4,7 +4,7 @@ import { Check, Clock, ShieldCheck, Sparkles, AlertTriangle } from "lucide-react
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
-const HERO = "https://moqxtvbdgfambpmmslrr.supabase.co/storage/v1/object/public/marketing-assets/campaigns/everesse-july-2026.png";
+const HERO = "https://moqxtvbdgfambpmmslrr.apiQuery.co/storage/v1/object/public/marketing-assets/campaigns/everesse-july-2026.png";
 
 type Offer = {
   id: string;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { MessageSquare } from "lucide-react";
@@ -22,13 +22,13 @@ export function SmsCard({ appointmentId, optedIn: optedInProp, phone, clientEmai
     setTogglingOptIn(true);
     try {
       const now = new Date().toISOString();
-      const { error } = await supabase
+      const { error } = await apiQuery
         .from("appointments")
         .update({ sms_opt_in: next, sms_opt_in_at: next ? now : null })
         .eq("id", appointmentId);
       if (error) throw error;
       if (clientEmail) {
-        await supabase
+        await apiQuery
           .from("client_profiles")
           .update({ sms_opt_in: next, sms_opt_in_at: next ? now : null })
           .eq("email", clientEmail.toLowerCase());

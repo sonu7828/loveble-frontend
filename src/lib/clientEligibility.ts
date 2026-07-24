@@ -1,7 +1,7 @@
 // Client eligibility engine — inspects a client and returns the discount perks
 // they qualify for right now. Consumed by the checkout EligibilityStrip so the
 // receptionist can one-tap-apply the right discount instead of remembering rules.
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 
 export type EligibilityPerk = {
   key: string;
@@ -31,7 +31,7 @@ const DEFAULT_PRESETS: Presets = {
 };
 
 export async function loadDiscountPresets(): Promise<Presets> {
-  const { data } = await supabase
+  const { data } = await apiQuery
     .from("app_settings" as any)
     .select("discount_presets")
     .limit(1)
@@ -48,28 +48,28 @@ export async function getClientEligibility(
   const presets = await loadDiscountPresets();
 
   const [perksRes, profileRes, paidCountRes, reviewRes, referralRes] = await Promise.all([
-    supabase
+    apiQuery
       .from("client_perks" as any)
       .select("is_healthcare_worker, is_friend")
       .eq("client_email", email)
       .maybeSingle(),
-    supabase
+    apiQuery
       .from("client_profiles")
       .select("dob")
       .ilike("email", email)
       .maybeSingle(),
-    supabase
+    apiQuery
       .from("sales")
       .select("id", { count: "exact", head: true })
       .ilike("client_email", email)
       .eq("status", "paid"),
-    supabase
+    apiQuery
       .from("client_review_promos" as any)
       .select("id")
       .ilike("client_email", email)
       .limit(1)
       .maybeSingle(),
-    supabase
+    apiQuery
       .from("referral_codes")
       .select("code")
       .ilike("owner_email", email)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,10 +17,10 @@ export default function StaffResetPassword() {
 
   useEffect(() => {
     // Supabase puts the recovery session in the URL hash and triggers PASSWORD_RECOVERY
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const { data: sub } = authService.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
     });
-    supabase.auth.getSession().then(({ data }) => {
+    authService.getSession().then(({ data }) => {
       if (data.session) setReady(true);
     });
     return () => sub.subscription.unsubscribe();
@@ -37,7 +37,7 @@ export default function StaffResetPassword() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await authService.updateUser({ password });
     setLoading(false);
     if (error) {
       toast.error(error.message);

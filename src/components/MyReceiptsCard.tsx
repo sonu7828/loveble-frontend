@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, Receipt, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
@@ -20,7 +20,7 @@ export default function MyReceiptsCard() {
     (async () => {
       const session = await getClientSession();
       if (!session?.user?.email) { setRows([]); return; }
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("sales")
         .select("id, paid_at, created_at, total_cents, receipt_url, status")
         .ilike("client_email", session.user.email)

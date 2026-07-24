@@ -1,1 +1,0 @@
-ALTER TABLE public.client_feedback ADD COLUMN IF NOT EXISTS google_review_sms_sent_at timestamptz;

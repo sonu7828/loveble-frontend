@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { ArrowLeft, Clock, Sparkles, Calendar, Loader2 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -37,7 +37,7 @@ export default function ServiceDetail() {
     if (!slug) return;
     (async () => {
       setLoading(true);
-      const { data: s } = await supabase
+      const { data: s } = await apiQuery
         .from("services")
         .select("id, name, description, duration_minutes, price_cents, price_note, image_url, category_id")
         .eq("id", slug)
@@ -46,8 +46,8 @@ export default function ServiceDetail() {
       if (!s) { setNotFound(true); setLoading(false); return; }
       setService(s as Service);
       const [{ data: p }, { data: po }] = await Promise.all([
-        supabase.from("service_pre_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
-        supabase.from("service_post_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
+        apiQuery("service_pre_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
+        apiQuery("service_post_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
       ]);
       setPre(p?.body_markdown ? (p as PrePost) : null);
       setPost(po?.body_markdown ? (po as PrePost) : null);

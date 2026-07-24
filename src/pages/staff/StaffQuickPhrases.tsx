@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Loader2, MessageSquareText, Plus, Trash2 } from "lucide-react";
@@ -29,7 +29,7 @@ export default function StaffQuickPhrases() {
 
   const load = async () => {
     setBusy(true);
-    const { data, error } = await supabase
+    const { data, error } = await apiQuery
       .from("quick_phrases")
       .select("*")
       .order("category")
@@ -52,7 +52,7 @@ export default function StaffQuickPhrases() {
     const phrase = draft[cat].trim();
     if (!phrase) return;
     const max = Math.max(0, ...phrases.filter(p => p.category === cat).map(p => p.sort_order));
-    const { error } = await supabase.from("quick_phrases").insert({
+    const { error } = await apiQuery("quick_phrases").insert({
       category: cat, phrase, sort_order: max + 1,
     });
     if (error) toast({ title: "Failed", description: error.message, variant: "destructive" });
@@ -61,13 +61,13 @@ export default function StaffQuickPhrases() {
 
   const remove = async (id: string) => {
     if (!await confirmDialog({ title: "Delete phrase?", confirmLabel: "Delete", destructive: true })) return;
-    const { error } = await supabase.from("quick_phrases").delete().eq("id", id);
+    const { error } = await apiQuery("quick_phrases").delete().eq("id", id);
     if (error) toast({ title: "Failed", description: error.message, variant: "destructive" });
     else await load();
   };
 
   const toggle = async (p: Phrase) => {
-    const { error } = await supabase.from("quick_phrases").update({ is_active: !p.is_active }).eq("id", p.id);
+    const { error } = await apiQuery("quick_phrases").update({ is_active: !p.is_active }).eq("id", p.id);
     if (error) toast({ title: "Failed", description: error.message, variant: "destructive" });
     else await load();
   };

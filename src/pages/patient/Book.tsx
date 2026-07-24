@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,7 @@ const Book = () => {
     sessionIdRef.current = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
   }
   const trackEvent = (eventName: string, extra: Record<string, unknown> = {}) => {
-    supabase.from("booking_events").insert({
+    apiQuery("booking_events").insert({
       session_id: sessionIdRef.current,
       event_name: eventName,
       step,
@@ -111,12 +111,12 @@ const Book = () => {
   useEffect(() => {
     (async () => {
       const [c, s, l, sp, p, sess] = await Promise.all([
-        supabase.from("service_categories").select("*").eq("is_active", true).order("display_order"),
-        supabase.from("services").select("*").eq("is_active", true).order("display_order"),
-        supabase.from("locations").select("*").eq("is_active", true),
-        supabase.from("staff_directory" as any).select("id, full_name, title, color"),
-        supabase.from("service_providers").select("service_id, staff_id, location_id"),
-        supabase.auth.getSession(),
+        apiQuery("service_categories").select("*").eq("is_active", true).order("display_order"),
+        apiQuery("services").select("*").eq("is_active", true).order("display_order"),
+        apiQuery("locations").select("*").eq("is_active", true),
+        apiQuery("staff_directory" as any).select("id, full_name, title, color"),
+        apiQuery("service_providers").select("service_id, staff_id, location_id"),
+        authService.getSession(),
       ]);
       setCategories(c.data ?? []);
       setServices(s.data ?? []);
@@ -160,7 +160,7 @@ const Book = () => {
       const userId = sess.data.session?.user?.id;
       const userEmail = sess.data.session?.user?.email;
       if (userId) {
-        const { data: prof } = await supabase
+        const { data: prof } = await apiQuery
           .from("client_profiles").select("*").eq("user_id", userId).maybeSingle();
         if (prof) {
           setClient((prev) => ({
@@ -292,7 +292,7 @@ const Book = () => {
     setLoadingSlots(true);
     setSlot(null);
     const dateStr = format(date, "yyyy-MM-dd");
-    supabase.functions.invoke("get-availability", {
+    ApiClient.post("get-availability", {
       body: { serviceIds, staffId, locationId, date: dateStr },
     }).then(({ data, error }) => {
       if (error) toast.error("Could not load times");
@@ -305,7 +305,7 @@ const Book = () => {
   useEffect(() => {
     if (step !== 5 || serviceIds.length === 0) return;
     setLoadingConsents(true);
-    supabase.functions.invoke("get-service-consents", {
+    ApiClient.post("get-service-consents", {
       body: { serviceIds, email: client.email },
     }).then(({ data, error }) => {
       if (error || data?.error) {
@@ -362,7 +362,7 @@ const Book = () => {
     }
     setFieldErrors({});
     // Capture the booking attempt for abandonment recovery
-    supabase.functions.invoke("track-booking-attempt", {
+    ApiClient.post("track-booking-attempt", {
       body: {
         sessionId: sessionIdRef.current,
         email: client.email,
@@ -452,7 +452,7 @@ const Book = () => {
     try { storedRef = localStorage.getItem("rka_ref"); } catch { }
 
     const rescheduleId = searchParams.get("reschedule");
-    const { data, error } = await supabase.functions.invoke("create-booking", {
+    const { data, error } = await ApiClient.post("create-booking", {
       body: {
         serviceIds, staffId, locationId, startAt: slot,
         client: {
@@ -476,7 +476,7 @@ const Book = () => {
       return;
     }
     // Mark attempt completed + log funnel event
-    supabase.functions.invoke("track-booking-attempt", {
+    ApiClient.post("track-booking-attempt", {
       body: { sessionId: sessionIdRef.current, completed: true },
     }).catch(() => { });
     trackEvent("booking_completed", { serviceIds, locationId, staffId, appointmentId: data.id });
@@ -489,9 +489,9 @@ const Book = () => {
     // Record NPP acknowledgment on the profile for signed-in patients.
     try {
       const { NPP_VERSION } = await import("../public/PrivacyPractices");
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await authService.getSession();
       if (session?.user?.id) {
-        await supabase.from("client_profiles").update({
+        await apiQuery("client_profiles").update({
           npp_acknowledged_at: new Date().toISOString(),
           npp_version: NPP_VERSION,
         }).eq("user_id", session.user.id);

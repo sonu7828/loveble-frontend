@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addMonths } from "date-fns";
@@ -69,8 +69,8 @@ export default function StaffCalendar() {
       setLoading(true);
       const [s, sv, l] = await Promise.all([
         fetchUnifiedStaffMembers(),
-        supabase.from("services").select("id, name"),
-        supabase.from("locations").select("id, name").eq("is_active", true),
+        apiQuery("services").select("id, name"),
+        apiQuery("locations").select("id, name").eq("is_active", true),
       ]);
       setStaff(s as StaffP[]);
       setServices(sv.data ?? []);
@@ -92,16 +92,16 @@ export default function StaffCalendar() {
       const start = startLocal.toISOString();
       const end = endLocal.toISOString();
       const [a, o, sc] = await Promise.all([
-        supabase.from("appointments").select("*").gte("start_at", start).lt("start_at", end).in("status", ["pending", "approved"]),
-        supabase.from("schedule_overrides").select("*").gte("start_at", start).lt("start_at", end),
-        supabase.from("weekly_schedules").select("*").eq("is_active", true),
+        apiQuery("appointments").select("*").gte("start_at", start).lt("start_at", end).in("status", ["pending", "approved"]),
+        apiQuery("schedule_overrides").select("*").gte("start_at", start).lt("start_at", end),
+        apiQuery("weekly_schedules").select("*").eq("is_active", true),
       ]);
       setAppts(a.data ?? []);
       setOverrides(o.data ?? []);
       setSchedules(sc.data ?? []);
       const ids = (a.data ?? []).map((x: any) => x.id);
       if (ids.length > 0) {
-        const { data: aps } = await supabase
+        const { data: aps } = await apiQuery
           .from("appointment_services")
           .select("appointment_id, display_order, service_id")
           .in("appointment_id", ids)

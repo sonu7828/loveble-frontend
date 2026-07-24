@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Star, MapPin } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { format } from "date-fns";
 
@@ -30,7 +30,7 @@ const Reviews = () => {
     if (!meta.parentElement) document.head.appendChild(meta);
 
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("public_testimonials" as any)
         .select("*")
         .order("created_at", { ascending: false })

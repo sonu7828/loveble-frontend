@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, Plus, AlertTriangle } from "lucide-react";
 import { differenceInDays, format } from "date-fns";
 import { ReceiveLotDialog } from "./ReceiveLotDialog";
@@ -32,7 +32,7 @@ export function LotPicker({ product, category, unit = "unit", value, onChange, l
   const load = useCallback(async () => {
     if (!product) { setLots([]); return; }
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await apiQuery
       .from("product_lots")
       .select("id, product_name, lot_number, expiration_date, quantity_remaining, unit, low_stock_threshold")
       .ilike("product_name", product)

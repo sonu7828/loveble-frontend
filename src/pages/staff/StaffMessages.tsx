@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, MessageSquare, Search, PenSquare, CalendarPlus, CheckCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
@@ -39,12 +39,12 @@ export default function StaffMessages() {
   const load = async () => {
     setLoading(true);
     const [{ data: msgs }, { data: profs }] = await Promise.all([
-      supabase
+      apiQuery
         .from("sms_messages")
         .select("id, client_email, body, direction, sender_role, created_at, read_by_staff_at")
         .order("created_at", { ascending: false })
         .limit(1000),
-      supabase.from("client_profiles").select("email, first_name, last_name, phone"),
+      apiQuery("client_profiles").select("email, first_name, last_name, phone"),
     ]);
 
     const pmap: Record<string, { first_name: string; last_name: string; phone?: string | null }> = {};
@@ -88,7 +88,7 @@ export default function StaffMessages() {
   // realtime: debounce list refresh so a burst of events triggers one reload
   const debounceRef = useRef<number | null>(null);
   useEffect(() => {
-    const ch = supabase
+    const ch = apiQuery
       .channel("staff_messages_inbox")
       .on("postgres_changes", { event: "*", schema: "public", table: "sms_messages" }, () => {
         if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -97,14 +97,14 @@ export default function StaffMessages() {
       .subscribe();
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
-      supabase.removeChannel(ch);
+      apiQuery.removeChannel(ch);
     };
   }, []);
 
   const totalUnread = useMemo(() => threads.reduce((sum, t) => sum + t.unread, 0), [threads]);
   const markAllRead = async () => {
     if (totalUnread === 0) return;
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("sms_messages")
       .update({ read_by_staff_at: new Date().toISOString() })
       .is("read_by_staff_at", null)
@@ -313,7 +313,7 @@ function ComposeDialog({
     if (!picked || !message.trim()) return;
     setSending(true);
     try {
-      const { data, error } = await supabase.functions.invoke("staff-send-sms", {
+      const { data, error } = await ApiClient.post("staff-send-sms", {
         body: { clientEmail: picked, message: message.trim() },
       });
       if (error || (data as any)?.error) {

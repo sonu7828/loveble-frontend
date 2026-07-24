@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,7 @@ export default function PatientAuth() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await authService.signInWithPassword({
         email: cleanEmail,
         password: form.password,
       });
@@ -79,7 +79,7 @@ export default function PatientAuth() {
     }
 
     const email = form.email.trim().toLowerCase();
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await authService.signUp({
       email,
       password: form.password,
       options: {
@@ -99,7 +99,7 @@ export default function PatientAuth() {
 
     // Insert client profile (best-effort if session exists)
     if (data.user && data.session) {
-      await supabase.from("client_profiles").upsert({
+      await apiQuery("client_profiles").upsert({
         user_id: data.user.id,
         email,
         first_name: form.firstName.trim(),
@@ -109,7 +109,7 @@ export default function PatientAuth() {
     }
 
     // Sync to GoHighLevel (best-effort)
-    supabase.functions.invoke("ghl-sync-contact", {
+    ApiClient.post("ghl-sync-contact", {
       body: {
         email,
         firstName: form.firstName.trim(),
@@ -136,7 +136,7 @@ export default function PatientAuth() {
       toast.error("Enter your email first"); return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await authService.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/account`, shouldCreateUser: true },
     });

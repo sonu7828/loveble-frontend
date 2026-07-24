@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Package, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -18,7 +18,7 @@ export function MyTreatmentPlansCard() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await (supabase as any)
+      const { data } = await (apiQuery as any)
         .from("client_treatment_plans")
         .select("id,name,total_sessions,sessions_used,status,expires_at")
         .order("purchased_at", { ascending: false });

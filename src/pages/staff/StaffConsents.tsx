@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Save, FileText, Plus, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ export default function StaffConsents() {
     if (resending) return;
     setResending(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-consent-reminders", { body: {} });
+      const { data, error } = await ApiClient.post("send-consent-reminders", { body: {} });
       if (error) throw error;
       const count = (data as any)?.totalSent ?? (data as any)?.total_sent ?? 0;
       toast.success(count > 0 ? `Sent ${count} consent reminder${count === 1 ? "" : "s"}` : "No clients needed a reminder right now");
@@ -51,9 +51,9 @@ export default function StaffConsents() {
   useEffect(() => {
     (async () => {
       const [f, s, m] = await Promise.all([
-        supabase.from("consent_forms").select("*").order("is_universal", { ascending: false }).order("title"),
-        supabase.from("services").select("id, name").order("name"),
-        supabase.from("service_consents").select("id, service_id, consent_form_id"),
+        apiQuery("consent_forms").select("*").order("is_universal", { ascending: false }).order("title"),
+        apiQuery("services").select("id, name").order("name"),
+        apiQuery("service_consents").select("id, service_id, consent_form_id"),
       ]);
       setForms((f.data ?? []) as Form[]);
       setServices((s.data ?? []) as Service[]);
@@ -71,7 +71,7 @@ export default function StaffConsents() {
   const save = async () => {
     if (!draft) return;
     setSaving(true);
-    const { error } = await supabase.from("consent_forms").update({
+    const { error } = await apiQuery("consent_forms").update({
       title: draft.title.trim(),
       slug: draft.slug.trim(),
       body_markdown: draft.body_markdown,
@@ -82,7 +82,7 @@ export default function StaffConsents() {
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     // Reload (version may have bumped via trigger)
-    const { data } = await supabase.from("consent_forms").select("*").eq("id", draft.id).single();
+    const { data } = await apiQuery("consent_forms").select("*").eq("id", draft.id).single();
     if (data) {
       setForms(forms.map(f => f.id === data.id ? (data as Form) : f));
       toast.success(`Saved${(data as Form).version !== draft.version ? ` (version → v${(data as Form).version})` : ""}`);
@@ -103,7 +103,7 @@ export default function StaffConsents() {
     const slug = (newSlug.trim() || slugify(title)).trim();
     if (!slug) { toast.error("Slug is required"); return; }
     setCreating(true);
-    const { data, error } = await supabase.from("consent_forms").insert({
+    const { data, error } = await apiQuery("consent_forms").insert({
       slug, title, body_markdown: "Edit this consent body…", is_active: true, is_universal: false, is_optional: false,
     }).select().single();
     setCreating(false);
@@ -116,14 +116,14 @@ export default function StaffConsents() {
 
   const toggleMapping = async (serviceId: string, formId: string, on: boolean) => {
     if (on) {
-      const { data, error } = await supabase.from("service_consents")
+      const { data, error } = await apiQuery("service_consents")
         .insert({ service_id: serviceId, consent_form_id: formId }).select().single();
       if (error) { toast.error(error.message); return; }
       setMappings([...mappings, data as Mapping]);
     } else {
       const m = mappings.find(x => x.service_id === serviceId && x.consent_form_id === formId);
       if (!m) return;
-      const { error } = await supabase.from("service_consents").delete().eq("id", m.id);
+      const { error } = await apiQuery("service_consents").delete().eq("id", m.id);
       if (error) { toast.error(error.message); return; }
       setMappings(mappings.filter(x => x.id !== m.id));
     }

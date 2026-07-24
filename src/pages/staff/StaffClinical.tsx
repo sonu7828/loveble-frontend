@@ -2,7 +2,7 @@
 // This page is just: find a patient, plus urgent alerts (cosign queue, expiring GFEs).
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, ShieldAlert, FileText, ShieldCheck, Search, Calendar as CalIcon, AlertTriangle, ClipboardPlus, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
@@ -29,8 +29,8 @@ export default function StaffClinical() {
         const now = new Date();
         const in30 = new Date(now.getTime() + 30 * 86400000).toISOString();
         const [cosRes, gexRes, incompleteRows] = await Promise.all([
-          supabase.from("clinical_notes").select("*").eq("status", "signed").eq("requires_cosign", true).order("signed_at", { ascending: false }).limit(50),
-          supabase.from("gfe_records").select("id, client_email, client_first_name, client_last_name, np_name, expires_at").gte("expires_at", now.toISOString()).lt("expires_at", in30).order("expires_at").limit(20),
+          apiQuery("clinical_notes").select("*").eq("status", "signed").eq("requires_cosign", true).order("signed_at", { ascending: false }).limit(50),
+          apiQuery("gfe_records").select("id, client_email, client_first_name, client_last_name, np_name, expires_at").gte("expires_at", now.toISOString()).lt("expires_at", in30).order("expires_at").limit(20),
           fetchIncompleteCharts({ canSeeAll, staffId }),
         ]);
         if (cosRes.error) console.error("[StaffClinical] cosign query error:", cosRes.error);

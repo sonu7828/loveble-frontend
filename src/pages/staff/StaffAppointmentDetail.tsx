@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { parseLocalDate } from "@/lib/utils";
@@ -49,7 +49,7 @@ export default function StaffAppointmentDetail() {
     if (!id) return;
     setResendingConsents(true);
     try {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await apiQuery
         .from("appointment_consents")
         .select("consent_form_id, signed, consent_forms!inner(is_optional, is_active, version)")
         .eq("appointment_id", id);
@@ -62,7 +62,7 @@ export default function StaffAppointmentDetail() {
         return;
       }
       const consentFormIds = unsignedRequired.map((r: any) => r.consent_form_id);
-      const { data, error: invErr } = await supabase.functions.invoke("assign-consent-forms", {
+      const { data, error: invErr } = await ApiClient.post("assign-consent-forms", {
         body: { appointmentId: id, consentFormIds },
       });
       if (invErr || data?.error) {
@@ -81,7 +81,7 @@ export default function StaffAppointmentDetail() {
     if (!appt) return;
     setDownloadingPdf(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-consent-pdf", {
+      const { data, error } = await ApiClient.post("generate-consent-pdf", {
         body: { appointmentId: appt.id },
       });
       if (error || data?.error || !data?.url) {
@@ -103,11 +103,11 @@ export default function StaffAppointmentDetail() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    const { data: a } = await supabase.from("appointments").select("*").eq("id", id).maybeSingle();
+    const { data: a } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
     if (!a) { setLoading(false); return; }
     setAppt(a);
     if (a.client_email) {
-      const { data: gfeData } = await supabase
+      const { data: gfeData } = await apiQuery
         .from("gfe_records")
         .select("id, expires_at, signed_at")
         .ilike("client_email", a.client_email)
@@ -118,12 +118,12 @@ export default function StaffAppointmentDetail() {
       setGfe(gfeData ?? null);
     }
     const [{ data: s }, { data: st }, { data: l }, { data: hist }, { data: apsv }, { data: consentRows }] = await Promise.all([
-      supabase.from("services").select("name, duration_minutes").eq("id", a.service_id).maybeSingle(),
-      supabase.from("staff_profiles").select("full_name, title, email").eq("id", a.staff_id).maybeSingle(),
-      supabase.from("locations").select("name, address, city, state").eq("id", a.location_id).maybeSingle(),
-      supabase.from("appointment_audit_log").select("*").eq("appointment_id", id).order("created_at", { ascending: false }),
-      supabase.from("appointment_services").select("display_order, duration_minutes, service_id").eq("appointment_id", id).order("display_order", { ascending: true }),
-      supabase
+      apiQuery("services").select("name, duration_minutes").eq("id", a.service_id).maybeSingle(),
+      apiQuery("staff_profiles").select("full_name, title, email").eq("id", a.staff_id).maybeSingle(),
+      apiQuery("locations").select("name, address, city, state").eq("id", a.location_id).maybeSingle(),
+      apiQuery("appointment_audit_log").select("*").eq("appointment_id", id).order("created_at", { ascending: false }),
+      apiQuery("appointment_services").select("display_order, duration_minutes, service_id").eq("appointment_id", id).order("display_order", { ascending: true }),
+      apiQuery
         .from("appointment_consents")
         .select("consent_form_id, signed, consent_forms!inner(is_active, is_optional, version)")
         .eq("appointment_id", id),
@@ -143,7 +143,7 @@ export default function StaffAppointmentDetail() {
     const svcIds = [...new Set((apsv ?? []).map((r: any) => r.service_id))];
     const svcNameMap: Record<string, { name: string; duration_minutes: number }> = {};
     if (svcIds.length) {
-      const { data: svcRows } = await supabase.from("services").select("id, name, duration_minutes").in("id", svcIds);
+      const { data: svcRows } = await apiQuery("services").select("id, name, duration_minutes").in("id", svcIds);
       (svcRows ?? []).forEach((sv: any) => { svcNameMap[sv.id] = { name: sv.name, duration_minutes: sv.duration_minutes }; });
     }
     const allServices = (apsv ?? []).map((r: any) => ({
@@ -159,7 +159,7 @@ export default function StaffAppointmentDetail() {
     const activeRows = (consentRows ?? []).filter((r: any) => r.consent_forms?.is_active);
     let signaturesByForm = new Set<string>();
     if (activeRows.length) {
-      const { data: sigs } = await supabase
+      const { data: sigs } = await apiQuery
         .from("consent_signatures")
         .select("consent_form_id, decision, form_version, expires_at")
         .eq("client_email", String(a.client_email ?? "").toLowerCase())
@@ -213,7 +213,7 @@ export default function StaffAppointmentDetail() {
           "staff-calendar-update",
           "staff-cancellation-notification",
         ];
-        const { data: logs, error: logError } = await supabase
+        const { data: logs, error: logError } = await apiQuery
           .from("email_send_log")
           .select("id, message_id, template_name, recipient_email, status, error_message, created_at")
           .in("recipient_email", recipients)
@@ -241,7 +241,7 @@ export default function StaffAppointmentDetail() {
   useEffect(() => { load(); }, [load]);
 
   const resyncCal = async () => {
-    const { data, error } = await supabase.functions.invoke("google-calendar-sync", { body: { appointmentId: id } });
+    const { data, error } = await ApiClient.post("google-calendar-sync", { body: { appointmentId: id } });
     if (error || data?.error) { toast.error(data?.error || error?.message || "Calendar sync failed"); return; }
     if (data?.skipped) { toast.message("Calendar not connected"); return; }
     toast.success("Synced to Google Calendar");
@@ -262,29 +262,29 @@ export default function StaffAppointmentDetail() {
     setAppt({ ...appt, status: "cancelled" });
     const t = toast.loading("Cancelling appointment…");
     try {
-      const { error } = await supabase
+      const { error } = await apiQuery
         .from("appointments")
         .update({ status: "cancelled" })
         .eq("id", appt.id);
       if (error) throw error;
-      await supabase.from("appointment_audit_log").insert({
+      await apiQuery("appointment_audit_log").insert({
         appointment_id: appt.id,
         action: "cancelled_by_staff",
         from_status: prevStatus,
         to_status: "cancelled",
       });
       // Fire-and-forget side effects — never let them blank the page
-      supabase.functions.invoke("google-calendar-sync", {
+      ApiClient.post("google-calendar-sync", {
         body: { appointmentId: appt.id, action: "delete" },
       }).catch(() => {});
-      supabase.functions.invoke("process-waitlist-fill", {
+      ApiClient.post("process-waitlist-fill", {
         body: { appointmentId: appt.id },
       }).catch(() => {});
-      supabase.functions.invoke("notify-cancellation", {
+      ApiClient.post("notify-cancellation", {
         body: { appointmentId: appt.id, cancelledBy: "staff" },
       }).catch(() => {});
       if (appt.client_email) {
-        supabase.functions.invoke("ghl-sync-contact", {
+        ApiClient.post("ghl-sync-contact", {
           body: { email: appt.client_email, tags: ["rkabook", "appointment-cancelled"] },
         }).catch(() => {});
       }
@@ -314,12 +314,12 @@ export default function StaffAppointmentDetail() {
       label: "Marked no-show (no charge)",
       onUndo: () => setAppt((a: any) => a ? { ...a, status: prevStatus } : a),
       commit: async () => {
-        const { error } = await supabase
+        const { error } = await apiQuery
           .from("appointments")
           .update({ status: "no_show" })
           .eq("id", appt.id);
         if (error) throw error;
-        await supabase.from("appointment_audit_log").insert({
+        await apiQuery("appointment_audit_log").insert({
           appointment_id: appt.id,
           action: "marked_no_show",
           from_status: prevStatus,
@@ -350,7 +350,7 @@ export default function StaffAppointmentDetail() {
   const sendPostOp = async ({ openPrintWindow, resend }: { openPrintWindow?: boolean; resend?: boolean } = {}) => {
     if (!appt) return;
     const t = toast.loading(resend ? "Resending post-op instructions…" : "Sending post-op instructions…");
-    const { data: po, error: poErr } = await supabase.functions.invoke("send-post-op-instructions", { body: { appointmentId: appt.id, force: !!resend } });
+    const { data: po, error: poErr } = await ApiClient.post("send-post-op-instructions", { body: { appointmentId: appt.id, force: !!resend } });
     toast.dismiss(t);
     if (poErr || po?.error) {
       toast.error(po?.error || poErr?.message || "Could not send post-op email");
@@ -488,18 +488,18 @@ export default function StaffAppointmentDetail() {
                   );
                   return;
                 }
-                const { error } = await supabase
+                const { error } = await apiQuery
                   .from("appointments")
                   .update({ status: "arrived", checked_in_at: new Date().toISOString() })
                   .eq("id", appt.id);
                 if (error) { toast.error(error.message); return; }
-                await supabase.from("appointment_audit_log").insert({
+                await apiQuery("appointment_audit_log").insert({
                   appointment_id: appt.id, action: "checked_in",
                   from_status: appt.status, to_status: "arrived" as any,
                 });
                 // Pre-create draft sale so checkout opens with services loaded
                 try {
-                  await supabase.functions.invoke("pos-create-or-get-sale", {
+                  await ApiClient.post("pos-create-or-get-sale", {
                     body: { appointmentId: appt.id },
                   });
                 } catch (e) { console.error("pos draft create failed", e); }
@@ -533,7 +533,7 @@ export default function StaffAppointmentDetail() {
                   confirmLabel: "Mark completed",
                 }))) return;
                 const t = toast.loading("Completing…");
-                const { data, error } = await supabase.functions.invoke("mark-appointment-complete", { body: { appointmentId: appt.id } });
+                const { data, error } = await ApiClient.post("mark-appointment-complete", { body: { appointmentId: appt.id } });
                 toast.dismiss(t);
                 if (error || data?.error) { toast.error(data?.error || error?.message || "Could not complete"); return; }
                 toast.success(data?.reviewSent ? "Completed — review email sent" : "Completed (no review URL set for this location)");

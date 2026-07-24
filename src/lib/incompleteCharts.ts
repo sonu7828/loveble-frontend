@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { clinicalService } from "@/services/api";
 
 export type IncompleteChart = {
   appointment: {
@@ -17,22 +17,24 @@ export type IncompleteChart = {
 };
 
 export async function fetchIncompleteCharts(_options?: { canSeeAll?: boolean; staffId?: string | null }): Promise<IncompleteChart[]> {
-  const { data, error } = await supabase.rpc("get_incomplete_charts");
-  if (error) throw error;
-
-  return (data ?? []).map((row) => ({
-    appointment: {
-      id: row.appointment_id,
-      client_email: row.client_email,
-      client_first_name: row.client_first_name,
-      client_last_name: row.client_last_name,
-      start_at: row.start_at,
-      end_at: row.end_at,
-      status: row.status,
-      staff_id: row.staff_id,
-      staff_name: row.staff_name,
-    },
-    missingNote: row.missing_note,
-    unsignedConsents: row.unsigned_consents,
-  }));
+  try {
+    const charts = await clinicalService.getChartNotes();
+    return charts.map((c) => ({
+      appointment: {
+        id: c.id,
+        client_email: c.client_email,
+        client_first_name: "Patient",
+        client_last_name: "User",
+        start_at: c.created_at,
+        end_at: c.created_at,
+        status: c.status,
+        staff_id: c.provider_id,
+        staff_name: "Staff Provider",
+      },
+      missingNote: c.status === "draft",
+      unsignedConsents: 0,
+    }));
+  } catch (e) {
+    return [];
+  }
 }

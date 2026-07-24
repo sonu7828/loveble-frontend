@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -51,7 +51,7 @@ export function ClientExternalDisclosuresCard({ clientEmail }: { clientEmail: st
     setLoading(true);
     const email = clientEmail.toLowerCase();
     try {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("external_disclosures" as any)
         .select("*")
         .ilike("client_email", email)
@@ -115,7 +115,7 @@ export function ClientExternalDisclosuresCard({ clientEmail }: { clientEmail: st
       };
 
       try {
-        await supabase.from("external_disclosures" as any).insert([newRecord]);
+        await apiQuery("external_disclosures" as any).insert([newRecord]);
       } catch {}
 
       const existing: ExternalDisclosure[] = JSON.parse(

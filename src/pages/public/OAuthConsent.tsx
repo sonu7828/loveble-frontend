@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck } from "lucide-react";
 
-// Beta namespace typing — the installed @supabase/supabase-js may not expose
+// Beta namespace typing — the installed @apiQuery/apiQuery-js may not expose
 // auth.oauth.* on its types yet. We narrow to the methods we call.
 type OAuthApi = {
   getAuthorizationDetails: (id: string) => Promise<{ data: any; error: any }>;
@@ -13,7 +13,7 @@ type OAuthApi = {
 };
 
 function oauthApi(): OAuthApi | null {
-  const api = (supabase.auth as any)?.oauth;
+  const api = (apiQuery.auth as any)?.oauth;
   return api && typeof api.getAuthorizationDetails === "function" ? api : null;
 }
 
@@ -41,7 +41,7 @@ export default function OAuthConsent() {
         setLoading(false);
         return;
       }
-      const { data: sess } = await supabase.auth.getSession();
+      const { data: sess } = await authService.getSession();
       if (!sess.session) {
         const next = window.location.pathname + window.location.search;
         window.location.href = "/staff/login?next=" + encodeURIComponent(next);

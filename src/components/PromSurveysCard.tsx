@@ -2,7 +2,7 @@
 // Shows surveys whose default_offset_days has elapsed since the client's most
 // recent signed appointment, and that haven't been completed yet.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, ClipboardList, Check, Sparkles } from "lucide-react";
 import { differenceInDays } from "date-fns";
@@ -35,15 +35,15 @@ export function PromSurveysCard() {
       setLoading(true);
       const email = user.email!.toLowerCase();
       const [{ data: instruments }, { data: notes }, { data: responses }] = await Promise.all([
-        supabase.from("prom_instruments").select("*").eq("is_active", true),
-        supabase
+        apiQuery("prom_instruments").select("*").eq("is_active", true),
+        apiQuery
           .from("clinical_notes")
           .select("appointment_id, category, service_name, signed_at, status")
           .eq("client_email", email)
           .in("status", ["signed", "cosigned", "locked"])
           .order("signed_at", { ascending: false })
           .limit(20),
-        supabase
+        apiQuery
           .from("prom_responses")
           .select("instrument_key, appointment_id, timepoint")
           .eq("client_email", email),
@@ -167,7 +167,7 @@ function SurveyForm({
     if (!user?.email) return;
     setSubmitting(true);
     const s = score(survey.instrument, answers);
-    const { error } = await supabase.from("prom_responses").insert({
+    const { error } = await apiQuery("prom_responses").insert({
       instrument_id: survey.instrument.id,
       instrument_key: survey.instrument.key,
       client_email: user.email.toLowerCase(),

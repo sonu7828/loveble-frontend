@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { Loader2, History, ChevronRight, Filter, ShieldCheck, Activity, Download, AlertTriangle, ShieldAlert } from "lucide-react";
@@ -96,7 +96,7 @@ export default function AdminAudit() {
     if (!isAdmin) return;
     (async () => {
       setLoading(true);
-      let q = supabase
+      let q = apiQuery
         .from("appointment_audit_log")
         .select("*")
         .order("created_at", { ascending: false })
@@ -112,10 +112,10 @@ export default function AdminAudit() {
       const actorIds = [...new Set(sliced.map((e) => e.actor_user_id).filter(Boolean) as string[])];
       const [{ data: aData }, { data: stData }] = await Promise.all([
         apptIds.length
-          ? supabase.from("appointments").select("id, client_first_name, client_last_name, start_at").in("id", apptIds)
+          ? apiQuery("appointments").select("id, client_first_name, client_last_name, start_at").in("id", apptIds)
           : Promise.resolve({ data: [] as any[] }),
         actorIds.length
-          ? supabase.from("staff_profiles").select("user_id, full_name").in("user_id", actorIds)
+          ? apiQuery("staff_profiles").select("user_id, full_name").in("user_id", actorIds)
           : Promise.resolve({ data: [] as any[] }),
       ]);
       const am: typeof appts = {};
@@ -133,7 +133,7 @@ export default function AdminAudit() {
     (async () => {
       setPhiLoading(true);
       const since = subDays(new Date(), phiDays).toISOString();
-      let q = supabase
+      let q = apiQuery
         .from("phi_access_log")
         .select("*")
         .gte("created_at", since)
@@ -147,7 +147,7 @@ export default function AdminAudit() {
       setPhi(list.slice(0, PAGE));
 
       // Anomaly detection — sampled over the same window (capped 5000 for perf)
-      const { data: window } = await supabase
+      const { data: window } = await apiQuery
         .from("phi_access_log")
         .select("actor_user_id, actor_name, client_email, created_at")
         .gte("created_at", since)
@@ -176,7 +176,7 @@ export default function AdminAudit() {
 
   const exportPhiCsv = async () => {
     const since = subDays(new Date(), phiDays).toISOString();
-    let q = supabase
+    let q = apiQuery
       .from("phi_access_log")
       .select("*")
       .gte("created_at", since)

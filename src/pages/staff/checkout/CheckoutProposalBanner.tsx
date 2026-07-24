@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, X, User2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { fmt, type LineItem } from "./shared";
 
@@ -31,7 +31,7 @@ export function CheckoutProposalBanner({ appointmentId, onAccept }: Props) {
     if (!appointmentId) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("checkout_proposals" as any)
         .select("*")
         .eq("appointment_id", appointmentId)
@@ -75,7 +75,7 @@ export function CheckoutProposalBanner({ appointmentId, onAccept }: Props) {
       pct: proposal.suggested_discount_pct ? Number(proposal.suggested_discount_pct) : null,
       amountCents: proposal.suggested_discount_amount_cents ?? null,
     });
-    await supabase
+    await apiQuery
       .from("checkout_proposals" as any)
       .update({ status: "accepted", accepted_at: new Date().toISOString() })
       .eq("id", proposal.id);
@@ -85,7 +85,7 @@ export function CheckoutProposalBanner({ appointmentId, onAccept }: Props) {
 
   const dismiss = async () => {
     setWorking(true);
-    await supabase
+    await apiQuery
       .from("checkout_proposals" as any)
       .update({ status: "dismissed" })
       .eq("id", proposal.id);

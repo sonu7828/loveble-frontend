@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { ApiClient } from "@/services/api";
 
 export type PhiResourceType =
   | "chart_note"
@@ -12,7 +12,7 @@ export type PhiResourceType =
 export type PhiAction = "view" | "download" | "print" | "export";
 
 /**
- * Records a PHI access event. Fire-and-forget — never blocks the UI.
+ * Records a PHI access event via Express API. Fire-and-forget — never blocks the UI.
  * Required by HIPAA §164.312(b) — audit controls.
  */
 export function logPhiAccess(opts: {
@@ -24,13 +24,13 @@ export function logPhiAccess(opts: {
 }): void {
   try {
     const route = typeof window !== "undefined" ? window.location.pathname : null;
-    void (supabase as any).rpc("log_phi_access", {
-      _resource_type: opts.resourceType,
-      _resource_id: opts.resourceId ?? null,
-      _client_email: opts.clientEmail ?? null,
-      _action: opts.action ?? "view",
-      _route: route,
-      _metadata: opts.metadata ?? null,
+    ApiClient.post("/admin/phi-audit", {
+      resource_type: opts.resourceType,
+      resource_id: opts.resourceId ?? null,
+      client_email: opts.clientEmail ?? null,
+      action: opts.action ?? "view",
+      route: route,
+      metadata: opts.metadata ?? null,
     });
   } catch {
     // never throw from audit

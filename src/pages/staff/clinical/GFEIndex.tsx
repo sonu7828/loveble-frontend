@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,7 +27,7 @@ export default function GFEIndex() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("gfe_records")
         .select("id, client_email, client_first_name, client_last_name, np_name, signed_at, expires_at")
         .order("expires_at", { ascending: true, nullsFirst: false })

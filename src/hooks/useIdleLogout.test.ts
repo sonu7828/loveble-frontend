@@ -1,10 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useIdleLogout } from "./useIdleLogout";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
+vi.mock("@/services/api", () => ({
+  apiQuery: {
     auth: {
       signOut: vi.fn().mockResolvedValue({}),
     },
@@ -38,7 +38,7 @@ describe("useIdleLogout", () => {
     
     // Warning should be showing
     expect(result.current.showWarning).toBe(true);
-    expect(supabase.auth.signOut).not.toHaveBeenCalled();
+    expect(authService.signOut).not.toHaveBeenCalled();
 
     // Fast-forward 1 more minute (Total 15 minutes)
     await act(async () => {
@@ -48,7 +48,7 @@ describe("useIdleLogout", () => {
     });
 
     // Should have called signOut
-    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(authService.signOut).toHaveBeenCalledTimes(1);
     expect(window.location.href).toBe("/staff/login?reason=idle");
     expect(window.clearInterval).toHaveBeenCalled();
 
@@ -59,7 +59,7 @@ describe("useIdleLogout", () => {
     });
 
     // Still exactly 1 call
-    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(authService.signOut).toHaveBeenCalledTimes(1);
     
     unmount();
   });

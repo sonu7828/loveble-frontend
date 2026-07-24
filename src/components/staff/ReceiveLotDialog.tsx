@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { NEUROTOXIN_PRODUCTS, FILLER_PRODUCTS } from "@/lib/clinicalOptions";
@@ -45,7 +45,7 @@ export function ReceiveLotDialog({
       setLotNumber(""); setExpDate(""); setQty(""); setNotes("");
       setUnit(defaultUnit);
       setThreshold("");
-      supabase.from("locations").select("id, name").eq("is_active", true).order("name")
+      apiQuery("locations").select("id, name").eq("is_active", true).order("name")
         .then(({ data }) => setLocations(data ?? []));
     }
   }, [open, defaultProduct, defaultUnit]);
@@ -56,7 +56,7 @@ export function ReceiveLotDialog({
       return;
     }
     setSaving(true);
-    const { data, error } = await supabase.rpc("receive_lot", {
+    const { data, error } = await apiQuery("receive_lot", {
       _product_name: product.trim(),
       _lot_number: lotNumber.trim(),
       _expiration_date: expDate || null,

@@ -9,8 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { PortalCTA } from "@/components/PortalCTA";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-
 const ALLERGY_OPTIONS = [
   "No known allergies", "Latex", "Lidocaine", "Penicillin", "Sulfa", "Iodine/Shellfish",
   "Aspirin/NSAIDs", "Adhesive tape", "Bee/wasp stings", "Hyaluronic acid", "Lily/gram (+) bacterial proteins",

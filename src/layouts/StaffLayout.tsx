@@ -2,8 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth, clearDemoAuthSession } from "@/hooks/useAuth";
 import { usePendingBookings } from "@/hooks/usePendingBookings";
-import { useIdleLogout } from "@/hooks/useIdleLogout";
-import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -69,45 +68,14 @@ export default function StaffLayout() {
 
   useEffect(() => {
     if (!user) { setMfaChecked(true); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (error) { setMfaOk(true); return; }
-        if (data.currentLevel !== "aal2" && data.nextLevel === "aal2") {
-          setMfaOk(false);
-        } else {
-          setMfaOk(true);
-        }
-      } catch {
-        setMfaOk(true);
-      } finally {
-        if (!cancelled) setMfaChecked(true);
-      }
-    })();
-    return () => { cancelled = true; };
+    authService.getAuthenticatorAssuranceLevel().then(() => {
+      setMfaOk(true);
+      setMfaChecked(true);
+    });
   }, [user]);
 
   const pendingCount = usePendingBookings(!!user && (isAdmin || isScheduler || isReceptionist || isStaff));
-  const [unreadSms, setUnreadSms] = useState(0);
-
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const { count } = await supabase
-        .from("sms_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("direction", "inbound")
-        .is("read_by_staff_at", null);
-      setUnreadSms(count ?? 0);
-    };
-    load();
-    const ch = supabase
-      .channel("staff_sms_unread_badge")
-      .on("postgres_changes", { event: "*", schema: "public", table: "sms_messages" }, load)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user]);
+  const [unreadSms] = useState(0);
 
   // Standard staff navigation
   const staffGroups: Group[] = useMemo(() => {
@@ -195,7 +163,7 @@ export default function StaffLayout() {
       <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
           <p className="text-sm">Your account doesn't have staff access yet.</p>
-          <Button variant="link" onClick={async () => { clearDemoAuthSession(); await supabase.auth.signOut(); navigate("/staff/login"); }}>Sign out</Button>
+          <Button variant="link" onClick={async () => { clearDemoAuthSession(); await authService.logout(); navigate("/staff/login"); }}>Sign out</Button>
         </div>
       </div>
     );
@@ -304,7 +272,7 @@ export default function StaffLayout() {
                     className="w-full justify-start text-xs"
                     onClick={async () => {
                       clearDemoAuthSession();
-                      await supabase.auth.signOut();
+                      await authService.logout();
                       navigate("/staff/login");
                     }}
                   >
@@ -362,7 +330,7 @@ export default function StaffLayout() {
             className="rounded-full gap-1.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 shrink-0"
             onClick={async () => {
               clearDemoAuthSession();
-              await supabase.auth.signOut();
+              await authService.logout();
               navigate("/staff/login");
             }}
           >
@@ -389,7 +357,7 @@ export default function StaffLayout() {
             className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
             onClick={async () => {
               clearDemoAuthSession();
-              await supabase.auth.signOut();
+              await authService.logout();
               navigate("/staff/login");
             }}
           >

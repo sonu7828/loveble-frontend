@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { supabase as supabaseTyped } from "@/integrations/supabase/client";
-const supabase = supabaseTyped as any;
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, ShieldCheck, FileText, ArrowLeft, History, Stethoscope, ClipboardList } from "lucide-react";
@@ -123,14 +122,14 @@ export default function Protocols() {
     if (authLoading) return;
     if (!isNP && !isAdmin) return;
     (async () => {
-      const { data: ps } = await supabase
+      const { data: ps } = await apiQuery
         .from("clinical_protocols")
         .select("id, slug, title, category, current_version_id, updated_at")
         .order("category").order("title");
       setProtocols((ps ?? []) as Protocol[]);
       const protocolIds = (ps ?? []).map(p => p.id).filter(Boolean) as string[];
       if (protocolIds.length) {
-        const { data: vs } = await supabase
+        const { data: vs } = await apiQuery
           .from("clinical_protocol_versions")
           .select("id, protocol_id, version_number, status, signed_at, signed_by_name")
           .in("protocol_id", protocolIds)
@@ -146,12 +145,12 @@ export default function Protocols() {
   async function createProtocol(template: ProtocolTemplate) {
     if (!user) return;
     setCreating(true);
-    const { data: p, error: pErr } = await supabase
+    const { data: p, error: pErr } = await apiQuery
       .from("clinical_protocols")
       .insert({ slug: template.slug, title: template.title, category: template.category, created_by: user.id })
       .select("id").maybeSingle();
     if (pErr || !p) { toast.error(pErr?.message ?? "Failed"); setCreating(false); return; }
-    const { data: v, error: vErr } = await supabase
+    const { data: v, error: vErr } = await apiQuery
       .from("clinical_protocol_versions")
       .insert({ protocol_id: p.id, version_number: 1, status: "draft", created_by: user.id, ...template.version })
       .select("id").maybeSingle();
@@ -358,7 +357,7 @@ function RecentEncounters() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("clinical_encounters")
         .select("id, client_first_name, client_last_name, client_email, visit_type, category, status, updated_at, signed_at")
         .order("updated_at", { ascending: false })

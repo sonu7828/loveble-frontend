@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,17 +53,17 @@ export default function MyCompliance() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authService.getSession();
       if (!user) return;
 
-      const { data: protocols } = await supabase
+      const { data: protocols } = await apiQuery
         .from("compliance_protocols")
         .select("id, slug, title, category, version, renewal_months, summary")
         .eq("is_active", true)
         .order("category")
         .order("title");
 
-      const { data: sigs } = await supabase
+      const { data: sigs } = await apiQuery
         .from("compliance_signatures")
         .select("id, protocol_id, protocol_version, signed_at, expires_at, pdf_path, status")
         .eq("staff_user_id", user.id)
@@ -103,7 +103,7 @@ export default function MyCompliance() {
   async function downloadPdf(r: Row) {
     if (!r.pdf_path) return;
     setDownloadingId(r.signature_id);
-    const { data, error } = await supabase.storage
+    const { data, error } = await apiQuery.storage
       .from("compliance-signatures")
       .createSignedUrl(r.pdf_path, 300);
     setDownloadingId(null);

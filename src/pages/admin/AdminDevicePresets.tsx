@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ export default function AdminDevicePresets() {
   const [editing, setEditing] = useState<Partial<Preset> | null>(null);
 
   async function load() {
-    const { data } = await supabase
+    const { data } = await apiQuery
       .from("device_presets")
       .select("*")
       .order("device_name");
@@ -56,8 +56,8 @@ export default function AdminDevicePresets() {
     const payload: any = { ...editing };
     delete payload.id;
     const res = editing.id
-      ? await supabase.from("device_presets").update(payload).eq("id", editing.id)
-      : await supabase.from("device_presets").insert(payload);
+      ? await apiQuery("device_presets").update(payload).eq("id", editing.id)
+      : await apiQuery("device_presets").insert(payload);
     if (res.error) { toast.error(res.error.message); return; }
     toast.success("Preset saved");
     setEditing(null);
@@ -65,7 +65,7 @@ export default function AdminDevicePresets() {
   }
 
   async function archive(id: string) {
-    await supabase.from("device_presets").update({ is_archived: true }).eq("id", id);
+    await apiQuery("device_presets").update({ is_archived: true }).eq("id", id);
     toast.success("Archived");
     load();
   }

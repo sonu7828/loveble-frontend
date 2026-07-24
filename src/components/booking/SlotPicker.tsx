@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { ArrowRight, Clock, Loader2, Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 
 interface Props {
   serviceIds: string[];
@@ -47,7 +47,7 @@ export function SlotPicker({
   useEffect(() => {
     if (serviceIds.length === 0 || !locationId || !staffId) return;
     setLoadingRange(true);
-    supabase.functions.invoke("get-availability-range", {
+    ApiClient.post("get-availability-range", {
       body: { serviceIds, staffId, locationId, days: 180 },
     }).then(({ data }) => {
       setAvailableSet(new Set(data?.availableDates ?? []));
@@ -63,7 +63,7 @@ export function SlotPicker({
       setInternalSlots([]); return;
     }
     setInternalLoading(true);
-    supabase.functions.invoke("get-availability", {
+    ApiClient.post("get-availability", {
       body: { serviceIds, staffId, locationId, date: format(date, "yyyy-MM-dd") },
     }).then(({ data }) => {
       setInternalSlots(data?.slots ?? []);

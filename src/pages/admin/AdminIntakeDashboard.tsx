@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export default function AdminIntakeDashboard() {
 
   async function load() {
     setLoading(true);
-    const { data: appts, error } = await supabase
+    const { data: appts, error } = await apiQuery
       .from("appointments")
       .select("id,start_at,client_first_name,client_last_name,client_email,intake_sent_at,intake_completed_at,intake_last_sent_at,intake_send_count,status,service_id,staff_id")
       .gte("start_at", new Date().toISOString())
@@ -60,10 +60,10 @@ export default function AdminIntakeDashboard() {
     const svcIds = Array.from(new Set((appts ?? []).map((a) => a.service_id).filter(Boolean))) as string[];
     const staffIds = Array.from(new Set((appts ?? []).map((a) => a.staff_id).filter(Boolean))) as string[];
     const [svcRes, staffRes, errRes] = await Promise.all([
-      svcIds.length ? supabase.from("services").select("id,name").in("id", svcIds) : Promise.resolve({ data: [] as any[] }),
-      staffIds.length ? supabase.from("staff_profiles").select("id,full_name").in("id", staffIds) : Promise.resolve({ data: [] as any[] }),
+      svcIds.length ? apiQuery("services").select("id,name").in("id", svcIds) : Promise.resolve({ data: [] as any[] }),
+      staffIds.length ? apiQuery("staff_profiles").select("id,full_name").in("id", staffIds) : Promise.resolve({ data: [] as any[] }),
       ids.length
-        ? supabase
+        ? apiQuery
             .from("email_send_log")
             .select("recipient_email,status,error_message,created_at,metadata")
             .eq("template_name", "intake-link")
@@ -128,7 +128,7 @@ export default function AdminIntakeDashboard() {
   async function sendIntake(appointmentId: string, mode: "force" | "resend") {
     setBusyId(appointmentId);
     try {
-      const { data, error } = await supabase.functions.invoke("send-intake-links", {
+      const { data, error } = await ApiClient.post("send-intake-links", {
         body: { appointment_id: appointmentId, mode },
       });
       if (error) throw error;
@@ -148,7 +148,7 @@ export default function AdminIntakeDashboard() {
     let ok = 0, fail = 0;
     for (const r of targets) {
       try {
-        const { error } = await supabase.functions.invoke("send-intake-links", {
+        const { error } = await ApiClient.post("send-intake-links", {
           body: { appointment_id: r.id, mode: r.status === "sent" ? "resend" : "force" },
         });
         if (error) throw error;

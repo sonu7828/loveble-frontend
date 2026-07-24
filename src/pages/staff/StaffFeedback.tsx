@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -34,7 +34,7 @@ export default function StaffFeedback() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await apiQuery
       .from("client_feedback")
       .select(`id, appointment_id, client_email, rating, comment, allow_testimonial, featured, google_review_sms_sent_at, created_at, staff_id, service_id, location_id,
         staff:staff_profiles(full_name), service:services(name), location:locations(name),
@@ -67,7 +67,7 @@ export default function StaffFeedback() {
   const toggleFeatured = async (r: Row) => {
     const next = !r.featured;
     setRows(rs => rs.map(x => x.id === r.id ? { ...x, featured: next } : x));
-    const { error } = await supabase.from("client_feedback").update({ featured: next }).eq("id", r.id);
+    const { error } = await apiQuery("client_feedback").update({ featured: next }).eq("id", r.id);
     if (error) {
       toast.error(error.message);
       setRows(rs => rs.map(x => x.id === r.id ? { ...x, featured: !next } : x));

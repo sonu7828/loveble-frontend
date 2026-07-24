@@ -1,7 +1,7 @@
 // Outcome tracking report: post-visit ratings rolled up by provider and by service.
 // Admin-only. Joins client_feedback with appointments → staff and services.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
 import { Loader2, Star, TrendingUp, Image as ImgIcon } from "lucide-react";
@@ -32,7 +32,7 @@ export default function StaffOutcomes({ embedded = false }: { embedded?: boolean
     (async () => {
       setBusy(true);
       const since = subDays(new Date(), days).toISOString();
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("client_feedback")
         .select(`id, rating, comment, created_at, client_email,
                  services(name),

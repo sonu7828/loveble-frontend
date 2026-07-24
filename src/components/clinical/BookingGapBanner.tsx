@@ -3,7 +3,7 @@
 //   • Unsigned consent forms attached to the appointment
 // Renders nothing when the booking is non-clinical (e.g. consult, facial).
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { ShieldAlert, FileWarning } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -26,14 +26,14 @@ export function BookingGapBanner({
     let cancel = false;
     (async () => {
       const [{ data: g }, { data: rows }] = await Promise.all([
-        supabase.from("gfe_records")
+        apiQuery("gfe_records")
           .select("expires_at")
           .ilike("client_email", clientEmail)
           .gt("expires_at", new Date().toISOString())
           .order("expires_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase.from("appointment_consents")
+        apiQuery("appointment_consents")
           .select("consent_form_id, signed, consent_form:consent_forms!inner(id, version, is_optional, is_active)")
           .eq("appointment_id", appointmentId),
       ]);
@@ -46,7 +46,7 @@ export function BookingGapBanner({
       const unsignedHere = activeRequired.filter((r: any) => !r.signed);
       let stillMissing = unsignedHere.length;
       if (unsignedHere.length && clientEmail) {
-        const { data: sigs } = await supabase
+        const { data: sigs } = await apiQuery
           .from("consent_signatures")
           .select("consent_form_id, decision, form_version, expires_at")
           .ilike("client_email", clientEmail)

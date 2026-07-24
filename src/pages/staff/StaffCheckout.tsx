@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { withUndo } from "@/lib/undoToast";
@@ -81,12 +81,12 @@ export default function StaffCheckout() {
 
   const loadSaleData = useCallback(async (sId: string) => {
     const [{ data: s }, { data: it }, { data: svc }, { data: us }, { data: prods }, { data: readerRows, error: readerError }] = await Promise.all([
-      supabase.from("sales").select("*").eq("id", sId).maybeSingle(),
-      supabase.from("sale_items").select("*").eq("sale_id", sId).order("display_order"),
-      supabase.from("services").select("id, name, price_cents, tippable, is_featured").eq("is_active", true).order("name"),
-      supabase.from("unit_services").select("service_id, price_per_unit_cents, unit_label, min_units, max_units, services(name)").eq("is_active", true),
-      supabase.from("products").select("id, name, price_cents, kind, taxable, tippable").eq("is_active", true).order("display_order"),
-      supabase.from("terminal_readers").select("*").eq("is_active", true).order("created_at", { ascending: false }),
+      apiQuery("sales").select("*").eq("id", sId).maybeSingle(),
+      apiQuery("sale_items").select("*").eq("sale_id", sId).order("display_order"),
+      apiQuery("services").select("id, name, price_cents, tippable, is_featured").eq("is_active", true).order("name"),
+      apiQuery("unit_services").select("service_id, price_per_unit_cents, unit_label, min_units, max_units, services(name)").eq("is_active", true),
+      apiQuery("products").select("id, name, price_cents, kind, taxable, tippable").eq("is_active", true).order("display_order"),
+      apiQuery("terminal_readers").select("*").eq("is_active", true).order("created_at", { ascending: false }),
     ]);
     setSale(s);
     if (s) {
@@ -117,27 +117,27 @@ export default function StaffCheckout() {
     setReaders(rs);
     setReaderId((current) => current && rs.some((r: any) => r.id === current) ? current : (rs[0]?.id ?? ""));
     // Load points settings (independent of client)
-    const { data: ps } = await supabase.from("client_points_settings" as any).select("*").eq("id", true).maybeSingle();
+    const { data: ps } = await apiQuery("client_points_settings" as any).select("*").eq("id", true).maybeSingle();
     setPointsSettings(ps as any);
     if (s?.client_email) {
       const [{ data: bal }, { data: svcCreds }, { data: cards }, { data: pts }] = await Promise.all([
-        supabase
+        apiQuery
           .from("client_credit_balances" as any)
           .select("balance_cents")
           .ilike("client_email", s.client_email)
           .maybeSingle(),
-        supabase
+        apiQuery
           .from("client_service_credits_available" as any)
           .select("id, kind, service_id, service_label, units, amount_cents, reason")
           .ilike("client_email", s.client_email),
-        supabase
+        apiQuery
           .from("client_payment_methods")
           .select("brand, last4, is_default")
           .ilike("client_email", s.client_email)
           .order("is_default", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(1),
-        supabase.rpc("get_points_balance" as any, { _client_email: s.client_email }),
+        apiQuery("get_points_balance" as any, { _client_email: s.client_email }),
       ]);
       setCreditBalanceCents(Math.max(0, (bal as any)?.balance_cents ?? 0));
       setServiceCredits((svcCreds as any) ?? []);
@@ -156,7 +156,7 @@ export default function StaffCheckout() {
   const startAppointmentSale = useCallback(async () => {
     if (!appointmentId) return;
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke("pos-create-or-get-sale", { body: { appointmentId } });
+    const { data, error } = await ApiClient.post("pos-create-or-get-sale", { body: { appointmentId } });
     if (error || data?.error) { toast.error(data?.error || await functionErrorMessage(error, "Could not start checkout")); setLoading(false); return; }
     setSaleId(data.saleId);
     await loadSaleData(data.saleId);
@@ -173,7 +173,7 @@ export default function StaffCheckout() {
     };
     if (walkInEmail.trim()) body.clientEmail = walkInEmail.trim();
     if (walkInPhone.trim()) body.clientPhone = walkInPhone.trim();
-    const { data, error } = await supabase.functions.invoke("pos-create-or-get-sale", { body });
+    const { data, error } = await ApiClient.post("pos-create-or-get-sale", { body });
     setWalkInStarting(false);
     if (error || data?.error) { toast.error(data?.error || await functionErrorMessage(error, "Could not start walk-in checkout")); return; }
     setSaleId(data.saleId);
@@ -195,7 +195,7 @@ export default function StaffCheckout() {
       if (qLast) setWalkInLastName(qLast);
       if (qEmail) setWalkInEmail(qEmail);
       if (qPhone) setWalkInPhone(qPhone);
-      supabase.from("locations").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
+      apiQuery("locations").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
         setWalkInLocations(data ?? []);
         if (qLoc && data?.some((l: any) => l.id === qLoc)) setWalkInLocationId(qLoc);
         else if (data && data.length === 1) setWalkInLocationId(data[0].id);
@@ -208,8 +208,8 @@ export default function StaffCheckout() {
 
   const confirmManualCardPaid = useCallback(async () => {
     if (!saleId) return false;
-    await supabase.functions.invoke("pos-confirm-payment", { body: { saleId } });
-    const { data: s } = await supabase.from("sales").select("*").eq("id", saleId).maybeSingle();
+    await ApiClient.post("pos-confirm-payment", { body: { saleId } });
+    const { data: s } = await apiQuery("sales").select("*").eq("id", saleId).maybeSingle();
     if (s) {
       setSale(s);
       if (s.status === "paid") {
@@ -255,7 +255,7 @@ export default function StaffCheckout() {
     const ptsNum = Math.max(0, Math.floor(Number(pointsApply || 0)));
     if (ptsNum > 0) body.pointsRedeemed = ptsNum;
 
-    const { data, error } = await supabase.functions.invoke("pos-update-sale", { body });
+    const { data, error } = await ApiClient.post("pos-update-sale", { body });
     if (error || data?.error) { toast.error(data?.error || await functionErrorMessage(error, "Could not update checkout totals")); return; }
     setItems(data.items.map((i: any) => ({
       kind: i.kind, reference_id: i.reference_id, label: i.label, quantity: Number(i.quantity),
@@ -361,7 +361,7 @@ export default function StaffCheckout() {
 
   const recordCreditApplication = async () => {
     if (!sale?.client_email || creditCents <= 0) return;
-    const { error } = await supabase.from("client_credits").insert({
+    const { error } = await apiQuery("client_credits").insert({
       client_email: sale.client_email,
       amount_cents: -creditCents,
       reason: "applied_to_sale",
@@ -389,7 +389,7 @@ export default function StaffCheckout() {
         const newUnits = Math.max(0, c.units - unitsUsed);
         const newAmount = Math.max(0, c.amount_cents - usedCents);
         if (newUnits > 0 && newAmount > 0) {
-          return supabase.from("client_credits").update({
+          return apiQuery("client_credits").update({
             units: newUnits,
             amount_cents: newAmount,
             service_label: c.service_label?.replace(/^\d+\s*units/i, `${newUnits} units`) ?? c.service_label,
@@ -397,7 +397,7 @@ export default function StaffCheckout() {
           }).eq("id", c.id);
         }
       }
-      return supabase.from("client_credits").update({
+      return apiQuery("client_credits").update({
         redeemed_at: new Date().toISOString(),
         redeemed_sale_id: saleId,
         redeemed_amount_cents: usedCents,
@@ -409,7 +409,7 @@ export default function StaffCheckout() {
     } else {
       // Reload credits so partials show updated remaining units immediately.
       if (sale?.client_email) {
-        const { data: refreshed } = await supabase
+        const { data: refreshed } = await apiQuery
           .from("client_service_credits_available" as any)
           .select("id, kind, service_id, service_label, units, amount_cents, reason")
           .ilike("client_email", sale.client_email);
@@ -443,7 +443,7 @@ export default function StaffCheckout() {
     // creditCents / claimedCreditIds in state may have been cleared by
     // subsequent UI updates.
     if (snap.creditCents > 0 && sale?.client_email && saleId) {
-      const { error } = await supabase.from("client_credits").insert({
+      const { error } = await apiQuery("client_credits").insert({
         client_email: sale.client_email,
         amount_cents: -snap.creditCents,
         reason: "applied_to_sale",
@@ -467,7 +467,7 @@ export default function StaffCheckout() {
           const newUnits = Math.max(0, c.units - unitsUsed);
           const newAmount = Math.max(0, c.amount_cents - usedCents);
           if (newUnits > 0 && newAmount > 0) {
-            return supabase.from("client_credits").update({
+            return apiQuery("client_credits").update({
               units: newUnits,
               amount_cents: newAmount,
               service_label: c.service_label?.replace(/^\d+\s*units/i, `${newUnits} units`) ?? c.service_label,
@@ -475,7 +475,7 @@ export default function StaffCheckout() {
             }).eq("id", c.id);
           }
         }
-        return supabase.from("client_credits").update({
+        return apiQuery("client_credits").update({
           redeemed_at: new Date().toISOString(),
           redeemed_sale_id: saleId,
           redeemed_amount_cents: usedCents,
@@ -541,19 +541,19 @@ export default function StaffCheckout() {
     };
     delete (saveBody as any).paymentMethod;
     delete (saveBody as any).readerId;
-    const saved = await supabase.functions.invoke("pos-update-sale", { body: saveBody });
+    const saved = await ApiClient.post("pos-update-sale", { body: saveBody });
     if (saved.error || saved.data?.error) {
       setWorking(false);
       toast.error(saved.data?.error || await functionErrorMessage(saved.error, "Could not save checkout before payment"));
       return;
     }
 
-    let { data, error } = await supabase.functions.invoke("pos-finalize-sale", { body });
+    let { data, error } = await ApiClient.post("pos-finalize-sale", { body });
     // Duplicate-charge guard returns 409 with a confirmation message.
     const dupMsg: string | undefined = data?.error;
     if (dupMsg && /duplicate/i.test(dupMsg) && /already charged/i.test(dupMsg)) {
       if (window.confirm(`${dupMsg}\n\nCharge this client again anyway?`)) {
-        ({ data, error } = await supabase.functions.invoke("pos-finalize-sale", { body: { ...body, acknowledgeDuplicate: true } }));
+        ({ data, error } = await ApiClient.post("pos-finalize-sale", { body: { ...body, acknowledgeDuplicate: true } }));
       } else {
         setWorking(false);
         return;
@@ -565,7 +565,7 @@ export default function StaffCheckout() {
       setPaymentMonitorActive(false);
       // Sale completed immediately (cash / credit-only / zero-amount) — apply now.
       await recordCreditApplication(); await recordServiceCreditRedemptions();
-      const { data: paidSale } = await supabase.from("sales").select("*").eq("id", saleId).maybeSingle();
+      const { data: paidSale } = await apiQuery("sales").select("*").eq("id", saleId).maybeSingle();
       if (paidSale) setSale(paidSale);
       const email = sale?.client_email;
       toast.success(email ? `Payment collected — receipt sent to ${email}` : "Payment collected");

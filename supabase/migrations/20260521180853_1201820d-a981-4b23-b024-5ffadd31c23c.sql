@@ -1,1 +1,0 @@
-UPDATE services SET name = 'GLP- Wellness management' WHERE id = 'a1000000-0000-0000-0000-000000000002';

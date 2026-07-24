@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,8 +96,8 @@ export default function AdminTeam() {
 
   const load = async () => {
     setLoading(true);
-    const { data: m } = await supabase.from("staff_profiles").select("id, user_id, full_name, title, email, bio, color, is_owner, is_active, created_at, updated_at, calendar_email, phone, license_number" as any).order("is_owner", { ascending: false }).order("created_at");
-    const { data: pay } = await (supabase as any).from("staff_pay_config").select("staff_id, hourly_rate_cents, commission_percent");
+    const { data: m } = await apiQuery("staff_profiles").select("id, user_id, full_name, title, email, bio, color, is_owner, is_active, created_at, updated_at, calendar_email, phone, license_number" as any).order("is_owner", { ascending: false }).order("created_at");
+    const { data: pay } = await (apiQuery as any).from("staff_pay_config").select("staff_id, hourly_rate_cents, commission_percent");
     const payMap: Record<string, { hourly_rate_cents: number | null; commission_percent: number | null }> = {};
     (pay ?? []).forEach((p: any) => { payMap[p.staff_id] = { hourly_rate_cents: p.hourly_rate_cents, commission_percent: p.commission_percent }; });
 
@@ -140,7 +140,7 @@ export default function AdminTeam() {
 
     const userIds = (m ?? []).map((x: any) => x.user_id).filter(Boolean);
     if (userIds.length) {
-      const { data: r } = await supabase.from("user_roles").select("user_id, role").in("user_id", userIds);
+      const { data: r } = await apiQuery("user_roles").select("user_id, role").in("user_id", userIds);
       const map: Record<string, Role[]> = {};
       (r ?? []).forEach((row: any) => {
         map[row.user_id] = [...(map[row.user_id] ?? []), row.role];
@@ -149,7 +149,7 @@ export default function AdminTeam() {
     } else {
       setRoles({});
     }
-    const { data: inv } = await supabase.from("staff_invitations").select("staff_id, created_at, accepted_at, role").order("created_at", { ascending: false });
+    const { data: inv } = await apiQuery("staff_invitations").select("staff_id, created_at, accepted_at, role").order("created_at", { ascending: false });
     const im: typeof invites = {};
     (inv ?? []).forEach((row: any) => {
       if (!im[row.staff_id]) im[row.staff_id] = { sent: row.created_at, accepted: row.accepted_at, role: row.role };
@@ -170,7 +170,7 @@ export default function AdminTeam() {
   const sendInvite = async (m: Member, role?: Role) => {
     if (!m.email) { toast.error("No email on file"); return; }
     setBusy(m.id);
-    const { data, error } = await supabase.functions.invoke("staff-invite-send", {
+    const { data, error } = await ApiClient.post("staff-invite-send", {
       body: { staffId: m.id, role: role ?? "staff" },
     });
     setBusy(null);
@@ -184,7 +184,7 @@ export default function AdminTeam() {
 
   const sendAll = async () => {
     setBusy("all");
-    const { data, error } = await supabase.functions.invoke("staff-invite-send", { body: { all: true } });
+    const { data, error } = await ApiClient.post("staff-invite-send", { body: { all: true } });
     setBusy(null);
     if (error || data?.error) { toast.error(data?.error || error?.message || "Failed"); return; }
     toast.success(`Sent ${data?.sent ?? 0} invites`);
@@ -248,7 +248,7 @@ export default function AdminTeam() {
       // Update in database if it exists there
       if (originalMember?.user_id) {
         try {
-          await supabase.from("staff_profiles").update({
+          await apiQuery("staff_profiles").update({
             full_name: draft.full_name.trim(),
             title: draft.title.trim(),
             email,
@@ -343,11 +343,11 @@ export default function AdminTeam() {
   const updateRole = async (m: Member, newRole: Role) => {
     if (!m.user_id) return;
     setBusy(m.id);
-    const { error: delErr } = await supabase.from("user_roles").delete().eq("user_id", m.user_id);
+    const { error: delErr } = await apiQuery("user_roles").delete().eq("user_id", m.user_id);
     if (delErr) { setBusy(null); toast.error(delErr.message); return; }
     const toInsert: { user_id: string; role: Role }[] = [{ user_id: m.user_id, role: newRole }];
     if (newRole === "admin" || newRole === "provider" || newRole === "scheduler" || newRole === "receptionist" || newRole === "nurse_practitioner" || newRole === "medical_director") toInsert.push({ user_id: m.user_id, role: "staff" });
-    const { error: insErr } = await supabase.from("user_roles").insert(toInsert);
+    const { error: insErr } = await apiQuery("user_roles").insert(toInsert);
     setBusy(null);
     if (insErr) { toast.error(insErr.message); return; }
     toast.success(`Role updated to ${newRole}`);
@@ -357,7 +357,7 @@ export default function AdminTeam() {
   const toggleActive = async (m: Member) => {
     setBusy(m.id);
     try {
-      await supabase.from("staff_profiles").update({ is_active: !m.is_active }).eq("id", m.id);
+      await apiQuery("staff_profiles").update({ is_active: !m.is_active }).eq("id", m.id);
     } catch (e) {}
 
     const localDemoMembers: Member[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
@@ -410,7 +410,7 @@ export default function AdminTeam() {
       return;
     }
 
-    const { error } = await (supabase as any).from("staff_pay_config").upsert({
+    const { error } = await (apiQuery as any).from("staff_pay_config").upsert({
       staff_id: payEditing.id,
       hourly_rate_cents: rate,
       commission_percent: pct,
@@ -426,11 +426,11 @@ export default function AdminTeam() {
   const deleteMember = async (m: Member) => {
     setBusy(m.id);
     try {
-      if (m.user_id) await supabase.from("user_roles").delete().eq("user_id", m.user_id);
-      await supabase.from("staff_invitations").delete().eq("staff_id", m.id);
-      await supabase.from("service_providers").delete().eq("staff_id", m.id);
-      await supabase.from("schedule_overrides").delete().eq("staff_id", m.id);
-      await supabase.from("staff_profiles").delete().eq("id", m.id);
+      if (m.user_id) await apiQuery("user_roles").delete().eq("user_id", m.user_id);
+      await apiQuery("staff_invitations").delete().eq("staff_id", m.id);
+      await apiQuery("service_providers").delete().eq("staff_id", m.id);
+      await apiQuery("schedule_overrides").delete().eq("staff_id", m.id);
+      await apiQuery("staff_profiles").delete().eq("id", m.id);
     } catch (e) {
       console.warn("Remote delete notice:", e);
     }

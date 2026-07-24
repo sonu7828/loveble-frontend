@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Search, X as XIcon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import FinancingBadge from "@/components/FinancingBadge";
@@ -75,9 +75,9 @@ const Services = () => {
   const [concern, setConcern] = useState<string | null>(null);
   useEffect(() => {
     Promise.all([
-      supabase.from("service_categories").select("*").eq("is_active", true).order("display_order"),
-      supabase.from("services").select("*").eq("is_active", true).order("display_order"),
-      supabase.from("promo_slots").select("promo_group, slot_at, claimed_appointment_id").order("slot_at"),
+      apiQuery("service_categories").select("*").eq("is_active", true).order("display_order"),
+      apiQuery("services").select("*").eq("is_active", true).order("display_order"),
+      apiQuery("promo_slots").select("promo_group, slot_at, claimed_appointment_id").order("slot_at"),
     ]).then(([c, s, ps]) => {
       setCats(c.data ?? []);
       // Hide package/series SKUs from the public listing — they're duplicates of the

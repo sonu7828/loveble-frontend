@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -57,9 +57,9 @@ export function RescheduleDialog({ open, onOpenChange, appointmentId, serviceId,
 
   useEffect(() => {
     Promise.all([
-      supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
-      supabase.from("service_providers").select("service_id, staff_id, location_id"),
-      supabase.from("staff_profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+      apiQuery("locations").select("id, name").eq("is_active", true).order("name"),
+      apiQuery("service_providers").select("service_id, staff_id, location_id"),
+      apiQuery("staff_profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     ]).then(([locs, prov, st]) => {
       setLocations(locs.data ?? []);
       setProviders((prov.data ?? []) as ProviderRow[]);
@@ -95,7 +95,7 @@ export function RescheduleDialog({ open, onOpenChange, appointmentId, serviceId,
     setSlot("");
     if (!date) { setSlots([]); return; }
     setLoadingSlots(true);
-    supabase.functions.invoke("get-availability", {
+    ApiClient.post("get-availability", {
       body: { serviceIds: effectiveServiceIds, staffId: selectedStaffId, locationId: selectedLocationId, date: format(date, "yyyy-MM-dd"), includeConflicts: canOverride && overrideConflict },
     }).then(({ data }) => {
       setSlots(data?.slots ?? []);
@@ -107,7 +107,7 @@ export function RescheduleDialog({ open, onOpenChange, appointmentId, serviceId,
   const submit = async () => {
     if (!slot) { toast.error("Pick a time"); return; }
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("staff-reschedule-appointment", {
+    const { data, error } = await ApiClient.post("staff-reschedule-appointment", {
       body: {
         appointmentId,
         newStartAt: slot,

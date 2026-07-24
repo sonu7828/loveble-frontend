@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -52,8 +52,8 @@ export default function VoProtocolRun() {
   async function load() {
     if (!runId) return;
     const [{ data: r }, { data: s }] = await Promise.all([
-      supabase.from("vo_protocol_runs").select("*").eq("id", runId).maybeSingle(),
-      supabase.from("vo_protocol_steps").select("*").eq("run_id", runId).order("sort_order"),
+      apiQuery("vo_protocol_runs").select("*").eq("id", runId).maybeSingle(),
+      apiQuery("vo_protocol_steps").select("*").eq("run_id", runId).order("sort_order"),
     ]);
     setRun(r as Run | null);
     setSteps((s as Step[]) ?? []);
@@ -71,22 +71,22 @@ export default function VoProtocolRun() {
     const patch: any = done
       ? { completed_at: new Date().toISOString() }
       : { completed_at: null };
-    await supabase.from("vo_protocol_steps").update(patch).eq("id", s.id);
+    await apiQuery("vo_protocol_steps").update(patch).eq("id", s.id);
     load();
   }
   async function updateNotes(s: Step, notes: string) {
-    await supabase.from("vo_protocol_steps").update({ notes }).eq("id", s.id);
+    await apiQuery("vo_protocol_steps").update({ notes }).eq("id", s.id);
     setSteps(prev => prev.map(p => p.id === s.id ? { ...p, notes } : p));
   }
 
   async function resolve() {
     if (!run) return;
-    await supabase.from("vo_protocol_runs").update({
+    await apiQuery("vo_protocol_runs").update({
       status: "resolved",
       resolved_at: new Date().toISOString(),
     }).eq("id", run.id);
     if ((run as any).ae_id) {
-      await supabase.from("adverse_events").update({
+      await apiQuery("adverse_events").update({
         outcome: "resolved",
         resolved_at: new Date().toISOString(),
       }).eq("id", (run as any).ae_id);

@@ -3,7 +3,7 @@
 // (1-5), upload an optional photo, and add notes. Submissions feed the
 // outcomes dataset (postop_checkins) used to identify complications early.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { getClientSession } from "@/hooks/useClientAuth";
 import { differenceInCalendarDays, format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ export function PostOpCheckInsCard() {
         setEmail(e);
 
         const since = new Date(); since.setDate(since.getDate() - 16);
-        const { data: ap } = await supabase
+        const { data: ap } = await apiQuery
           .from("appointments")
           .select("id, start_at, service_id, status")
           .ilike("client_email", e)
@@ -62,8 +62,8 @@ export function PostOpCheckInsCard() {
 
         const svcIds = Array.from(new Set(appts.map(a => a.service_id).filter(Boolean)));
         const [{ data: sv }, { data: chk }] = await Promise.all([
-          supabase.from("services").select("id, name").in("id", svcIds),
-          supabase.from("postop_checkins").select("appointment_id, day_offset, swelling, bruising, pain, photo_path, notes").in("appointment_id", appts.map(a => a.id)),
+          apiQuery("services").select("id, name").in("id", svcIds),
+          apiQuery("postop_checkins").select("appointment_id, day_offset, swelling, bruising, pain, photo_path, notes").in("appointment_id", appts.map(a => a.id)),
         ]);
         const svcMap: Record<string, string> = {};
         (sv ?? []).forEach((s: any) => { svcMap[s.id] = s.name; });
@@ -108,9 +108,9 @@ export function PostOpCheckInsCard() {
     setBusy(`${k}:upload`);
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
     const path = `${email}/postop/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error } = await supabase.storage.from("client-uploaded-photos").upload(path, file, { contentType: file.type, upsert: false });
+    const { error } = await ApiClient.upload(path, file, { contentType: file.type, upsert: false });
     if (error) { setBusy(null); toast.error(error.message); return; }
-    const { data: signed } = await supabase.storage.from("client-uploaded-photos").createSignedUrl(path, 600);
+    const { data: signed } = await ApiClient.createSignedUrl(path, 600);
     setDraft(k, { photoPath: path, photoUrl: signed?.signedUrl ?? null });
     setBusy(null);
   }
@@ -122,7 +122,7 @@ export function PostOpCheckInsCard() {
       toast.error("Add at least one rating, photo, or note."); return;
     }
     setBusy(k);
-    const { error } = await supabase.from("postop_checkins").upsert({
+    const { error } = await apiQuery("postop_checkins").upsert({
       appointment_id: apptId,
       client_email: email,
       day_offset: day,

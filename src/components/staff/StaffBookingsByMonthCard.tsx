@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 
@@ -49,7 +49,7 @@ export default function StaffBookingsByMonthCard() {
       const end = new Date(y, m + 1, 1).toISOString();
 
       // Staff-initiated bookings → audit log entries
-      const { data: logs } = await supabase
+      const { data: logs } = await apiQuery
         .from("appointment_audit_log")
         .select("actor_user_id, appointment_id")
         .eq("action", "manual_book")
@@ -59,7 +59,7 @@ export default function StaffBookingsByMonthCard() {
       const logList = (logs ?? []) as any[];
 
       // Online (client self-book): appointments created in window with NO manual_book audit row
-      const { data: appts } = await supabase
+      const { data: appts } = await apiQuery
         .from("appointments")
         .select("id")
         .gte("created_at", start)
@@ -75,7 +75,7 @@ export default function StaffBookingsByMonthCard() {
       const emailByAppt: Record<string, string> = {};
       const statusByAppt: Record<string, string> = {};
       if (allApptIds.length) {
-        const { data: aRows } = await supabase
+        const { data: aRows } = await apiQuery
           .from("appointments")
           .select("id, client_email, status")
           .in("id", allApptIds);
@@ -89,7 +89,7 @@ export default function StaffBookingsByMonthCard() {
       const actorIds = [...new Set(logList.map((l) => l.actor_user_id).filter(Boolean))];
       const nameByUser: Record<string, { id: string; name: string }> = {};
       if (actorIds.length) {
-        const { data: sp } = await supabase
+        const { data: sp } = await apiQuery
           .from("staff_profiles")
           .select("id, user_id, full_name")
           .in("user_id", actorIds);
@@ -101,7 +101,7 @@ export default function StaffBookingsByMonthCard() {
       // Revenue: sum sales tied to these booked appointments (paid/refunded)
       const revenueByAppt: Record<string, number> = {};
       if (allApptIds.length) {
-        const { data: salesRows } = await supabase
+        const { data: salesRows } = await apiQuery
           .from("sales")
           .select("appointment_id, total_cents, refunded_amount_cents, status")
           .in("appointment_id", allApptIds)

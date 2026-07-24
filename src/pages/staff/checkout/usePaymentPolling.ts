@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 
 /**
  * Tracks the sale row while a card payment is in progress.
@@ -42,7 +42,7 @@ export function usePaymentPolling(args: {
     };
 
     // Realtime subscription — push updates the moment the webhook lands.
-    const channel = supabase
+    const channel = apiQuery
       .channel(`sale-${saleId}`)
       .on(
         "postgres_changes",
@@ -56,10 +56,10 @@ export function usePaymentPolling(args: {
     // call so realtime push has a chance to land first and we don't hammer
     // pos-confirm-payment the instant the cashier starts a charge.
     const reconcile = async () => {
-      const { data: confirmed } = await supabase.functions
+      const { data: confirmed } = await apiQuery.functions
         .invoke("pos-confirm-payment", { body: { saleId } })
         .catch(() => ({ data: null } as any));
-      const { data: s } = await supabase.from("sales").select("*").eq("id", saleId).maybeSingle();
+      const { data: s } = await apiQuery("sales").select("*").eq("id", saleId).maybeSingle();
       if (!s) return;
       applySale(confirmed?.status === "paid"
         ? { ...s, status: "paid", paid_at: s.paid_at ?? new Date().toISOString() }
@@ -72,7 +72,7 @@ export function usePaymentPolling(args: {
       cancelled = true;
       clearTimeout(firstT);
       clearInterval(t);
-      supabase.removeChannel(channel);
+      apiQuery.removeChannel(channel);
     };
   }, [saleId, sale?.status, paymentMonitorActive, setSale, setPaymentMonitorActive]);
 }

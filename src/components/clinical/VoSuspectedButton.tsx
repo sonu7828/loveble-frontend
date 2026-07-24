@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AlertOctagon } from "lucide-react";
@@ -38,9 +38,9 @@ export function VoSuspectedButton(props: Props) {
   async function activate() {
     setBusy(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await authService.getSession();
       // 1. Create AE
-      const { data: ae, error: aeErr } = await supabase.from("adverse_events").insert({
+      const { data: ae, error: aeErr } = await apiQuery("adverse_events").insert({
         client_email: props.clientEmail.toLowerCase(),
         client_first_name: props.clientFirstName,
         client_last_name: props.clientLastName,
@@ -54,7 +54,7 @@ export function VoSuspectedButton(props: Props) {
       } as any).select("id").single();
       if (aeErr) throw aeErr;
       // 2. Create run
-      const { data: run, error: runErr } = await supabase.from("vo_protocol_runs").insert({
+      const { data: run, error: runErr } = await apiQuery("vo_protocol_runs").insert({
         client_email: props.clientEmail.toLowerCase(),
         client_first_name: props.clientFirstName,
         client_last_name: props.clientLastName,
@@ -75,9 +75,9 @@ export function VoSuspectedButton(props: Props) {
         due_offset_minutes: s.offset,
         sort_order: i,
       }));
-      await supabase.from("vo_protocol_steps").insert(steps as any);
+      await apiQuery("vo_protocol_steps").insert(steps as any);
       // 4. Fire alert (non-blocking)
-      supabase.functions.invoke("vo-alert-oncall", {
+      ApiClient.post("vo-alert-oncall", {
         body: {
           run_id: run!.id,
           client_email: props.clientEmail,

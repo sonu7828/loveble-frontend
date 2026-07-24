@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,7 +69,7 @@ export default function StaffMyProfile() {
       let metadataName = "";
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await authService.getSession();
         if (user) {
           myEmail = (user.email ?? "").toLowerCase();
           myUserId = user.id;
@@ -101,7 +101,7 @@ export default function StaffMyProfile() {
 
       // 1) Try by user_id
       if (myUserId) {
-        const { data } = await supabase
+        const { data } = await apiQuery
           .from("staff_profiles")
           .select(cols)
           .eq("user_id", myUserId)
@@ -114,7 +114,7 @@ export default function StaffMyProfile() {
 
       // 2) Fallback: match by email
       if (!sp && myEmail) {
-        const { data: byEmail } = await supabase
+        const { data: byEmail } = await apiQuery
           .from("staff_profiles")
           .select(cols)
           .ilike("email", myEmail)
@@ -125,7 +125,7 @@ export default function StaffMyProfile() {
         if (byEmail) {
           sp = byEmail;
           if (myUserId) {
-            await supabase
+            await apiQuery
               .from("staff_profiles")
               .update({ user_id: myUserId } as any)
               .eq("id", (byEmail as any).id);
@@ -209,7 +209,7 @@ export default function StaffMyProfile() {
     setSaving(true);
     try {
       if (staffId && !staffId.startsWith("staff-demo-")) {
-        const { error } = await supabase
+        const { error } = await apiQuery
           .from("staff_profiles")
           .update({
             full_name: parsed.data.full_name,

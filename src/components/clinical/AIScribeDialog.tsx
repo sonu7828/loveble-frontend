@@ -2,11 +2,12 @@
 // Uses Web Audio API + WAV encoding for reliable iOS/iPad/desktop capture.
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Mic, Square, Sparkles, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 
 type Props = {
   open: boolean;
@@ -102,19 +103,19 @@ export function AIScribeDialog(props: Props) {
     if (!open || !clientEmail) { setIntakeConsent(null); return; }
     (async () => {
       try {
-        const { supabase } = await import("@/integrations/supabase/client");
+        const { apiQuery: apiQuery } = await import("@/services/api");
         const nowIso = new Date().toISOString();
         const oneYearAgo = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
 
         // (a) Standalone AI Scribe consent form
-        const { data: form } = await supabase
+        const { data: form } = await apiQuery
           .from("consent_forms")
           .select("id")
           .eq("slug", "ai-scribe")
           .eq("is_active", true)
           .maybeSingle();
         if (form?.id) {
-          const { data: sig } = await supabase
+          const { data: sig } = await apiQuery
             .from("consent_signatures")
             .select("signed_at, expires_at, decision, signed_full_name")
             .eq("consent_form_id", form.id)
@@ -132,7 +133,7 @@ export function AIScribeDialog(props: Props) {
         }
 
         // (b) Fallback: intake form checkbox
-        const { data } = await supabase
+        const { data } = await apiQuery
           .from("client_intake_submissions")
           .select("ai_scribe_consent, ai_scribe_consent_at, signature_full_name, submitted_at")
           .eq("client_email", clientEmail.toLowerCase())
@@ -186,7 +187,7 @@ export function AIScribeDialog(props: Props) {
       });
       streamRef.current = stream;
       // Insert session row first
-      const { data: sess, error: iErr } = await supabase
+      const { data: sess, error: iErr } = await apiQuery
         .from("scribe_sessions")
         .insert({
           appointment_id: appointmentId,
@@ -251,26 +252,17 @@ export function AIScribeDialog(props: Props) {
       fd.append("file", blob, "recording.wav");
       fd.append("session_id", sid);
 
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData.session?.access_token;
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-scribe`;
-
       setStatus("transcribing");
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const trJson = await resp.json();
-      if (!resp.ok) throw new Error(trJson.error || "Transcription failed");
-      setTranscript(trJson.transcript || "");
+      const resp = await ApiClient.post("/clinical/ai-scribe/transcribe", fd);
+      if (resp.error) throw new Error(resp.error || "Transcription failed");
+      setTranscript(resp.data?.transcript || "");
 
       setStatus("generating");
       const action = mode === "gfe" ? "generate_gfe" : "generate";
-      const gResp = await supabase.functions.invoke("ai-scribe", {
-        body: { action, session_id: sid, ...(generateExtraBody ?? {}) },
+      const gResp = await ApiClient.post("/clinical/ai-scribe/generate", {
+        action, session_id: sid, ...(generateExtraBody ?? {})
       });
-      if (gResp.error) throw new Error(gResp.error.message || "Note generation failed");
+      if (gResp.error) throw new Error(gResp.error || "Note generation failed");
       const g = gResp.data as { narrative?: string; structured?: Record<string, unknown>; gfe?: Record<string, unknown> };
       setStatus("done");
       onGenerated({

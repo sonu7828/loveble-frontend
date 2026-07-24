@@ -3,7 +3,7 @@
 // with the exact items and a suggested discount when they open Checkout.
 import { useState } from "react";
 import { Send, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -52,11 +52,11 @@ export function SendToCheckoutButton({
     if (items.length === 0) { toast.error("Nothing to send — add units or a service first"); return; }
     setSaving(true);
 
-    const { data: userRes } = await supabase.auth.getUser();
+    const { data: userRes } = await authService.getSession();
     const uid = userRes.user?.id ?? null;
     let name: string | null = null;
     if (uid) {
-      const { data: sp } = await supabase
+      const { data: sp } = await apiQuery
         .from("staff_profiles")
         .select("full_name")
         .eq("user_id", uid)
@@ -65,7 +65,7 @@ export function SendToCheckoutButton({
     }
 
     // Dismiss any existing pending proposal so the unique index doesn't conflict.
-    await supabase
+    await apiQuery
       .from("checkout_proposals" as any)
       .update({ status: "dismissed" })
       .eq("appointment_id", appointmentId)
@@ -74,7 +74,7 @@ export function SendToCheckoutButton({
     const pctNum = pct ? Number(pct) : null;
     const amtCents = amount ? Math.round(Number(amount) * 100) : null;
 
-    const { error } = await supabase.from("checkout_proposals" as any).insert({
+    const { error } = await apiQuery("checkout_proposals" as any).insert({
       appointment_id: appointmentId,
       client_email: clientEmail?.toLowerCase() ?? null,
       created_by: uid,

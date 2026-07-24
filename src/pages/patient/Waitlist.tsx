@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,9 +31,9 @@ export default function Waitlist() {
   useEffect(() => {
     (async () => {
       const [{ data: s }, { data: l }, sess] = await Promise.all([
-        supabase.from("services").select("id, name").eq("is_active", true).order("display_order"),
-        supabase.from("locations").select("id, name, city").eq("is_active", true),
-        supabase.auth.getSession(),
+        apiQuery("services").select("id, name").eq("is_active", true).order("display_order"),
+        apiQuery("locations").select("id, name, city").eq("is_active", true),
+        authService.getSession(),
       ]);
       setServices(s ?? []);
       setLocations(l ?? []);
@@ -41,7 +41,7 @@ export default function Waitlist() {
       const userId = sess.data.session?.user?.id;
       const userEmail = sess.data.session?.user?.email;
       if (userId) {
-        const { data: prof } = await supabase
+        const { data: prof } = await apiQuery
           .from("client_profiles").select("first_name, last_name, email, phone").eq("user_id", userId).maybeSingle();
         if (prof) {
           setForm((prev) => ({
@@ -67,7 +67,7 @@ export default function Waitlist() {
     setSaving(true);
     const id = crypto.randomUUID();
     const locationId = form.locationId === "any" ? null : form.locationId;
-    const { error } = await supabase.from("waitlist_requests").insert({
+    const { error } = await apiQuery("waitlist_requests").insert({
       id,
       client_first_name: form.firstName.trim(),
       client_last_name: form.lastName.trim(),
@@ -85,7 +85,7 @@ export default function Waitlist() {
     try {
       const svcName = services.find(s => s.id === form.serviceId)?.name;
       const locName = locationId ? locations.find(l => l.id === locationId)?.name : "Either location";
-      await supabase.functions.invoke("notify-waitlist-join", {
+      await ApiClient.post("notify-waitlist-join", {
         body: {
           waitlistId: id,
           clientName: `${form.firstName} ${form.lastName}`.trim(),

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ export default function StaffActivate() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.functions.invoke("staff-invite-verify", { body: { token } });
+      const { data, error } = await ApiClient.post("staff-invite-verify", { body: { token } });
       if (error || !data?.valid) { setStage("invalid"); return; }
       setStaffName(data.staffName);
       setEmail(data.email);
@@ -33,7 +33,7 @@ export default function StaffActivate() {
     if (password !== confirm) { toast.error("Passwords don't match"); return; }
     if (password.length < 8) { toast.error("Password must be at least 8 characters"); return; }
     setSubmitting(true);
-    const { data, error } = await supabase.functions.invoke("staff-invite-accept", {
+    const { data, error } = await ApiClient.post("staff-invite-accept", {
       body: { token, password },
     });
     if (error || data?.error) {
@@ -42,7 +42,7 @@ export default function StaffActivate() {
       return;
     }
     // Sign in
-    const { error: signErr } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: signErr } = await authService.signInWithPassword({ email, password });
     setSubmitting(false);
     if (signErr) { toast.error(signErr.message); return; }
     setStage("done");

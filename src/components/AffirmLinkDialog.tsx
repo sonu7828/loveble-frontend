@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { QRCodeSVG } from "qrcode.react";
 import { Copy, Mail, ExternalLink, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 
 interface AffirmLinkDialogProps {
   open: boolean;
@@ -41,7 +41,7 @@ export function AffirmLinkDialog({
     if (!paymentUrl || !saleId) return;
     if (!email.trim()) { toast.error("Enter an email"); return; }
     setSending(true);
-    const { error } = await supabase.functions.invoke("send-transactional-email", {
+    const { error } = await ApiClient.post("send-transactional-email", {
       body: {
         templateName: "affirm-payment-link",
         recipientEmail: email.trim(),

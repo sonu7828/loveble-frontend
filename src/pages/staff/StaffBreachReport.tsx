@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +48,7 @@ export default function StaffBreachReport() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase.from("breach_reports" as any)
+    const { data, error } = await apiQuery("breach_reports" as any)
       .select("*").order("created_at", { ascending: false });
     if (error) toast({ title: "Load failed", description: error.message, variant: "destructive" });
     setRows(((data as any) ?? []) as Report[]);
@@ -74,7 +74,7 @@ export default function StaffBreachReport() {
       systems_involved: form.systems_involved || null,
       immediate_actions: form.immediate_actions || null,
     };
-    const { error } = await supabase.from("breach_reports" as any).insert(payload);
+    const { error } = await apiQuery("breach_reports" as any).insert(payload);
     setSaving(false);
     if (error) { toast({ title: "Submit failed", description: error.message, variant: "destructive" }); return; }
     toast({
@@ -86,7 +86,7 @@ export default function StaffBreachReport() {
   }
 
   async function updateStatus(id: string, status: string) {
-    const { error } = await supabase.from("breach_reports" as any).update({ status }).eq("id", id);
+    const { error } = await apiQuery("breach_reports" as any).update({ status }).eq("id", id);
     if (error) { toast({ title: "Update failed", description: error.message, variant: "destructive" }); return; }
     load();
   }

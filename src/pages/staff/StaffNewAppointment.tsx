@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +62,7 @@ export default function StaffNewAppointment() {
     const email = client.email.trim().toLowerCase();
     if (!email) { setExistingCard(null); return; }
     let cancelled = false;
-    supabase
+    apiQuery
       .from("appointments")
       .select("stripe_customer_id, stripe_payment_method_id, created_at")
       .ilike("client_email", email)
@@ -85,10 +85,10 @@ export default function StaffNewAppointment() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from("services").select("id, name, duration_minutes").eq("is_active", true).order("name"),
-      supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
+      apiQuery("services").select("id, name, duration_minutes").eq("is_active", true).order("name"),
+      apiQuery("locations").select("id, name").eq("is_active", true).order("name"),
       fetchUnifiedStaffMembers(),
-      supabase.from("service_providers").select("service_id, staff_id, location_id"),
+      apiQuery("service_providers").select("service_id, staff_id, location_id"),
     ]).then(([s, l, st, p]) => {
       setServices(s.data ?? []);
       setLocations(l.data ?? []);
@@ -117,7 +117,7 @@ export default function StaffNewAppointment() {
     if (serviceIds.length === 0 || !staffIdSel || !locationId || !pickedDate) { setSlots([]); return; }
     setLoadingSlots(true);
     const dateStr = format(pickedDate, "yyyy-MM-dd");
-    supabase.functions.invoke("get-availability", {
+    ApiClient.post("get-availability", {
       body: { serviceIds, staffId: staffIdSel, locationId, date: dateStr, includeConflicts: canOverride && overrideConflict },
     }).then(({ data }) => {
       const returned: string[] = data?.slots ?? [];
@@ -188,14 +188,14 @@ export default function StaffNewAppointment() {
           toast.error(cardErr?.message || "Card could not be saved"); setBusy(false); return;
         }
       }
-      const { data, error } = await supabase.functions.invoke("staff-create-booking", {
+      const { data, error } = await ApiClient.post("staff-create-booking", {
         body: {
           serviceIds, staffId: staffIdSel, locationId,
           startAt: pickedSlot,
           client, ...payment, overrideConflict: canOverride && overrideConflict,
         },
       });
-      // supabase-js surfaces non-2xx as `error` with `data` null. Parse the response body for the real reason.
+      // apiQuery-js surfaces non-2xx as `error` with `data` null. Parse the response body for the real reason.
       let errMsg: string | null = null;
       if (error) {
         try {

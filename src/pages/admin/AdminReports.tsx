@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { format, subDays, startOfDay, endOfDay, eachDayOfInterval } from "date-fns";
 import { Loader2, BarChart3, DollarSign, Users, AlertCircle, TrendingUp, Mail, Star, Download, CalendarDays } from "lucide-react";
@@ -53,13 +53,13 @@ export default function AdminReports() {
       const start = startOfDay(subDays(new Date(), days - 1)).toISOString();
       const end = endOfDay(new Date()).toISOString();
       const [a, sv, st, l, fb, salesRes] = await Promise.all([
-        supabase.from("appointments").select("id, status, start_at, service_id, staff_id, location_id, is_new_client, client_email").gte("start_at", start).lte("start_at", end),
-        supabase.from("services").select("id, name, price_cents"),
-        supabase.from("staff_profiles").select("id, full_name"),
-        supabase.from("locations").select("id, name"),
-        supabase.from("client_feedback").select("id, rating, comment, allow_testimonial, featured, created_at, client_email").gte("created_at", start).order("created_at", { ascending: false }),
+        apiQuery("appointments").select("id, status, start_at, service_id, staff_id, location_id, is_new_client, client_email").gte("start_at", start).lte("start_at", end),
+        apiQuery("services").select("id, name, price_cents"),
+        apiQuery("staff_profiles").select("id, full_name"),
+        apiQuery("locations").select("id, name"),
+        apiQuery("client_feedback").select("id, rating, comment, allow_testimonial, featured, created_at, client_email").gte("created_at", start).order("created_at", { ascending: false }),
         // Real paid revenue from POS sales in window
-        supabase.from("sales").select("id, appointment_id, total_cents, paid_at").eq("status", "paid").gte("paid_at", start).lte("paid_at", end),
+        apiQuery("sales").select("id, appointment_id, total_cents, paid_at").eq("status", "paid").gte("paid_at", start).lte("paid_at", end),
       ]);
       const list = (a.data ?? []) as Appt[];
       setAppts(list);
@@ -83,7 +83,7 @@ export default function AdminReports() {
       // Per-service actual paid revenue from sale_items (reflects discounts & corrections)
       const svcRev: Record<string, number> = {};
       if (saleIds.length) {
-        const { data: items } = await supabase
+        const { data: items } = await apiQuery
           .from("sale_items")
           .select("sale_id, kind, reference_id, line_total_cents")
           .in("sale_id", saleIds);
@@ -97,7 +97,7 @@ export default function AdminReports() {
 
       const ids = list.map((x) => x.id);
       if (ids.length) {
-        const { data } = await supabase.from("appointment_services").select("appointment_id, service_id").in("appointment_id", ids);
+        const { data } = await apiQuery("appointment_services").select("appointment_id, service_id").in("appointment_id", ids);
         const m: Record<string, string[]> = {};
         for (const r of (data ?? []) as any[]) (m[r.appointment_id] ||= []).push(r.service_id);
         setApptSvcMap(m);
@@ -292,7 +292,7 @@ export default function AdminReports() {
             size="sm" variant="outline" className="rounded-full"
             onClick={async () => {
               const t = toast.loading("Sending digest…");
-              const { data, error } = await supabase.functions.invoke("send-daily-digest", { body: {} });
+              const { data, error } = await ApiClient.post("send-daily-digest", { body: {} });
               toast.dismiss(t);
               if (error || data?.error) toast.error(data?.error || error?.message || "Could not send");
               else toast.success(`Digest sent to ${data?.sent ?? 0} admin${data?.sent === 1 ? "" : "s"}`);
@@ -304,7 +304,7 @@ export default function AdminReports() {
             size="sm" variant="outline" className="rounded-full"
             onClick={async () => {
               const t = toast.loading("Sending monthly report…");
-              const { data, error } = await supabase.functions.invoke("send-monthly-report", { body: {} });
+              const { data, error } = await ApiClient.post("send-monthly-report", { body: {} });
               toast.dismiss(t);
               if (error || data?.error) toast.error(data?.error || error?.message || "Could not send");
               else toast.success(`Monthly report sent to ${data?.sent ?? 0} admin${data?.sent === 1 ? "" : "s"}`);
@@ -547,7 +547,7 @@ export default function AdminReports() {
                           className="h-7 text-[11px]"
                           onClick={async () => {
                             const next = !f.featured;
-                            const { error } = await supabase.from("client_feedback").update({ featured: next }).eq("id", f.id);
+                            const { error } = await apiQuery("client_feedback").update({ featured: next }).eq("id", f.id);
                             if (error) { toast.error(error.message); return; }
                             setFeedback((prev) => prev.map((x) => x.id === f.id ? { ...x, featured: next } : x));
                             toast.success(next ? "Added to public reviews wall" : "Removed from reviews wall");

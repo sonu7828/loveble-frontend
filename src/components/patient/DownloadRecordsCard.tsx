@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, Download, FileText, FileArchive, Loader2 } from "lucide-react";
@@ -35,7 +35,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
       if (includeNotes) {
         promises.push(
           (async () => {
-            const { data } = await supabase
+            const { data } = await apiQuery
               .from("clinical_notes")
               .select("id, created_at, category, service_name, provider_name, note_body, status")
               .ilike("client_email", email)
@@ -49,7 +49,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
       if (includeConsents) {
         promises.push(
           (async () => {
-            const { data } = await supabase
+            const { data } = await apiQuery
               .from("consent_signatures")
               .select("id, signed_at, signed_full_name, decision, signing_mode, form_version")
               .ilike("client_email", email)
@@ -62,7 +62,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
       if (includeAppts) {
         promises.push(
           (async () => {
-            const { data } = await supabase
+            const { data } = await apiQuery
               .from("appointments")
               .select("id, start_at, end_at, status, created_at")
               .ilike("client_email", email)
@@ -75,7 +75,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
       if (includeReceipts) {
         promises.push(
           (async () => {
-            const { data } = await supabase
+            const { data } = await apiQuery
               .from("sales")
               .select("id, paid_at, total_cents, receipt_url, status")
               .ilike("client_email", email);

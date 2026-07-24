@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -97,7 +97,7 @@ export default function PhotoUpload() {
       const fullCaption = `${angleTag}${caption}`.trim() || undefined;
       for (const f of files) {
         const b64 = await fileToBase64(f);
-        const { data, error } = await supabase.functions.invoke("client-upload-photo", {
+        const { data, error } = await ApiClient.post("client-upload-photo", {
           body: { token, fileBase64: b64, mimeType: f.type, caption: fullCaption },
         });
         if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message);

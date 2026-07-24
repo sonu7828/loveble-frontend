@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Search, FileText } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,7 +33,7 @@ export default function ChartNotesIndex() {
       const since = new Date();
       const days = parseInt(range, 10);
       since.setDate(since.getDate() - (isNaN(days) ? 30 : days));
-      let q = supabase
+      let q = apiQuery
         .from("clinical_notes")
         .select("id, client_email, client_first_name, client_last_name, category, status, signed_at, created_at, provider_name")
         .order("created_at", { ascending: false })

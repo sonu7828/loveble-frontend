@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2, RefreshCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { toast } from "sonner";
 import { fmt, functionErrorMessage } from "./shared";
 
@@ -19,7 +19,7 @@ export function PaymentMonitorScreen({ saleId, totalCents, onCheckNow, onCancell
     if (!saleId) return;
     if (!confirm("Cancel this payment and pick a different method?\n\nIf the card has already been charged, the sale will be marked paid instead.")) return;
     setCancelling(true);
-    const { data, error } = await supabase.functions.invoke("pos-cancel-payment", { body: { saleId } });
+    const { data, error } = await ApiClient.post("pos-cancel-payment", { body: { saleId } });
     setCancelling(false);
     if (error || data?.error) {
       toast.error(data?.error || await functionErrorMessage(error, "Could not cancel payment"));
@@ -45,7 +45,7 @@ export function PaymentMonitorScreen({ saleId, totalCents, onCheckNow, onCancell
         <div className="flex flex-col sm:flex-row gap-2 justify-center">
           <Button variant="outline" className="rounded-full" onClick={async () => {
             onCheckNow();
-            if (saleId) await supabase.functions.invoke("pos-confirm-payment", { body: { saleId } }).catch(() => {});
+            if (saleId) await ApiClient.post("pos-confirm-payment", { body: { saleId } }).catch(() => {});
           }}>
             <RefreshCcw className="h-4 w-4 mr-2" /> Check now
           </Button>

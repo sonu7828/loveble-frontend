@@ -5,7 +5,7 @@
 // Accept/Decline, and a SINGLE signature at the bottom is applied to every accepted
 // form. Staff witness name is captured once.
 import { useEffect, useState, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, PenLine, AlertTriangle, ShieldCheck, Check } from "lucide-react";
@@ -13,9 +13,6 @@ import { toast } from "sonner";
 import { CompactConsentCard, buildPayloadFor, type CompactValue } from "@/components/CompactConsentCard";
 import { SharedConsentSigner } from "@/components/SharedConsentSigner";
 import type { ConsentFormData } from "@/components/ConsentSigner";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface Props {
   open: boolean;
@@ -41,16 +38,16 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authService.getSession();
       if (!user) return;
-      const { data: sp } = await supabase.from("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
+      const { data: sp } = await apiQuery("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
       if (sp?.full_name) setWitnessName(sp.full_name);
     })();
   }, [open]);
 
   const loadAll = async () => {
     setLoading(true); setValues({}); setSharedSig(""); setMissing([]);
-    const { data: a } = await supabase
+    const { data: a } = await apiQuery
       .from("appointments")
       .select("public_token, client_first_name, client_last_name, client_email")
       .eq("id", appointmentId).maybeSingle();
@@ -58,11 +55,11 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
     setToken(a.public_token);
 
     const [{ data: apsv }, { data: universal }] = await Promise.all([
-      supabase
+      apiQuery
         .from("appointment_services")
         .select("service_id, services!inner(skip_consents)")
         .eq("appointment_id", appointmentId),
-      supabase
+      apiQuery
         .from("consent_forms")
         .select("id, title, is_optional")
         .eq("is_active", true)
@@ -74,7 +71,7 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
 
     let mappedForms: { id: string; title: string; is_optional: boolean }[] = [];
     if (eligibleSvcIds.length) {
-      const { data: sc } = await supabase
+      const { data: sc } = await apiQuery
         .from("service_consents")
         .select("consent_form_id, consent_forms!inner(id, title, is_optional, is_active)")
         .in("service_id", eligibleSvcIds);
@@ -88,7 +85,7 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
     for (const f of mappedForms) expected.set(f.id, f as any);
     const requiredExpected = Array.from(expected.values()).filter((f) => !f.is_optional);
 
-    const { data: assigned } = await supabase
+    const { data: assigned } = await apiQuery
       .from("appointment_consents")
       .select("consent_form_id")
       .eq("appointment_id", appointmentId);
@@ -124,7 +121,7 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
   const fixMissing = async () => {
     if (!missing.length) return;
     setFixing(true);
-    const { data, error } = await supabase.functions.invoke("assign-consent-forms", {
+    const { data, error } = await ApiClient.post("assign-consent-forms", {
       body: { appointmentId, consentFormIds: missing.map((m) => m.id) },
     });
     setFixing(false);

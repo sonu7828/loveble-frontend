@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { PortalCTA } from "@/components/PortalCTA";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+import { ApiClient } from "@/services/api";
 
 export default function PatientConsents() {
   const { token } = useParams();
@@ -25,10 +23,9 @@ export default function PatientConsents() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`${SUPABASE_URL}/functions/v1/public-sign-consents?token=${encodeURIComponent(token)}`,
-      { headers: { apikey: ANON } })
-      .then((r) => r.json())
-      .then((d) => {
+    ApiClient.get(`/consents?token=${encodeURIComponent(token)}`)
+      .then((res) => {
+        const d = res.data || {};
         if (d.error) { toast.error(d.error); }
         else {
           setAppt(d.appointment);

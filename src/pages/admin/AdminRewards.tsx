@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Loader2, Star } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -40,13 +40,13 @@ export default function AdminRewards() {
   const load = async () => {
     setLoading(true);
     const [s, l, b] = await Promise.all([
-      supabase.from("client_points_settings" as any).select("*").eq("id", true).maybeSingle(),
-      supabase
+      apiQuery("client_points_settings" as any).select("*").eq("id", true).maybeSingle(),
+      apiQuery
         .from("client_points_ledger" as any)
         .select("id, client_email, delta, reason, notes, created_at")
         .order("created_at", { ascending: false })
         .limit(50),
-      supabase
+      apiQuery
         .from("client_points_balances" as any)
         .select("client_email, balance, last_activity_at")
         .order("balance", { ascending: false })
@@ -68,7 +68,7 @@ export default function AdminRewards() {
   const save = async () => {
     if (!settings) return;
     setSaving(true);
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("client_points_settings" as any)
       .update({ ...settings, updated_at: new Date().toISOString() })
       .eq("id", true);

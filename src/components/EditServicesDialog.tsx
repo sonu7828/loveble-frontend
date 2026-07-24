@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -34,9 +34,9 @@ export function EditServicesDialog({
     if (!open) return;
     setLoading(true);
     Promise.all([
-      supabase.from("services").select("id, name, duration_minutes, buffer_minutes").eq("is_active", true).order("name"),
-      supabase.from("service_providers").select("service_id, staff_id, location_id"),
-      supabase.from("appointment_services").select("service_id, display_order").eq("appointment_id", appointmentId).order("display_order"),
+      apiQuery("services").select("id, name, duration_minutes, buffer_minutes").eq("is_active", true).order("name"),
+      apiQuery("service_providers").select("service_id, staff_id, location_id"),
+      apiQuery("appointment_services").select("service_id, display_order").eq("appointment_id", appointmentId).order("display_order"),
     ]).then(([s, p, a]) => {
       setAllServices((s.data ?? []) as SvcRow[]);
       setProviders((p.data ?? []) as any);
@@ -85,7 +85,7 @@ export function EditServicesDialog({
       const end = new Date(start.getTime() + totalMinutes * 60000);
 
       // Pre-check overlap with other appointments for same provider
-      const { data: conflicts } = await supabase
+      const { data: conflicts } = await apiQuery
         .from("appointments")
         .select("id, start_at, end_at, client_first_name, client_last_name")
         .eq("staff_id", staffId)
@@ -108,14 +108,14 @@ export function EditServicesDialog({
       }
 
       if (useOverride) {
-        const { error: fErr } = await supabase.rpc("update_appointment_end_force", {
+        const { error: fErr } = await apiQuery("update_appointment_end_force", {
           p_appointment_id: appointmentId,
           p_end_at: end.toISOString(),
           p_service_id: primaryId,
         });
         if (fErr) throw fErr;
       } else {
-        const { error: aErr } = await supabase
+        const { error: aErr } = await apiQuery
           .from("appointments")
           .update({
             service_id: primaryId,
@@ -129,7 +129,7 @@ export function EditServicesDialog({
 
 
       // Replace appointment_services rows
-      await supabase.from("appointment_services").delete().eq("appointment_id", appointmentId);
+      await apiQuery("appointment_services").delete().eq("appointment_id", appointmentId);
       const rows = serviceIds.map((sid, idx) => {
         const s = allServices.find(x => x.id === sid);
         return {
@@ -139,11 +139,11 @@ export function EditServicesDialog({
           duration_minutes: s?.duration_minutes ?? 0,
         };
       });
-      const { error: asErr } = await supabase.from("appointment_services").insert(rows);
+      const { error: asErr } = await apiQuery("appointment_services").insert(rows);
       if (asErr) throw asErr;
 
       // Auto-assign service-specific consents (don't remove existing; idempotent)
-      const { data: links } = await supabase
+      const { data: links } = await apiQuery
         .from("service_consents")
         .select("consent_form_id, service_id, consent_forms(is_active)")
         .in("service_id", serviceIds);
@@ -153,7 +153,7 @@ export function EditServicesDialog({
           .map((l: any) => l.consent_form_id as string)
       ));
       if (formIds.length) {
-        const { data: existing } = await supabase
+        const { data: existing } = await apiQuery
           .from("appointment_consents")
           .select("consent_form_id")
           .eq("appointment_id", appointmentId);
@@ -162,18 +162,18 @@ export function EditServicesDialog({
           .filter(fid => !have.has(fid))
           .map(fid => ({ appointment_id: appointmentId, consent_form_id: fid }));
         if (toInsert.length) {
-          await supabase.from("appointment_consents").insert(toInsert);
+          await apiQuery("appointment_consents").insert(toInsert);
         }
       }
 
-      await supabase.from("appointment_audit_log").insert({
+      await apiQuery("appointment_audit_log").insert({
         appointment_id: appointmentId,
         action: "services_updated",
         notes: `Services updated to: ${serviceIds.map(id => allServices.find(s => s.id === id)?.name).filter(Boolean).join(", ")} (${totalMinutes} min)`,
       });
 
       // Re-sync calendar event with new times/title (fire-and-forget)
-      supabase.functions.invoke("google-calendar-sync", { body: { appointmentId } }).catch(() => {});
+      ApiClient.post("google-calendar-sync", { body: { appointmentId } }).catch(() => {});
 
       toast.success("Services updated");
       onSaved();

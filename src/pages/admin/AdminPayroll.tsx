@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,12 +97,12 @@ export default function AdminPayroll() {
     setLoading(true);
     try {
       // Members + pay config
-      const { data: m } = await supabase
+      const { data: m } = await apiQuery
         .from("staff_profiles")
         .select("id, full_name, title, email, is_active")
         .eq("is_active", true)
         .order("full_name");
-      const { data: pay } = await (supabase as any).from("staff_pay_config")
+      const { data: pay } = await (apiQuery as any).from("staff_pay_config")
         .select("staff_id, hourly_rate_cents, commission_percent");
       const payMap: Record<string, { rate: number; pct: number }> = {};
       (pay ?? []).forEach((p: any) => {
@@ -129,7 +129,7 @@ export default function AdminPayroll() {
       endTs.setHours(23, 59, 59, 999);
 
       // Time entries in window (clock_in within period, clock_out not null)
-      const { data: entries } = await supabase
+      const { data: entries } = await apiQuery
         .from("staff_time_entries")
         .select("staff_id, clock_in, clock_out")
         .gte("clock_in", startTs.toISOString())
@@ -144,7 +144,7 @@ export default function AdminPayroll() {
       });
 
       // Paid sales in window per staff (for tips)
-      const { data: sales } = await supabase
+      const { data: sales } = await apiQuery
         .from("sales")
         .select("id, staff_id, tip_cents, paid_at, status")
         .eq("status", "paid")
@@ -164,7 +164,7 @@ export default function AdminPayroll() {
       // Service line items on those sales for commission base
       const commissionBaseMap: Record<string, number> = {};
       if (saleIds.length) {
-        const { data: items } = await supabase
+        const { data: items } = await apiQuery
           .from("sale_items")
           .select("sale_id, kind, line_total_cents")
           .in("sale_id", saleIds)
@@ -188,7 +188,7 @@ export default function AdminPayroll() {
       setRows(computed);
 
       // Existing payouts for this period
-      const { data: po } = await supabase
+      const { data: po } = await apiQuery
         .from("staff_payouts" as any)
         .select("*")
         .eq("period_start", periodStartISO)
@@ -224,8 +224,8 @@ export default function AdminPayroll() {
     setSaving(true);
     const adj = Math.round((parseFloat(adjustments || "0") || 0) * 100);
     const total = paying.total_cents + adj;
-    const user = (await supabase.auth.getUser()).data.user;
-    const { error } = await (supabase as any).from("staff_payouts").upsert({
+    const user = (await authService.getSession()).data.user;
+    const { error } = await (apiQuery as any).from("staff_payouts").upsert({
       staff_id: paying.member.id,
       period_start: periodStartISO,
       period_end: periodEndISO,
@@ -257,7 +257,7 @@ export default function AdminPayroll() {
 
   const unmarkPaid = async (staff_id: string) => {
     if (!(await confirmDialog({ title: "Remove payout record?", description: "The staff member will appear as unpaid for this pay period. This action can be reversed.", destructive: true, confirmLabel: "Remove Payout" }))) return;
-    const { error } = await (supabase as any).from("staff_payouts")
+    const { error } = await (apiQuery as any).from("staff_payouts")
       .delete()
       .eq("staff_id", staff_id)
       .eq("period_start", periodStartISO)

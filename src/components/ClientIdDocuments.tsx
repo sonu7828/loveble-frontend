@@ -1,6 +1,6 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Upload, FileImage, Trash2, Eye, ShieldCheck } from "lucide-react";
@@ -25,7 +25,7 @@ export function ClientIdDocuments({ email }: { email: string }) {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.storage.from(BUCKET).list(folder, {
+    const { data, error } = await ApiClient.list(folder, {
       limit: 100,
       sortBy: { column: "updated_at", order: "desc" },
     });
@@ -60,7 +60,7 @@ export function ClientIdDocuments({ email }: { email: string }) {
     setUploading(true);
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = `${folder}/${Date.now()}-${safeName}`;
-    const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    const { error } = await ApiClient.upload(path, file, {
       cacheControl: "3600",
       upsert: false,
       contentType: file.type || undefined,
@@ -76,7 +76,7 @@ export function ClientIdDocuments({ email }: { email: string }) {
   };
 
   const onView = async (path: string) => {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 300);
+    const { data, error } = await ApiClient.createSignedUrl(path, 300);
     if (error || !data?.signedUrl) {
       toast.error("Could not open file");
       return;
@@ -89,7 +89,7 @@ export function ClientIdDocuments({ email }: { email: string }) {
 
   const onDelete = async (path: string) => {
     if (!(await confirmDialog({ title: "Delete this ID document?", description: "This cannot be undone.", destructive: true, confirmLabel: "Delete" }))) return;
-    const { error } = await supabase.storage.from(BUCKET).remove([path]);
+    const { error } = await ApiClient.remove([path]);
     if (error) {
       toast.error("Delete failed");
       return;

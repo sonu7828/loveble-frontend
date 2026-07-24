@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Star, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const Feedback = () => {
       return;
     }
     setSubmitting(true);
-    const { data, error } = await supabase.functions.invoke("submit-feedback", {
+    const { data, error } = await ApiClient.post("submit-feedback", {
       body: { token, rating, comment, allowTestimonial },
     });
     setSubmitting(false);

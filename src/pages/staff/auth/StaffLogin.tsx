@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,7 +74,7 @@ export default function StaffLogin() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await authService.getSession();
       if (cancelled) return;
       if (data.session) {
         setEmail(data.session.user.email ?? "");
@@ -92,7 +92,7 @@ export default function StaffLogin() {
     setErrMsg("");
     try {
       const { data: aal, error: aalErr } = await withTimeout(
-        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+        authService.mfa.getAuthenticatorAssuranceLevel(),
         "Checking two-factor status",
       );
       if (aalErr) throw aalErr;
@@ -102,21 +102,21 @@ export default function StaffLogin() {
         // Resolve target from DB roles — no email hardcoding.
         let aal2Target = "/staff/today";
         try {
-          const { data: { session: s } } = await supabase.auth.getSession();
+          const { data: { session: s } } = await authService.getSession();
           if (s?.user?.id) {
-            const { data: rd } = await supabase.from("user_roles").select("role").eq("user_id", s.user.id);
+            const { data: rd } = await apiQuery("user_roles").select("role").eq("user_id", s.user.id);
             aal2Target = resolveRedirectTarget((rd ?? []).map((x: any) => x.role));
           }
         } catch { /* keep fallback /staff/today */ }
         setTimeout(() => navigate(aal2Target, { replace: true }), 350);
         return;
       }
-      const { data: factors, error } = await withTimeout(supabase.auth.mfa.listFactors(), "Loading authenticator factors");
+      const { data: factors, error } = await withTimeout(authService.mfa.listFactors(), "Loading authenticator factors");
       if (error) throw error;
       const verified = factors?.totp?.find((f) => f.status === "verified");
       if (verified) {
         const { data: ch, error: chErr } = await withTimeout(
-          supabase.auth.mfa.challenge({ factorId: verified.id }),
+          authService.mfa.challenge({ factorId: verified.id }),
           "Starting two-factor verification",
         );
         if (chErr) throw chErr;
@@ -127,11 +127,11 @@ export default function StaffLogin() {
         setMode("ready");
       } else {
         // Evaluate if user is in a privileged role (admin, provider/staff, nurse_practitioner)
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const { data: { session: currentSession } } = await authService.getSession();
         const uid = currentSession?.user?.id;
         let isPrivileged = false;
         if (uid) {
-          const { data: rData } = await supabase.from("user_roles").select("role").eq("user_id", uid);
+          const { data: rData } = await apiQuery("user_roles").select("role").eq("user_id", uid);
           const userRoles = (rData ?? []).map((x: any) => x.role);
           isPrivileged = userRoles.includes("admin") || userRoles.includes("staff") || userRoles.includes("nurse_practitioner");
         }
@@ -146,18 +146,18 @@ export default function StaffLogin() {
 
         const unverified = factors?.totp?.filter((f) => f.status !== "verified") ?? [];
         for (const f of unverified) {
-          try { await withTimeout(supabase.auth.mfa.unenroll({ factorId: f.id }), "Clearing old authenticator setup"); } catch (e) { console.warn(e); }
+          try { await withTimeout(authService.mfa.unenroll({ factorId: f.id }), "Clearing old authenticator setup"); } catch (e) { console.warn(e); }
         }
-        let { data: enroll, error: enrErr } = await withTimeout(supabase.auth.mfa.enroll({
+        let { data: enroll, error: enrErr } = await withTimeout(authService.mfa.enroll({
           factorType: "totp",
           friendlyName: `Authenticator-${crypto.randomUUID()}`,
         }), "Creating authenticator setup");
         if (enrErr && isFactorNameConflict(enrErr)) {
-          const { data: latest } = await withTimeout(supabase.auth.mfa.listFactors(), "Refreshing authenticator factors");
+          const { data: latest } = await withTimeout(authService.mfa.listFactors(), "Refreshing authenticator factors");
           for (const f of latest?.totp?.filter((i) => i.status !== "verified") ?? []) {
-            try { await withTimeout(supabase.auth.mfa.unenroll({ factorId: f.id }), "Clearing duplicate authenticator setup"); } catch (e) { console.warn(e); }
+            try { await withTimeout(authService.mfa.unenroll({ factorId: f.id }), "Clearing duplicate authenticator setup"); } catch (e) { console.warn(e); }
           }
-          const retry = await withTimeout(supabase.auth.mfa.enroll({
+          const retry = await withTimeout(authService.mfa.enroll({
             factorType: "totp",
             friendlyName: `Authenticator-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           }), "Creating a fresh authenticator setup");
@@ -255,7 +255,7 @@ export default function StaffLogin() {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+    const { error } = await authService.signInWithPassword({ email: cleanEmail, password });
     setLoading(false);
     if (error) {
       toast.error(error.message);
@@ -271,11 +271,11 @@ export default function StaffLogin() {
     setBusy(true);
     try {
       const { data: ch, error: chErr } = await withTimeout(
-        supabase.auth.mfa.challenge({ factorId }),
+        authService.mfa.challenge({ factorId }),
         "Starting two-factor verification",
       );
       if (chErr) { toast.error(chErr.message); return; }
-      const { error } = await withTimeout(supabase.auth.mfa.verify({
+      const { error } = await withTimeout(authService.mfa.verify({
         factorId, challengeId: ch.id, code: code.trim(),
       }), "Verifying two-factor code");
       if (error) { toast.error(error.message); return; }
@@ -284,9 +284,9 @@ export default function StaffLogin() {
       // Resolve target from DB roles after successful MFA enrollment.
       let enrollTarget = "/staff/today";
       try {
-        const { data: { session: es } } = await supabase.auth.getSession();
+        const { data: { session: es } } = await authService.getSession();
         if (es?.user?.id) {
-          const { data: rd } = await supabase.from("user_roles").select("role").eq("user_id", es.user.id);
+          const { data: rd } = await apiQuery("user_roles").select("role").eq("user_id", es.user.id);
           enrollTarget = resolveRedirectTarget((rd ?? []).map((x: any) => x.role));
         }
       } catch { /* keep fallback /staff/today */ }
@@ -319,13 +319,13 @@ export default function StaffLogin() {
     if (!factorId || !challengeId) return;
     setBusy(true);
     try {
-      const { error } = await withTimeout(supabase.auth.mfa.verify({
+      const { error } = await withTimeout(authService.mfa.verify({
         factorId, challengeId, code: code.trim(),
       }), "Verifying two-factor code");
       if (error) {
         toast.error(error.message);
         setCode("");
-        const { data: ch } = await supabase.auth.mfa.challenge({ factorId });
+        const { data: ch } = await authService.mfa.challenge({ factorId });
         if (ch) setChallengeId(ch.id);
         return;
       }
@@ -334,9 +334,9 @@ export default function StaffLogin() {
       // Resolve target from DB roles — no email hardcoding.
       let verifyTarget = "/staff/today";
       try {
-        const { data: { session: vs } } = await supabase.auth.getSession();
+        const { data: { session: vs } } = await authService.getSession();
         if (vs?.user?.id) {
-          const { data: rd } = await supabase.from("user_roles").select("role").eq("user_id", vs.user.id);
+          const { data: rd } = await apiQuery("user_roles").select("role").eq("user_id", vs.user.id);
           verifyTarget = resolveRedirectTarget((rd ?? []).map((x: any) => x.role));
         }
       } catch { /* keep fallback /staff/today */ }
@@ -349,7 +349,7 @@ export default function StaffLogin() {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await authService.logout();
     setStep("credentials");
     setMode("ready");
     setEmail(""); setPassword(""); setCode("");

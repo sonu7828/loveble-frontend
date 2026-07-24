@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -161,7 +161,7 @@ export default function AdminHipaaPolicies() {
     setLoading(true);
     let remotePolicies: Policy[] = [];
     try {
-      const { data, error } = await supabase.from("hipaa_policies" as any).select("*").order("category").order("title");
+      const { data, error } = await apiQuery("hipaa_policies" as any).select("*").order("category").order("title");
       if (!error && data) remotePolicies = (data as any) || [];
     } catch (e) {}
 
@@ -183,7 +183,7 @@ export default function AdminHipaaPolicies() {
       loadAuditLogs(p.id);
     }
     
-    supabase.from("hipaa_policy_versions" as any)
+    apiQuery("hipaa_policy_versions" as any)
       .select("*").eq("policy_id", selectedId).order("version", { ascending: false })
       .then(({ data }) => {
         const remoteVersions = (data as any) || [];
@@ -212,7 +212,7 @@ export default function AdminHipaaPolicies() {
     if (!draft) return;
     setSaving(true);
     try {
-      await supabase.from("hipaa_policies" as any).update({
+      await apiQuery("hipaa_policies" as any).update({
         title: draft.title, category: draft.category, summary: draft.summary,
         body_markdown: draft.body_markdown, effective_date: draft.effective_date,
         review_due_date: draft.review_due_date,
@@ -250,8 +250,8 @@ export default function AdminHipaaPolicies() {
     };
 
     try {
-      await supabase.from("hipaa_policies" as any).update(updatePayload).eq("id", draft.id);
-      await supabase.from("hipaa_policy_versions" as any).insert({
+      await apiQuery("hipaa_policies" as any).update(updatePayload).eq("id", draft.id);
+      await apiQuery("hipaa_policy_versions" as any).insert({
         policy_id: draft.id, version: newVersion, title: draft.title, summary: draft.summary,
         body_markdown: draft.body_markdown, effective_date: draft.effective_date, approved_by: user?.id,
       });
@@ -306,7 +306,7 @@ export default function AdminHipaaPolicies() {
     };
 
     try {
-      await supabase.from("hipaa_policies" as any).update({ status: "draft" }).eq("id", draft.id);
+      await apiQuery("hipaa_policies" as any).update({ status: "draft" }).eq("id", draft.id);
     } catch (e) {}
 
     const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
@@ -325,7 +325,7 @@ export default function AdminHipaaPolicies() {
     if (!draft) return;
     if (!(await confirmDialog({ title: "Archive this policy?", description: "This policy will be moved to archived status.", destructive: true, confirmLabel: "Archive Policy" }))) return;
     try {
-      await supabase.from("hipaa_policies" as any).update({ status: "archived" }).eq("id", draft.id);
+      await apiQuery("hipaa_policies" as any).update({ status: "archived" }).eq("id", draft.id);
     } catch (e) {}
 
     const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
@@ -339,7 +339,7 @@ export default function AdminHipaaPolicies() {
   const reactivate = async () => {
     if (!draft) return;
     try {
-      await supabase.from("hipaa_policies" as any).update({ status: "draft" }).eq("id", draft.id);
+      await apiQuery("hipaa_policies" as any).update({ status: "draft" }).eq("id", draft.id);
     } catch (e) {}
 
     const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
@@ -371,7 +371,7 @@ export default function AdminHipaaPolicies() {
 
     let newId = `policy-${Date.now()}`;
     try {
-      const { data, error } = await supabase.from("hipaa_policies" as any).insert(payload).select().single();
+      const { data, error } = await apiQuery("hipaa_policies" as any).insert(payload).select().single();
       if (!error && data) {
         newId = (data as any).id;
       }
