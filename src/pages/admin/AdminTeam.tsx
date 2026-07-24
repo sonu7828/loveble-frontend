@@ -231,18 +231,31 @@ export default function AdminTeam() {
 
       // Update active team list
       const existingTeam: Member[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
+      let teamFound = false;
       const updatedTeam = existingTeam.map(m => {
-        if (m.id === draft.id) {
+        if (m.id === draft.id || (m.email && email && m.email.toLowerCase() === m.email.toLowerCase())) {
+          teamFound = true;
           return {
             ...m,
             full_name: draft.full_name.trim(),
             title: draft.title.trim(),
             email,
             color: draft.color,
+            role: draft.role,
           };
         }
         return m;
       });
+      if (!teamFound && originalMember) {
+        updatedTeam.push({
+          ...originalMember,
+          full_name: draft.full_name.trim(),
+          title: draft.title.trim(),
+          email,
+          color: draft.color,
+          role: draft.role,
+        } as any);
+      }
       localStorage.setItem("rka_demo_team_members", JSON.stringify(updatedTeam));
 
       // Update in database if it exists there
@@ -454,24 +467,6 @@ export default function AdminTeam() {
   };
 
   const resolveMemberRole = (m: Member): Role => {
-    const titleLower = (m.title || "").toLowerCase();
-    const inferredRoleFromTitle: Role | null =
-      titleLower.includes("medical director") || titleLower.includes("supervising physician")
-        ? "medical_director"
-        : titleLower.includes("nurse practitioner") || titleLower.includes("np")
-        ? "nurse_practitioner"
-        : titleLower.includes("physician") || titleLower.includes("practitioner") || titleLower.includes("provider") || titleLower.includes("injector")
-        ? "provider"
-        : titleLower.includes("security") || titleLower.includes("privacy")
-        ? "privacy_officer"
-        : titleLower.includes("receptionist")
-        ? "receptionist"
-        : titleLower.includes("scheduler")
-        ? "scheduler"
-        : null;
-
-    if (inferredRoleFromTitle) return inferredRoleFromTitle;
-
     const memberRoles = m.user_id ? (roles[m.user_id] ?? []) : [];
     const inv = invites[m.id];
     const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
@@ -479,10 +474,10 @@ export default function AdminTeam() {
       (a: any) => a.email && m.email && a.email.toLowerCase() === m.email.toLowerCase()
     );
 
-    return (
-      m.pending_role ||
+    const explicitRole =
       (m as any).role ||
       (matchedApproved?.role as Role) ||
+      m.pending_role ||
       (memberRoles.includes("admin")
         ? "admin"
         : memberRoles.includes("medical_director")
@@ -499,8 +494,19 @@ export default function AdminTeam() {
         ? "receptionist"
         : memberRoles.includes("staff")
         ? "staff"
-        : (inv?.role ?? "staff"))
-    );
+        : null);
+
+    if (explicitRole) return explicitRole as Role;
+
+    const titleLower = (m.title || "").toLowerCase();
+    if (titleLower.includes("medical director") || titleLower.includes("supervising physician")) return "medical_director";
+    if (titleLower.includes("nurse practitioner") || titleLower.includes("np")) return "nurse_practitioner";
+    if (titleLower.includes("physician") || titleLower.includes("practitioner") || titleLower.includes("provider") || titleLower.includes("injector")) return "provider";
+    if (titleLower.includes("security") || titleLower.includes("privacy")) return "privacy_officer";
+    if (titleLower.includes("receptionist")) return "receptionist";
+    if (titleLower.includes("scheduler")) return "scheduler";
+
+    return (inv?.role as Role) ?? "staff";
   };
 
   const getRoleBadge = (role: Role) => {
@@ -526,13 +532,26 @@ export default function AdminTeam() {
 
   if (!isAdmin) return <div className="p-8 text-sm text-muted-foreground">Admins only.</div>;
 
+  const getMemberRoleFilterCount = (filter: string) => {
+    return members.filter((m) => {
+      if (filter === "all") return true;
+      const r = resolveMemberRole(m);
+      if (filter === "admin") return r === "admin";
+      if (filter === "provider") return r === "provider";
+      if (filter === "md") return r === "medical_director";
+      if (filter === "np") return r === "nurse_practitioner";
+      if (filter === "staff") return r === "staff" || r === "receptionist" || r === "scheduler";
+      return true;
+    }).length;
+  };
+
   const filteredMembers = members.filter((m) => {
     if (roleFilter === "all") return true;
     const primaryRole = resolveMemberRole(m);
 
     if (roleFilter === "admin") return primaryRole === "admin";
     if (roleFilter === "md") return primaryRole === "medical_director";
-    if (roleFilter === "provider") return primaryRole === "provider" || primaryRole === "nurse_practitioner" || primaryRole === "medical_director";
+    if (roleFilter === "provider") return primaryRole === "provider";
     if (roleFilter === "np") return primaryRole === "nurse_practitioner";
     if (roleFilter === "staff") return primaryRole === "staff" || primaryRole === "receptionist" || primaryRole === "scheduler";
     return true;

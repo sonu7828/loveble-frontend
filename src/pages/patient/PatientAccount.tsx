@@ -110,11 +110,12 @@ export default function PatientAccount() {
 
   useEffect(() => {
     (async () => {
-      const session = await getClientSession();
-      if (!session) { navigate("/account/auth"); return; }
-      setUser(session.user);
+      try {
+        const session = await getClientSession();
+        if (!session) { navigate("/account/auth"); return; }
+        setUser(session.user);
 
-      const email = session.user.email?.toLowerCase();
+        const email = session.user.email?.toLowerCase();
 
       const [{ data: prof }, { data: ap }, { data: cs }, { data: sv }, { data: st }, { data: loc }] = await Promise.all([
         apiQuery("client_profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
@@ -125,31 +126,36 @@ export default function PatientAccount() {
         apiQuery("locations").select("id, name, city"),
       ]);
 
-      const resolvedProfile = prof ?? {
-        id: "demo-profile",
-        user_id: session.user.id,
-        email: session.user.email ?? "user@gmail.com",
-        first_name: session.user.user_metadata?.first_name ?? "Demo",
-        last_name: session.user.user_metadata?.last_name ?? "User",
-        phone: session.user.user_metadata?.phone ?? "555-0199",
-      };
+        const resolvedProfile = prof ?? {
+          id: "demo-profile",
+          user_id: session.user.id,
+          email: session.user.email ?? "user@gmail.com",
+          first_name: session.user.user_metadata?.first_name ?? "Demo",
+          last_name: session.user.user_metadata?.last_name ?? "User",
+          phone: session.user.user_metadata?.phone ?? "555-0199",
+        };
 
-      setProfile(resolvedProfile);
-      setProfileForm({
-        firstName: resolvedProfile.first_name || "",
-        lastName: resolvedProfile.last_name || "",
-        phone: resolvedProfile.phone || "",
-        emergencyContact: resolvedProfile.emergency_contact || "",
-      });
+        setProfile(resolvedProfile);
+        setProfileForm({
+          firstName: resolvedProfile.first_name || "",
+          lastName: resolvedProfile.last_name || "",
+          phone: resolvedProfile.phone || "",
+          emergencyContact: resolvedProfile.emergency_contact || "",
+        });
 
-      setAppts((ap ?? []) as Appt[]);
-      setConsents(cs ?? []);
-      setServices(Object.fromEntries((sv ?? []).map((s: any) => [s.id, s.name])));
-      setStaff(Object.fromEntries((st ?? []).map((s: any) => [s.id, { name: s.full_name, title: s.title }])));
-      setLocations(Object.fromEntries((loc ?? []).map((l: any) => [l.id, { name: l.name, city: l.city }])));
-      setLoading(false);
+        setAppts((ap ?? []) as Appt[]);
+        setConsents(cs ?? []);
+        setServices(Object.fromEntries((sv ?? []).map((s: any) => [s.id, s.name])));
+        setStaff(Object.fromEntries((st ?? []).map((s: any) => [s.id, { name: s.full_name, title: s.title }])));
+        setLocations(Object.fromEntries((loc ?? []).map((l: any) => [l.id, { name: l.name, city: l.city }])));
+      } catch (err) {
+        console.error("PatientAccount load error:", err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [navigate]);
+
 
   const signOut = async () => {
     clearDemoAuthSession();
