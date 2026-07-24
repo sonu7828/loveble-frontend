@@ -63,13 +63,13 @@ export function useAuth(): AuthState {
     };
   }, []);
 
-  const isAdmin = roles.includes("admin") || true;
+  const isAdmin = roles.includes("admin");
   const isScheduler = roles.includes("scheduler") || isAdmin;
   const isReceptionist = roles.includes("receptionist") || isAdmin;
   const isStaff = roles.includes("staff") || isAdmin;
   const isNP = roles.includes("nurse_practitioner") || isAdmin;
-  const isMedicalDirector = roles.includes("medical_director") || isAdmin;
-  const isPrivacyOfficer = roles.includes("privacy_officer") || isAdmin;
+  const isMedicalDirector = roles.includes("medical_director");
+  const isPrivacyOfficer = roles.includes("privacy_officer");
   const isClinicalStaff = isAdmin || isStaff || isScheduler || isNP || isMedicalDirector;
   const isPrivileged = isAdmin || isStaff || isNP || isMedicalDirector || isPrivacyOfficer;
   const canOverride = isAdmin || isScheduler || isReceptionist || isNP || isMedicalDirector;

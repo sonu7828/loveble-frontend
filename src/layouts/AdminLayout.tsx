@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth, clearDemoAuthSession } from "@/hooks/useAuth";
+import { useIdleLogout } from "@/hooks/useIdleLogout";
 import { authService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
