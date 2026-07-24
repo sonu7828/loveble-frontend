@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { openPdf } from "@/lib/openPdf";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -282,13 +282,13 @@ export default function GFEForm() {
       // Prefill NP name from profile
       (async () => {
         if (!user) return;
-        const { data: sp } = await supabase.from("staff_profiles").select("full_name, license_number").eq("user_id", user.id).maybeSingle();
+        const { data: sp } = await apiQuery("staff_profiles").select("full_name, license_number").eq("user_id", user.id).maybeSingle();
         if (sp) setForm(f => ({ ...f, np_name: sp.full_name ?? f.np_name, np_license: (sp as any).license_number ?? f.np_license }));
       })();
       return;
     }
     (async () => {
-      const { data, error } = await supabase.from("gfe_records").select("*").eq("id", id).maybeSingle();
+      const { data, error } = await apiQuery("gfe_records").select("*").eq("id", id).maybeSingle();
       if (error || !data) { toast.error("GFE not found"); navigate(-1); return; }
       setRecord(data);
       // HIPAA audit: record PHI read
@@ -308,7 +308,7 @@ export default function GFEForm() {
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
-      const { data: appts } = await supabase
+      const { data: appts } = await apiQuery
         .from("appointments")
         .select("id, service_id, services:service_id(name)")
         .ilike("client_email", form.client_email)
@@ -333,7 +333,7 @@ export default function GFEForm() {
   useEffect(() => {
     if (isViewMode) return;
     (async () => {
-      const { data } = await supabase.from("services").select("name").eq("is_active", true).order("name");
+      const { data } = await apiQuery("services").select("name").eq("is_active", true).order("name");
       setAllServiceNames((data ?? []).map((r: any) => r.name as string));
     })();
   }, [isViewMode]);
@@ -462,9 +462,9 @@ export default function GFEForm() {
         signature_png: form.signature_png,
         signed_user_agent: ua,
       };
-      const { data, error } = await supabase.from("gfe_records").insert(payload).select("id").single();
+      const { data, error } = await apiQuery("gfe_records").insert(payload).select("id").single();
       if (error) throw error;
-      await supabase.from("clinical_audit_log").insert({
+      await apiQuery("clinical_audit_log").insert({
         actor_user_id: user!.id,
         actor_name: form.np_name,
         resource_type: "gfe",
@@ -484,7 +484,7 @@ export default function GFEForm() {
     if (!record) return;
     setPdfBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-clinical-pdf", {
+      const { data, error } = await ApiClient.post("generate-clinical-pdf", {
         body: { kind: "gfe", id: record.id },
       });
       if (error) throw error;

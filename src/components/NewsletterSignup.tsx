@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Mail, Loader2, Check } from "lucide-react";
 
 const schema = z.object({
@@ -22,7 +22,7 @@ export default function NewsletterSignup({ source = "footer" }: { source?: strin
       return;
     }
     setStatus("loading");
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("newsletter_subscribers")
       .insert({ email: parsed.data.email, source });
     // Treat unique-violation as success ("you're already on the list").

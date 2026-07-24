@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { Loader2, TrendingUp, Users, Syringe, DollarSign, AlertCircle, ClipboardList } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,7 @@ export default function AdminProductivity() {
       const endIso = new Date(`${to}T23:59:59.999`).toISOString();
 
       // 1. Notes (signed) in range with optional neurotoxin units + appointment start
-      const { data: notes } = await supabase
+      const { data: notes } = await apiQuery
         .from("clinical_notes")
         .select("id, provider_user_id, provider_name, status, signed_at, appointment_id, category")
         .gte("signed_at", startIso)
@@ -58,18 +58,18 @@ export default function AdminProductivity() {
 
       const [{ data: neuro }, { data: appts }, { data: sales }, { data: noShows }] = await Promise.all([
         noteIds.length
-          ? supabase.from("clinical_note_neurotoxin").select("clinical_note_id, total_units").in("clinical_note_id", noteIds)
+          ? apiQuery("clinical_note_neurotoxin").select("clinical_note_id, total_units").in("clinical_note_id", noteIds)
           : Promise.resolve({ data: [] as any[] }),
         apptIds.length
-          ? supabase.from("appointments").select("id, start_at, staff_id").in("id", apptIds)
+          ? apiQuery("appointments").select("id, start_at, staff_id").in("id", apptIds)
           : Promise.resolve({ data: [] as any[] }),
         // Revenue: paid sales in range, joined by staff_id (provider) — need to map staff_id → provider_user_id
-        supabase.from("sales")
+        apiQuery("sales")
           .select("staff_id, total_cents, paid_at, status")
           .eq("status", "paid")
           .gte("paid_at", startIso)
           .lte("paid_at", endIso),
-        supabase.from("appointments")
+        apiQuery("appointments")
           .select("staff_id, status, start_at")
           .eq("status", "no_show")
           .gte("start_at", startIso)
@@ -77,7 +77,7 @@ export default function AdminProductivity() {
       ]);
 
       // Map staff_id → user_id via staff_profiles
-      const { data: staff } = await supabase
+      const { data: staff } = await apiQuery
         .from("staff_profiles")
         .select("id, user_id, full_name");
       const staffByUser = new Map((staff ?? []).map(s => [s.user_id, s]));

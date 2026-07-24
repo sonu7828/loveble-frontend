@@ -1,7 +1,7 @@
 // Inventory burn report — consumption rate and projected runway per product.
 // Reads inventory_movements with reason='consume' and aggregates by product.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Flame, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -35,7 +35,7 @@ export default function StaffInventoryBurn() {
         const since = new Date(Date.now() - days * 86400_000).toISOString();
 
         // Pull recent consume movements with their lot product info.
-        const { data: moves, error: e1 } = await supabase
+        const { data: moves, error: e1 } = await apiQuery
           .from("inventory_movements")
           .select("qty_delta, reason, created_at, product_lots(product_name, unit)")
           .eq("reason", "consume")
@@ -44,7 +44,7 @@ export default function StaffInventoryBurn() {
         if (e1) throw e1;
 
         // Current on-hand inventory grouped by product name.
-        const { data: lots, error: e2 } = await supabase
+        const { data: lots, error: e2 } = await apiQuery
           .from("product_lots")
           .select("product_name, unit, quantity_remaining, is_active");
         if (e2) throw e2;

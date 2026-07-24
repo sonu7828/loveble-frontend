@@ -1,7 +1,7 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -110,50 +110,56 @@ export default function PatientAccount() {
 
   useEffect(() => {
     (async () => {
-      const session = await getClientSession();
-      if (!session) { navigate("/account/auth"); return; }
-      setUser(session.user);
+      try {
+        const session = await getClientSession();
+        if (!session) { navigate("/account/auth"); return; }
+        setUser(session.user);
 
-      const email = session.user.email?.toLowerCase();
+        const email = session.user.email?.toLowerCase();
 
       const [{ data: prof }, { data: ap }, { data: cs }, { data: sv }, { data: st }, { data: loc }] = await Promise.all([
-        supabase.from("client_profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
-        supabase.from("appointments").select("*").order("start_at", { ascending: false }),
-        supabase.from("consent_signatures").select("*").ilike("client_email", email ?? "").order("signed_at", { ascending: false }),
-        supabase.from("services").select("id, name"),
-        supabase.from("staff_directory" as any).select("id, full_name, title"),
-        supabase.from("locations").select("id, name, city"),
+        apiQuery("client_profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
+        apiQuery("appointments").select("*").order("start_at", { ascending: false }),
+        apiQuery("consent_signatures").select("*").ilike("client_email", email ?? "").order("signed_at", { ascending: false }),
+        apiQuery("services").select("id, name"),
+        apiQuery("staff_directory" as any).select("id, full_name, title"),
+        apiQuery("locations").select("id, name, city"),
       ]);
 
-      const resolvedProfile = prof ?? {
-        id: "demo-profile",
-        user_id: session.user.id,
-        email: session.user.email ?? "user@gmail.com",
-        first_name: session.user.user_metadata?.first_name ?? "Demo",
-        last_name: session.user.user_metadata?.last_name ?? "User",
-        phone: session.user.user_metadata?.phone ?? "555-0199",
-      };
+        const resolvedProfile = prof ?? {
+          id: "demo-profile",
+          user_id: session.user.id,
+          email: session.user.email ?? "user@gmail.com",
+          first_name: session.user.user_metadata?.first_name ?? "Demo",
+          last_name: session.user.user_metadata?.last_name ?? "User",
+          phone: session.user.user_metadata?.phone ?? "555-0199",
+        };
 
-      setProfile(resolvedProfile);
-      setProfileForm({
-        firstName: resolvedProfile.first_name || "",
-        lastName: resolvedProfile.last_name || "",
-        phone: resolvedProfile.phone || "",
-        emergencyContact: resolvedProfile.emergency_contact || "",
-      });
+        setProfile(resolvedProfile);
+        setProfileForm({
+          firstName: resolvedProfile.first_name || "",
+          lastName: resolvedProfile.last_name || "",
+          phone: resolvedProfile.phone || "",
+          emergencyContact: resolvedProfile.emergency_contact || "",
+        });
 
-      setAppts((ap ?? []) as Appt[]);
-      setConsents(cs ?? []);
-      setServices(Object.fromEntries((sv ?? []).map((s: any) => [s.id, s.name])));
-      setStaff(Object.fromEntries((st ?? []).map((s: any) => [s.id, { name: s.full_name, title: s.title }])));
-      setLocations(Object.fromEntries((loc ?? []).map((l: any) => [l.id, { name: l.name, city: l.city }])));
-      setLoading(false);
+        setAppts((ap ?? []) as Appt[]);
+        setConsents(cs ?? []);
+        setServices(Object.fromEntries((sv ?? []).map((s: any) => [s.id, s.name])));
+        setStaff(Object.fromEntries((st ?? []).map((s: any) => [s.id, { name: s.full_name, title: s.title }])));
+        setLocations(Object.fromEntries((loc ?? []).map((l: any) => [l.id, { name: l.name, city: l.city }])));
+      } catch (err) {
+        console.error("PatientAccount load error:", err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [navigate]);
 
+
   const signOut = async () => {
     clearDemoAuthSession();
-    await supabase.auth.signOut();
+    await authService.logout();
     navigate("/");
   };
 
@@ -161,7 +167,7 @@ export default function PatientAccount() {
     e.preventDefault();
     try {
       if (user?.id) {
-        await supabase.from("client_profiles").upsert({
+        await apiQuery("client_profiles").upsert({
           user_id: user.id,
           email: user.email,
           first_name: profileForm.firstName,
@@ -196,7 +202,7 @@ export default function PatientAccount() {
     }
     setUpdatingPass(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword });
+      const { error } = await authService.updateUser({ password: passwordForm.newPassword });
       if (error) throw error;
       toast.success("Password updated successfully!");
       setPasswordForm({ newPassword: "", confirmPassword: "" });
@@ -225,7 +231,7 @@ export default function PatientAccount() {
         if (!(await confirmDialog({ title: "Cancel this appointment?", confirmLabel: "Cancel appointment", cancelLabel: "Keep it" }))) return;
       }
 
-      const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", id);
+      const { error } = await apiQuery("appointments").update({ status: "cancelled" }).eq("id", id);
       if (error) throw error;
       setAppts(prev => prev.map(a => a.id === id ? { ...a, status: "cancelled" } : a));
       toast.success("Appointment cancelled.");

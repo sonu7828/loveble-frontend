@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
@@ -38,21 +38,21 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     setLoading(true);
     const email = (appt.client_email ?? "").toLowerCase();
     const [{ data: n }, { data: s }, { data: i }, { data: lf }] = await Promise.all([
-      supabase
+      apiQuery
         .from("clinical_notes")
         .select("id, status, photo_pre_paths, photo_post_paths")
         .eq("appointment_id", appt.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      apiQuery
         .from("sales")
         .select("id, status")
         .eq("appointment_id", appt.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      apiQuery
         .from("client_intake_submissions")
         .select("*")
         .eq("appointment_id", appt.id)
@@ -60,7 +60,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
         .order("submitted_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      apiQuery
         .from("client_intake_submissions")
         .select("*")
         .eq("client_email", email)
@@ -128,17 +128,17 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     }
     setCheckingIn(true);
     try {
-      const { error } = await supabase
+      const { error } = await apiQuery
         .from("appointments")
         .update({ status: "arrived", checked_in_at: new Date().toISOString() })
         .eq("id", appt.id);
       if (error) { toast.error(error.message); return; }
-      await supabase.from("appointment_audit_log").insert({
+      await apiQuery("appointment_audit_log").insert({
         appointment_id: appt.id, action: "checked_in",
         from_status: appt.status, to_status: "arrived" as any,
       });
       try {
-        await supabase.functions.invoke("pos-create-or-get-sale", { body: { appointmentId: appt.id } });
+        await ApiClient.post("pos-create-or-get-sale", { body: { appointmentId: appt.id } });
       } catch (e) { console.error("pos draft create failed", e); }
       toast.success("Checked in");
       await onSendPostOp({ openPrintWindow: false });
@@ -165,7 +165,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
   const handleSendIntake = async () => {
     setSendingIntake(true);
     try {
-      const { error } = await supabase.functions.invoke("send-intake-links", {
+      const { error } = await ApiClient.post("send-intake-links", {
         body: { appointmentId: appt.id },
       });
 
@@ -190,15 +190,15 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     if (!ok) return;
     setMarkingIntakeInPerson(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await authService.getSession();
       let staffName = u.user?.email ?? "Staff";
       if (u.user?.id) {
-        const { data: sp } = await supabase.from("staff_profiles").select("full_name").eq("user_id", u.user.id).maybeSingle();
+        const { data: sp } = await apiQuery("staff_profiles").select("full_name").eq("user_id", u.user.id).maybeSingle();
         if (sp?.full_name) staffName = sp.full_name;
       }
       const nowIso = new Date().toISOString();
       const today = nowIso.slice(0, 10);
-      const { data, error } = await supabase.from("client_intake_submissions").insert({
+      const { data, error } = await apiQuery("client_intake_submissions").insert({
         appointment_id: appt.id,
         client_email: (appt.client_email ?? "").toLowerCase(),
         allergies: [],

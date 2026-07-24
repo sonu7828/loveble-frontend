@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { Button } from "@/components/ui/button";
@@ -60,9 +60,9 @@ export default function StaffInbox() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    let aq = supabase.from("appointments").select("*").eq("status", "pending").order("created_at", { ascending: true });
+    let aq = apiQuery("appointments").select("*").eq("status", "pending").order("created_at", { ascending: true });
     if (!canSeeAll && staffId) aq = aq.eq("staff_id", staffId);
-    const wq = supabase.from("waitlist_requests").select("*").eq("status", "open").order("created_at", { ascending: true });
+    const wq = apiQuery("waitlist_requests").select("*").eq("status", "open").order("created_at", { ascending: true });
 
     const [a, w] = await Promise.all([aq, wq]);
     setAppts((a.data ?? []) as Appt[]);
@@ -74,9 +74,9 @@ export default function StaffInbox() {
     const lids = [...new Set(all.map((x: any) => x.location_id).filter(Boolean))];
     const apptIds = (a.data ?? []).map((x: any) => x.id);
     const [s, st, l, apsvMap] = await Promise.all([
-      sids.length ? supabase.from("services").select("id, name").in("id", sids) : Promise.resolve({ data: [] as any[] }),
-      stids.length ? supabase.from("staff_profiles").select("id, full_name").in("id", stids) : Promise.resolve({ data: [] as any[] }),
-      lids.length ? supabase.from("locations").select("id, name").in("id", lids) : Promise.resolve({ data: [] as any[] }),
+      sids.length ? apiQuery("services").select("id, name").in("id", sids) : Promise.resolve({ data: [] as any[] }),
+      stids.length ? apiQuery("staff_profiles").select("id, full_name").in("id", stids) : Promise.resolve({ data: [] as any[] }),
+      lids.length ? apiQuery("locations").select("id, name").in("id", lids) : Promise.resolve({ data: [] as any[] }),
       fetchApptServiceNames(apptIds),
     ]);
     const m: typeof meta = {};
@@ -98,7 +98,7 @@ export default function StaffInbox() {
 
   const act = useCallback(async (id: string, action: "approve" | "deny", reason?: string) => {
     setBusyId(id);
-    const { data, error } = await supabase.functions.invoke("staff-update-appointment", {
+    const { data, error } = await ApiClient.post("staff-update-appointment", {
       body: { appointmentId: id, action, reason },
     });
     setBusyId(null);
@@ -114,7 +114,7 @@ export default function StaffInbox() {
 
   const dismissWait = async (id: string) => {
     setBusyId(id);
-    const { error } = await supabase.from("waitlist_requests").update({ status: "cancelled" }).eq("id", id);
+    const { error } = await apiQuery("waitlist_requests").update({ status: "cancelled" }).eq("id", id);
     setBusyId(null);
     if (error) { toast.error(error.message); return; }
     toast.success("Closed");
@@ -130,7 +130,7 @@ export default function StaffInbox() {
       confirmLabel: "Close all",
     }))) return;
     const ids = waits.map(w => w.id);
-    const { error } = await supabase.from("waitlist_requests").update({ status: "cancelled" }).in("id", ids);
+    const { error } = await apiQuery("waitlist_requests").update({ status: "cancelled" }).in("id", ids);
     if (error) { toast.error(error.message); return; }
     toast.success(`Closed ${ids.length} request${ids.length === 1 ? "" : "s"}`);
     load();

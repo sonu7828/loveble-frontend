@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
+import { ApiClient } from "@/services/api";
 
 interface Props {
   placeId: string | null;
@@ -15,10 +16,8 @@ export default function GoogleReviewBadge({ placeId, fallbackUrl, className }: P
 
   useEffect(() => {
     if (!placeId) { setLoading(false); return; }
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-google-reviews?placeId=${encodeURIComponent(placeId)}`;
-    fetch(url, { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } })
-      .then(async (r) => r.ok ? r.json() : null)
-      .then((d) => setData(d))
+    ApiClient.get<Live>(`/reviews?placeId=${encodeURIComponent(placeId)}`)
+      .then((res) => setData(res.data))
       .finally(() => setLoading(false));
   }, [placeId]);
 

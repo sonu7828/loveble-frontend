@@ -3,7 +3,7 @@
 // the client tick them off. Progress syncs to `preop_checklist_progress` so
 // the provider sees the same checkmarks in the chart at intake.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { getClientSession } from "@/hooks/useClientAuth";
 import { differenceInCalendarDays, format } from "date-fns";
 import { CalendarClock, CheckCircle2, Circle, Loader2 } from "lucide-react";
@@ -57,7 +57,7 @@ export function PreOpCountdownCard() {
         setEmail(e);
 
         const horizon = new Date(); horizon.setDate(horizon.getDate() + 7);
-        const { data: ap } = await supabase
+        const { data: ap } = await apiQuery
           .from("appointments")
           .select("id, start_at, service_id")
           .ilike("client_email", e)
@@ -73,9 +73,9 @@ export function PreOpCountdownCard() {
 
         const serviceIds = Array.from(new Set(appts.map(a => a.service_id).filter(Boolean)));
         const [{ data: services }, { data: preops }, { data: progress }] = await Promise.all([
-          supabase.from("services").select("id, name").in("id", serviceIds),
-          supabase.from("service_pre_op_instructions" as any).select("service_id, body_markdown").in("service_id", serviceIds),
-          supabase.from("preop_checklist_progress" as any).select("appointment_id, item_key, checked_at").in("appointment_id", appts.map(a => a.id)),
+          apiQuery("services").select("id, name").in("id", serviceIds),
+          apiQuery("service_pre_op_instructions" as any).select("service_id, body_markdown").in("service_id", serviceIds),
+          apiQuery("preop_checklist_progress" as any).select("appointment_id, item_key, checked_at").in("appointment_id", appts.map(a => a.id)),
         ]);
         const svcName = new Map<string, string>((services ?? []).map((s: any) => [s.id, s.name]));
         const md = new Map<string, string>((preops ?? []).map((p: any) => [p.service_id, p.body_markdown ?? ""]));
@@ -110,7 +110,7 @@ export function PreOpCountdownCard() {
     const isChecked = !cur.checked[item.key];
     setSaving(`${apptId}:${item.key}`);
     setByAppt(s => ({ ...s, [apptId]: { ...cur, checked: { ...cur.checked, [item.key]: isChecked } } }));
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("preop_checklist_progress")
       .upsert({
         appointment_id: apptId,

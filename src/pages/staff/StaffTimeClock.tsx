@@ -1,6 +1,6 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,11 +76,11 @@ export default function StaffTimeClock() {
     try {
       const result = await Promise.race([
         Promise.all([
-          supabase.from("staff_profiles").select("id, full_name").eq("is_active", true).order("full_name"),
-          supabase.from("staff_time_entries").select("*")
+          apiQuery("staff_profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+          apiQuery("staff_time_entries").select("*")
             .gte("clock_in", startIso).lte("clock_in", endIso)
             .order("clock_in", { ascending: false }),
-          supabase.from("sales").select("id, staff_id, tip_cents, paid_at, status")
+          apiQuery("sales").select("id, staff_id, tip_cents, paid_at, status")
             .eq("status", "paid").gte("paid_at", startIso).lte("paid_at", endIso),
         ]),
         timeout,
@@ -93,7 +93,7 @@ export default function StaffTimeClock() {
       const saleIds = salesRows.map(s => s.id);
       let items: any[] = [];
       if (saleIds.length) {
-        const { data: it, error: itErr } = await supabase.from("sale_items")
+        const { data: it, error: itErr } = await apiQuery("sale_items")
           .select("sale_id, line_total_cents, kind")
           .in("sale_id", saleIds).eq("kind", "service");
         if (itErr) throw itErr;
@@ -101,7 +101,7 @@ export default function StaffTimeClock() {
       }
       const saleStaffMap = Object.fromEntries(salesRows.map(s => [s.id, s.staff_id]));
       // Pay config is RLS-restricted: admins get all rows, employees get only their own
-      const { data: payRows } = await (supabase as any).from("staff_pay_config")
+      const { data: payRows } = await (apiQuery as any).from("staff_pay_config")
         .select("staff_id, hourly_rate_cents, commission_percent");
       const payMap: Record<string, { hourly_rate_cents: number | null; commission_percent: number | null }> = {};
       (payRows ?? []).forEach((p: any) => { payMap[p.staff_id] = p; });
@@ -145,7 +145,7 @@ export default function StaffTimeClock() {
 
   const remove = async (id: string) => {
     if (!(await confirmDialog({ title: "Delete this time entry?", destructive: true, confirmLabel: "Delete" }))) return;
-    const { error } = await supabase.from("staff_time_entries").delete().eq("id", id);
+    const { error } = await apiQuery("staff_time_entries").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Deleted");
     load();
@@ -340,8 +340,8 @@ function EntryDialog({
       adjusted_at: new Date().toISOString(),
     };
     const { error } = entry
-      ? await supabase.from("staff_time_entries").update(payload).eq("id", entry.id)
-      : await supabase.from("staff_time_entries").insert(payload);
+      ? await apiQuery("staff_time_entries").update(payload).eq("id", entry.id)
+      : await apiQuery("staff_time_entries").insert(payload);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Saved");

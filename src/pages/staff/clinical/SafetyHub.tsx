@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,14 +37,14 @@ export default function SafetyHub() {
 
   useEffect(() => {
     (async () => {
-      const { data: ps } = await supabase
+      const { data: ps } = await apiQuery
         .from("clinical_protocols")
         .select("id, slug, title, current_version_id")
         .like("slug", "complication-%")
         .order("title");
       const versionIds = (ps ?? []).map((p: any) => p.current_version_id).filter(Boolean);
       const { data: vs } = versionIds.length
-        ? await supabase.from("clinical_protocol_versions")
+        ? await apiQuery("clinical_protocol_versions")
             .select("id, indication, patient_handout_md, regulatory_basis, signed_by_name, signed_at, version_number")
             .in("id", versionIds)
         : { data: [] as any[] };
@@ -52,8 +52,8 @@ export default function SafetyHub() {
       setProtocols((ps ?? []).map((p: any) => ({ ...p, version: vMap.get(p.current_version_id) ?? null })));
 
       const [{ data: vo }, { data: ae }] = await Promise.all([
-        supabase.from("vo_protocol_runs").select("*").eq("status", "active").order("started_at", { ascending: false }),
-        supabase.from("adverse_events").select("*").in("outcome", ["ongoing", "improving"]).order("event_date", { ascending: false }).limit(20),
+        apiQuery("vo_protocol_runs").select("*").eq("status", "active").order("started_at", { ascending: false }),
+        apiQuery("adverse_events").select("*").in("outcome", ["ongoing", "improving"]).order("event_date", { ascending: false }).limit(20),
       ]);
       setOpenVo(vo ?? []);
       setOpenAe(ae ?? []);

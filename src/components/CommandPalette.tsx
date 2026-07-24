@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { searchClients, type ClientHit } from "@/lib/clientSearch";
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
@@ -71,7 +71,7 @@ export function CommandPalette({ isAdmin }: { isAdmin: boolean }) {
       const like = `%${q}%`;
       const [clients, appts] = await Promise.all([
         searchClients(q, 6),
-        supabase.from("appointments").select("id, start_at, client_first_name, client_last_name, client_email")
+        apiQuery("appointments").select("id, start_at, client_first_name, client_last_name, client_email")
           .or(`client_first_name.ilike.${like},client_last_name.ilike.${like},client_email.ilike.${like}`)
           .order("start_at", { ascending: false })
           .limit(6),

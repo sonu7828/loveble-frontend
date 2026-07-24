@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { ChevronDown, FileText } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,7 +34,7 @@ export function ChartTemplatePicker({ category, onApply }: Props) {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await apiQuery
         .from("chart_note_templates")
         .select("id, category, subtype, name, body, sort_order")
         .eq("category", category)

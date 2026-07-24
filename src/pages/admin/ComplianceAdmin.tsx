@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, X, Clock, Download, Mail } from "lucide-react";
@@ -23,9 +23,9 @@ export default function ComplianceAdmin() {
   async function load() {
     setLoading(true);
     const [{ data: p }, { data: s }, { data: sg }] = await Promise.all([
-      supabase.from("compliance_protocols").select("id, slug, title, category, version, renewal_months").eq("is_active", true).order("category").order("title"),
-      supabase.from("staff_profiles").select("id, user_id, full_name, title").not("user_id", "is", null).order("full_name"),
-      supabase.from("compliance_signatures").select("id, protocol_id, protocol_version, staff_id, status, signed_at, expires_at, pdf_path"),
+      apiQuery("compliance_protocols").select("id, slug, title, category, version, renewal_months").eq("is_active", true).order("category").order("title"),
+      apiQuery("staff_profiles").select("id, user_id, full_name, title").not("user_id", "is", null).order("full_name"),
+      apiQuery("compliance_signatures").select("id, protocol_id, protocol_version, staff_id, status, signed_at, expires_at, pdf_path"),
     ]);
     setProtocols((p ?? []) as Protocol[]);
     setStaff((s ?? []) as Staff[]);
@@ -42,7 +42,7 @@ export default function ComplianceAdmin() {
 
   async function downloadPdf(sig: Sig) {
     if (!sig.pdf_path) { toast.error("PDF not generated yet"); return; }
-    const { data } = await supabase.storage.from("compliance-signatures").createSignedUrl(sig.pdf_path, 300);
+    const { data } = await ApiClient.createSignedUrl(sig.pdf_path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   }
 

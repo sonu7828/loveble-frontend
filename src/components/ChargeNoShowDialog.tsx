@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, Lock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { functionErrorMessage } from "@/lib/functionError";
@@ -107,7 +107,7 @@ function ChargeOnFile({ appointmentId, amount, amountValid, onCharged, onCancel 
     if (!amountValid) { toast.error("Enter an amount between $1 and $1,000"); return; }
     setBusy(true);
     const cents = Math.round(parseFloat(amount) * 100);
-    const { data, error } = await supabase.functions.invoke("payments-charge-no-show", {
+    const { data, error } = await ApiClient.post("payments-charge-no-show", {
       body: { appointmentId, amountCents: cents },
     });
     setBusy(false);
@@ -145,7 +145,7 @@ function ManualCardForm({ appointmentId, amount, amountValid, onCharged, onCance
     const { paymentMethod, error } = await stripe.createPaymentMethod({ type: "card", card });
     if (error || !paymentMethod) { setErr(error?.message ?? "Card error"); setBusy(false); return; }
     const cents = Math.round(parseFloat(amount) * 100);
-    const { data, error: fnErr } = await supabase.functions.invoke("payments-charge-no-show", {
+    const { data, error: fnErr } = await ApiClient.post("payments-charge-no-show", {
       body: { appointmentId, amountCents: cents, paymentMethodId: paymentMethod.id },
     });
     setBusy(false);

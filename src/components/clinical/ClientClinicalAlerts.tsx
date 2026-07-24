@@ -3,7 +3,7 @@
 // plus unresolved adverse events and VO suspected runs, and renders critical
 // flags providers must see before starting any visit.
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { computeInteractionAlerts, type SafetyAlert } from "@/lib/interactionAlerts";
 import { AlertTriangle, AlertCircle, Info, ShieldAlert, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -37,16 +37,16 @@ export function ClientClinicalAlerts({ clientEmail, category = null, serviceName
 
 
     const [{ data: g }, { data: i }, { data: ae }, { data: vo }] = await Promise.all([
-      supabase.from("gfe_records")
+      apiQuery("gfe_records")
         .select("allergies, allergies_other, current_medications, current_medications_other, pregnancy_status, medical_history, medical_history_other, signed_at")
         .ilike("client_email", email).order("signed_at", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("client_intake_submissions")
+      apiQuery("client_intake_submissions")
         .select("allergies, allergies_other, current_medications, current_medications_other, pregnancy_status, medical_history, medical_history_other, changes_meds, changes_allergies, changes_history, changes_pregnancy, recent_illness_or_event, submitted_at")
         .ilike("client_email", email).not("submitted_at", "is", null).order("submitted_at", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("adverse_events")
+      apiQuery("adverse_events")
         .select("id, event_type, severity, body_region, product_involved, event_date, resolved_at, outcome")
         .ilike("client_email", email).order("event_date", { ascending: false }),
-      supabase.from("vo_protocol_runs")
+      apiQuery("vo_protocol_runs")
         .select("id, status")
         .ilike("client_email", email).limit(20),
     ]);

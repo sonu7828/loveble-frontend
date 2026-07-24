@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Save, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -46,8 +46,8 @@ const AdminServices = () => {
   useEffect(() => {
     (async () => {
       const [c, s] = await Promise.all([
-        supabase.from("service_categories").select("*").order("display_order"),
-        supabase.from("services").select("*").order("display_order"),
+        apiQuery("service_categories").select("*").order("display_order"),
+        apiQuery("services").select("*").order("display_order"),
       ]);
       setCats(c.data ?? []);
       const list = (s.data ?? []) as Svc[];
@@ -73,7 +73,7 @@ const AdminServices = () => {
     if (draft.rebook && rebookDays === null) { toast.error("Rebook days must be a whole number 0–365"); return; }
     setSavingId(svc.id);
     const note = draft.note.trim() || null;
-    const { error } = await supabase.from("services").update({
+    const { error } = await apiQuery("services").update({
       price_cents: priceCents,
       price_note: note,
       rebook_followup_days: rebookDays,
@@ -130,7 +130,7 @@ const AdminServices = () => {
                         onClick={async () => {
                           const next = !s.is_featured;
                           setSvcs(prev => prev.map(x => x.id === s.id ? { ...x, is_featured: next } : x));
-                          const { error } = await supabase.from("services").update({ is_featured: next }).eq("id", s.id);
+                          const { error } = await apiQuery("services").update({ is_featured: next }).eq("id", s.id);
                           if (error) {
                             setSvcs(prev => prev.map(x => x.id === s.id ? { ...x, is_featured: !next } : x));
                             toast.error(error.message);

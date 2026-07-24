@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +61,7 @@ export default function StaffMarketing() {
     if (!editing) return;
     if (!aiPrompt.trim()) { toast.error("Describe what you want the newsletter to be about"); return; }
     setAiDrafting(true);
-    const { data, error } = await supabase.functions.invoke("ai-draft-newsletter", {
+    const { data, error } = await ApiClient.post("ai-draft-newsletter", {
       body: { prompt: aiPrompt, generateImage: aiGenImage },
     });
     setAiDrafting(false);
@@ -84,16 +84,16 @@ export default function StaffMarketing() {
     setUploading(true);
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${user?.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("marketing-assets").upload(path, file, { upsert: false, contentType: file.type });
+    const { error } = await ApiClient.upload(path, file, { upsert: false, contentType: file.type });
     if (error) { setUploading(false); toast.error(error.message); return; }
-    const { data } = supabase.storage.from("marketing-assets").getPublicUrl(path);
+    const { data } = ApiClient.getPublicUrl(path);
     setEditing(prev => prev ? { ...prev, hero_image_url: data.publicUrl } : prev);
     setUploading(false);
     toast.success("Image uploaded");
   };
 
   const refresh = async () => {
-    const { data } = await supabase.from("marketing_campaigns").select("*").order("created_at", { ascending: false });
+    const { data } = await apiQuery("marketing_campaigns").select("*").order("created_at", { ascending: false });
     setList((data ?? []) as Campaign[]);
     setLoading(false);
   };
@@ -116,8 +116,8 @@ export default function StaffMarketing() {
       audience_params: editing.audience_params || {},
     };
     const { error } = editing.id
-      ? await supabase.from("marketing_campaigns").update(payload).eq("id", editing.id)
-      : await supabase.from("marketing_campaigns").insert({ ...payload, created_by: user.id });
+      ? await apiQuery("marketing_campaigns").update(payload).eq("id", editing.id)
+      : await apiQuery("marketing_campaigns").insert({ ...payload, created_by: user.id });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Saved");
@@ -126,14 +126,14 @@ export default function StaffMarketing() {
   };
 
   const setStatus = async (c: Campaign, status: Campaign["status"]) => {
-    const { error } = await supabase.from("marketing_campaigns").update({ status }).eq("id", c.id);
+    const { error } = await apiQuery("marketing_campaigns").update({ status }).eq("id", c.id);
     if (error) { toast.error(error.message); return; }
     refresh();
   };
 
   const run = async (c: Campaign, dryRun: boolean) => {
     setRunning(c.id);
-    const { data, error } = await supabase.functions.invoke("run-marketing-campaign", {
+    const { data, error } = await ApiClient.post("run-marketing-campaign", {
       body: { campaignId: c.id, dryRun },
     });
     setRunning(null);

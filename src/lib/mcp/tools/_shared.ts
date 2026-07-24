@@ -1,5 +1,5 @@
 import { defineTool, type ToolContext } from "@lovable.dev/mcp-js";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@apiQuery/apiQuery-js";
 
 export function mcpSupabase(ctx: ToolContext) {
   return createClient(

@@ -1,6 +1,6 @@
 import { promptDialog } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,8 +53,8 @@ function UnitTab() {
 
   const load = async () => {
     const [{ data: us }, { data: svc }] = await Promise.all([
-      supabase.from("unit_services").select("*, services(name)").order("created_at", { ascending: false }),
-      supabase.from("services").select("id, name").eq("is_active", true).order("name"),
+      apiQuery("unit_services").select("*, services(name)").order("created_at", { ascending: false }),
+      apiQuery("services").select("id, name").eq("is_active", true).order("name"),
     ]);
     setItems(us ?? []); setServices(svc ?? []);
   };
@@ -62,7 +62,7 @@ function UnitTab() {
 
   const add = async () => {
     if (!serviceId) { toast.error("Pick a service"); return; }
-    const { error } = await supabase.from("unit_services").insert({
+    const { error } = await apiQuery("unit_services").insert({
       service_id: serviceId,
       price_per_unit_cents: Math.round(parseFloat(price) * 100),
       unit_label: unitLabel, min_units: 1, max_units: parseInt(maxUnits || "500"),
@@ -71,7 +71,7 @@ function UnitTab() {
     toast.success("Saved"); setServiceId(""); load();
   };
   const del = async (id: string) => {
-    await supabase.from("unit_services").delete().eq("id", id); load();
+    await apiQuery("unit_services").delete().eq("id", id); load();
   };
 
   return (
@@ -117,14 +117,14 @@ function ProductsTab() {
   const [kind, setKind] = useState<"retail" | "package" | "service_addon">("package");
 
   const load = async () => {
-    const { data } = await supabase.from("products").select("*").order("display_order").order("name");
+    const { data } = await apiQuery("products").select("*").order("display_order").order("name");
     setItems(data ?? []);
   };
   useEffect(() => { load(); }, []);
 
   const add = async () => {
     if (!name || !price) return;
-    const { error } = await supabase.from("products").insert({
+    const { error } = await apiQuery("products").insert({
       name, price_cents: Math.round(parseFloat(price) * 100), kind, is_active: true,
       taxable: kind === "retail", tippable: kind !== "retail",
     });
@@ -132,7 +132,7 @@ function ProductsTab() {
     setName(""); setPrice(""); load();
   };
   const toggle = async (id: string, v: boolean) => {
-    await supabase.from("products").update({ is_active: v }).eq("id", id); load();
+    await apiQuery("products").update({ is_active: v }).eq("id", id); load();
   };
 
   return (
@@ -184,8 +184,8 @@ function PromosTab() {
 
   const load = async () => {
     const [{ data: pc }, { data: svc }] = await Promise.all([
-      supabase.from("promo_codes").select("*").order("created_at", { ascending: false }),
-      supabase.from("services").select("id, name").eq("is_active", true).order("name"),
+      apiQuery("promo_codes").select("*").order("created_at", { ascending: false }),
+      apiQuery("services").select("id, name").eq("is_active", true).order("name"),
     ]);
     setItems(pc ?? []); setServices(svc ?? []);
   };
@@ -197,12 +197,12 @@ function PromosTab() {
     if (kind === "percent") row.value_pct = parseFloat(val);
     else { row.value_cents = Math.round(parseFloat(val) * 100); }
     if (kind === "package_price" && minUnits) row.conditions = { min_units: parseInt(minUnits) };
-    const { error } = await supabase.from("promo_codes").insert(row);
+    const { error } = await apiQuery("promo_codes").insert(row);
     if (error) { toast.error(error.message); return; }
     setCode(""); setLabel(""); setVal(""); setMinUnits(""); load();
   };
   const toggle = async (id: string, v: boolean) => {
-    await supabase.from("promo_codes").update({ is_active: v }).eq("id", id); load();
+    await apiQuery("promo_codes").update({ is_active: v }).eq("id", id); load();
   };
 
   return (
@@ -263,9 +263,9 @@ function VouchersTab() {
 
   const load = async () => {
     const [vRes, lRes, sRes] = await Promise.all([
-      supabase.from("vouchers").select("*").order("created_at", { ascending: false }).limit(50),
-      supabase.from("locations").select("id,name").eq("is_active", true).order("name"),
-      supabase.from("services").select("id,name,price_note").eq("is_active", true).order("name"),
+      apiQuery("vouchers").select("*").order("created_at", { ascending: false }).limit(50),
+      apiQuery("locations").select("id,name").eq("is_active", true).order("name"),
+      apiQuery("services").select("id,name,price_note").eq("is_active", true).order("name"),
     ]);
     setItems(vRes.data ?? []);
     setLocations(lRes.data ?? []);
@@ -293,7 +293,7 @@ function VouchersTab() {
       toast.error("Add a dollar amount or at least one service entitlement");
       return;
     }
-    const { data, error } = await supabase.functions.invoke("vouchers-issue", {
+    const { data, error } = await ApiClient.post("vouchers-issue", {
       body: {
         amountCents: cents,
         issuedToEmail: email || undefined,
@@ -371,7 +371,7 @@ function VouchersTab() {
     if (!to) return;
     const name = (await promptDialog({ title: "Recipient name (optional)", placeholder: "Full name", defaultValue: v.issued_to_name ?? "" })) ?? "";
     setBusyId(v.id);
-    const { data, error } = await supabase.functions.invoke("vouchers-email", {
+    const { data, error } = await ApiClient.post("vouchers-email", {
       body: {
         voucherId: v.id,
         recipientEmail: to.trim().toLowerCase(),

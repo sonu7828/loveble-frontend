@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { toast } from "sonner";
 import { Camera, Loader2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,7 @@ export function ClientAvatar({
     let cancelled = false;
     if (!avatarPath) { setUrl(null); return; }
     (async () => {
-      const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(avatarPath, 60 * 60);
+      const { data, error } = await ApiClient.createSignedUrl(avatarPath, 60 * 60);
       if (!cancelled && !error) setUrl(data?.signedUrl ?? null);
     })();
     return () => { cancelled = true; };
@@ -54,15 +54,15 @@ export function ClientAvatar({
     try {
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const path = `${clientEmail.toLowerCase()}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+      const { error: upErr } = await ApiClient.upload(path, file, {
         cacheControl: "3600", upsert: false, contentType: file.type,
       });
       if (upErr) throw upErr;
 
       // Update client record(s). Try both tables; ignore failures on the one that doesn't have a row.
       await Promise.all([
-        supabase.from("imported_clients").update({ avatar_path: path }).eq("email", clientEmail.toLowerCase()),
-        supabase.from("client_profiles").update({ avatar_path: path }).eq("email", clientEmail.toLowerCase()),
+        apiQuery("imported_clients").update({ avatar_path: path }).eq("email", clientEmail.toLowerCase()),
+        apiQuery("client_profiles").update({ avatar_path: path }).eq("email", clientEmail.toLowerCase()),
       ]);
 
       onChange?.(path);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Button } from "@/components/ui/button";
 import { MapPin, Phone, ArrowRight, Loader2 } from "lucide-react";
@@ -43,11 +43,11 @@ export default function LocationPage() {
   useEffect(() => {
     if (!slug) return;
     (async () => {
-      const { data: l } = await supabase.from("locations").select("*").eq("slug", slug).maybeSingle();
+      const { data: l } = await apiQuery("locations").select("*").eq("slug", slug).maybeSingle();
       if (!l) { setLoading(false); return; }
       setLoc(l as Location);
 
-      const { data: rows } = await supabase
+      const { data: rows } = await apiQuery
         .from("service_providers")
         .select("staff_id, service_id, staff_profiles(id, full_name, title, bio, credentials, photo_url, is_active), services(name, description, is_active)")
         .eq("location_id", l.id);

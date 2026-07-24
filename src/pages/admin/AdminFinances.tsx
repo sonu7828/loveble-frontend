@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import {
   format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek,
@@ -111,20 +111,20 @@ export default function AdminFinances() {
       const cols = "id,status,paid_at,created_at,location_id,staff_id,subtotal_cents,discount_cents,tip_cents,processing_fee_cents,tax_cents,total_cents,refunded_amount_cents,voucher_applied_cents,payment_method,promo_code,appointment_id";
 
       const [salesCurr, salesPrev, ap, st, loc] = await Promise.all([
-        supabase.from("sales").select(cols)
+        apiQuery("sales").select(cols)
           .in("status", ["paid", "partially_refunded", "refunded"])
           .gte("paid_at", range.start.toISOString())
           .lte("paid_at", range.end.toISOString()),
-        supabase.from("sales").select(cols)
+        apiQuery("sales").select(cols)
           .in("status", ["paid", "partially_refunded", "refunded"])
           .gte("paid_at", prevStart.toISOString())
           .lte("paid_at", prevEnd.toISOString()),
-        supabase.from("appointments")
+        apiQuery("appointments")
           .select("id,status,start_at,client_first_name,client_last_name,client_email,deposit_charged_at,deposit_amount_cents,no_show_charged_at,staff_id,location_id")
           .gte("start_at", range.start.toISOString())
           .lte("start_at", range.end.toISOString()),
-        supabase.from("staff_profiles").select("id,full_name"),
-        supabase.from("locations").select("id,name"),
+        apiQuery("staff_profiles").select("id,full_name"),
+        apiQuery("locations").select("id,name"),
       ]);
 
       const currSales = (salesCurr.data ?? []) as Sale[];
@@ -136,7 +136,7 @@ export default function AdminFinances() {
 
       const ids = currSales.map((s) => s.id);
       if (ids.length) {
-        const { data: it } = await supabase
+        const { data: it } = await apiQuery
           .from("sale_items")
           .select("sale_id,kind,reference_id,label,quantity,line_total_cents")
           .in("sale_id", ids);
@@ -252,11 +252,11 @@ export default function AdminFinances() {
     if (!isAdmin) return;
     (async () => {
       const [{ data: v }, { data: r }] = await Promise.all([
-        supabase.from("vouchers")
+        apiQuery("vouchers")
           .select("original_amount_cents,created_at")
           .gte("created_at", range.start.toISOString())
           .lte("created_at", range.end.toISOString()),
-        supabase.from("voucher_redemptions")
+        apiQuery("voucher_redemptions")
           .select("amount_cents,redeemed_at,reversed_at")
           .gte("redeemed_at", range.start.toISOString())
           .lte("redeemed_at", range.end.toISOString()),

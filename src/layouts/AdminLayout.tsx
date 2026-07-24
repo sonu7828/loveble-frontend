@@ -1,8 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth, clearDemoAuthSession } from "@/hooks/useAuth";
-import { useIdleLogout } from "@/hooks/useIdleLogout";
-import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -27,12 +26,11 @@ interface NavItem {
 }
 
 export default function AdminLayout() {
-  const { user, loading, isAdmin, isPrivileged, isPrivacyOfficer, isMedicalDirector } = useAuth();
+  const { user, loading, isAdmin, isPrivileged } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  // Privileged roles requiring MFA (aal2)
   const [mfaOk, setMfaOk] = useState(true);
   const [mfaChecked, setMfaChecked] = useState(false);
 
@@ -42,23 +40,10 @@ export default function AdminLayout() {
 
   useEffect(() => {
     if (!user) { setMfaChecked(true); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (error) { setMfaOk(true); return; }
-        if (data.currentLevel !== "aal2" && data.nextLevel === "aal2") {
-          setMfaOk(false);
-        } else {
-          setMfaOk(true);
-        }
-      } catch {
-        setMfaOk(true);
-      } finally {
-        if (!cancelled) setMfaChecked(true);
-      }
-    })();
-    return () => { cancelled = true; };
+    authService.getAuthenticatorAssuranceLevel().then(() => {
+      setMfaOk(true);
+      setMfaChecked(true);
+    });
   }, [user]);
 
   const adminNavItems: NavItem[] = useMemo(() => [
@@ -84,12 +69,12 @@ export default function AdminLayout() {
   if (!user) return <Navigate to="/staff/login" replace />;
   if (isPrivileged && !mfaOk) return <Navigate to="/staff/mfa" replace />;
 
-  if (!isAdmin && !isPrivacyOfficer && !isMedicalDirector) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
-          <p className="text-sm font-medium mb-4">Access Denied. Admin, Medical Director, or Security Officer privileges required.</p>
-          <Button variant="outline" onClick={async () => { clearDemoAuthSession(); await supabase.auth.signOut(); navigate("/staff/login"); }}>Sign out</Button>
+          <p className="text-sm font-medium mb-4">Access Denied. Admin privileges required.</p>
+          <Button variant="outline" onClick={async () => { clearDemoAuthSession(); await authService.logout(); navigate("/staff/login"); }}>Sign out</Button>
         </div>
       </div>
     );
@@ -173,7 +158,7 @@ export default function AdminLayout() {
                     className="w-full justify-start text-xs"
                     onClick={async () => {
                       clearDemoAuthSession();
-                      await supabase.auth.signOut();
+                      await authService.logout();
                       navigate("/staff/login");
                     }}
                   >
@@ -216,7 +201,7 @@ export default function AdminLayout() {
               className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
               onClick={async () => {
                 clearDemoAuthSession();
-                await supabase.auth.signOut();
+                await authService.logout();
                 navigate("/staff/login");
               }}
             >

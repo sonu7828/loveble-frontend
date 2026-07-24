@@ -1,6 +1,6 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,7 @@ export function ClientCardsOnFile({ email, defaultName = "", defaultPhone = "" }
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await apiQuery
       .from("client_payment_methods")
       .select("id, brand, last4, exp_month, exp_year, cardholder_name, created_at, is_default")
       .ilike("client_email", email)
@@ -60,7 +60,7 @@ export function ClientCardsOnFile({ email, defaultName = "", defaultPhone = "" }
     setBusy(true);
     try {
       const result = await cardRef.current.collect({ email, name: name.trim(), phone: phone.trim() });
-      const { data, error } = await supabase.functions.invoke("payments-save-client-card", {
+      const { data, error } = await ApiClient.post("payments-save-client-card", {
         body: {
           email,
           customerId: result.customerId,
@@ -82,7 +82,7 @@ export function ClientCardsOnFile({ email, defaultName = "", defaultPhone = "" }
 
   const handleRemove = async (id: string, label: string) => {
     if (!(await confirmDialog({ title: `Remove ${label}?`, description: "The card will be detached from Stripe.", destructive: true, confirmLabel: "Remove card" }))) return;
-    const { data, error } = await supabase.functions.invoke("payments-detach-client-card", { body: { id } });
+    const { data, error } = await ApiClient.post("payments-detach-client-card", { body: { id } });
     if (error || (data as any)?.error) {
       toast.error((data as any)?.error || error?.message || "Could not remove card");
       return;

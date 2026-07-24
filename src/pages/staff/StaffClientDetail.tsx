@@ -1,7 +1,7 @@
 import { confirmDialog, promptDialog } from "@/components/ui/confirm";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -96,9 +96,9 @@ export default function StaffClientDetail() {
     (async () => {
       setLoading(true);
       const [{ data: ap }, { data: prof }, { data: imp }] = await Promise.all([
-        supabase.from("appointments").select("*").ilike("client_email", decodedEmail).order("start_at", { ascending: false }),
-        supabase.from("client_profiles").select("*").ilike("email", decodedEmail).maybeSingle(),
-        supabase.from("imported_clients").select("*").ilike("email", decodedEmail).maybeSingle(),
+        apiQuery("appointments").select("*").ilike("client_email", decodedEmail).order("start_at", { ascending: false }),
+        apiQuery("client_profiles").select("*").ilike("email", decodedEmail).maybeSingle(),
+        apiQuery("imported_clients").select("*").ilike("email", decodedEmail).maybeSingle(),
       ]);
       const list = (ap ?? []) as Appt[];
       setAppts(list);
@@ -111,10 +111,10 @@ export default function StaffClientDetail() {
       const apids = list.map(a => a.id);
 
       const [{ data: sv }, { data: st }, { data: loc }, { data: sg }] = await Promise.all([
-        sids.length ? supabase.from("services").select("id, name, price_cents").in("id", sids) : Promise.resolve({ data: [] as any[] }),
-        stids.length ? supabase.from("staff_profiles").select("id, full_name").in("id", stids) : Promise.resolve({ data: [] as any[] }),
-        lids.length ? supabase.from("locations").select("id, name").in("id", lids) : Promise.resolve({ data: [] as any[] }),
-        apids.length ? supabase.from("consent_signatures").select("id, signed_at, signed_full_name, consent_form_id, appointment_id").in("appointment_id", apids).order("signed_at", { ascending: false }) : Promise.resolve({ data: [] as any[] }),
+        sids.length ? apiQuery("services").select("id, name, price_cents").in("id", sids) : Promise.resolve({ data: [] as any[] }),
+        stids.length ? apiQuery("staff_profiles").select("id, full_name").in("id", stids) : Promise.resolve({ data: [] as any[] }),
+        lids.length ? apiQuery("locations").select("id, name").in("id", lids) : Promise.resolve({ data: [] as any[] }),
+        apids.length ? apiQuery("consent_signatures").select("id, signed_at, signed_full_name, consent_form_id, appointment_id").in("appointment_id", apids).order("signed_at", { ascending: false }) : Promise.resolve({ data: [] as any[] }),
       ]);
 
       setServices(Object.fromEntries((sv ?? []).map((s: any) => [s.id, { name: s.name, price_cents: s.price_cents }])));
@@ -125,11 +125,11 @@ export default function StaffClientDetail() {
 
       const fids = [...new Set((sg ?? []).map((s: any) => s.consent_form_id))];
       if (fids.length) {
-        const { data: ff } = await supabase.from("consent_forms").select("id, title").in("id", fids);
+        const { data: ff } = await apiQuery("consent_forms").select("id, title").in("id", fids);
         setForms(Object.fromEntries((ff ?? []).map((f: any) => [f.id, f.title])));
       }
 
-      const { data: salesData } = await supabase
+      const { data: salesData } = await apiQuery
         .from("sales")
         .select("id, paid_at, total_cents, refunded_amount_cents, payment_method, receipt_url, location_id")
         .ilike("client_email", decodedEmail)
@@ -137,7 +137,7 @@ export default function StaffClientDetail() {
         .order("paid_at", { ascending: false });
       setReceipts((salesData ?? []) as any);
 
-      const { data: gfeData } = await supabase
+      const { data: gfeData } = await apiQuery
         .from("gfe_records")
         .select("id, expires_at, signed_at")
         .ilike("client_email", decodedEmail)
@@ -146,7 +146,7 @@ export default function StaffClientDetail() {
         .maybeSingle();
       setGfe(gfeData ?? null);
 
-      const { data: noteRows, count: nc } = await supabase
+      const { data: noteRows, count: nc } = await apiQuery
         .from("clinical_notes")
         .select("id, status, created_at, service_name, category", { count: "exact" })
         .ilike("client_email", decodedEmail)
@@ -164,7 +164,7 @@ export default function StaffClientDetail() {
   useEffect(() => {
     if (!decodedEmail) return;
     (async () => {
-      const { data } = await supabase.from("blocked_clients").select("reason").eq("email", decodedEmail).maybeSingle();
+      const { data } = await apiQuery("blocked_clients").select("reason").eq("email", decodedEmail).maybeSingle();
       setBlocked(data ?? null);
     })();
   }, [decodedEmail]);
@@ -208,7 +208,7 @@ export default function StaffClientDetail() {
   const sendInvite = async () => {
     setSendingInvite(true);
     try {
-      const { error } = await supabase.functions.invoke("staff-send-client-invite", {
+      const { error } = await ApiClient.post("staff-send-client-invite", {
         body: { recipientEmail: decodedEmail, clientName: display?.client_first_name ?? display?.first_name ?? "" },
       });
       if (error) throw error;
@@ -230,8 +230,8 @@ export default function StaffClientDetail() {
     if (reason === null) return;
     setBusyAction(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("blocked_clients").upsert(
+      const { data: u } = await authService.getSession();
+      const { error } = await apiQuery("blocked_clients").upsert(
         { email: decodedEmail, reason: reason || null, blocked_by: u.user?.id ?? null },
         { onConflict: "email" },
       );
@@ -246,7 +246,7 @@ export default function StaffClientDetail() {
     if (!(await confirmDialog({ title: `Unblock ${decodedEmail}?`, description: "They will be able to book again.", confirmLabel: "Unblock" }))) return;
     setBusyAction(true);
     try {
-      const { error } = await supabase.from("blocked_clients").delete().eq("email", decodedEmail);
+      const { error } = await apiQuery("blocked_clients").delete().eq("email", decodedEmail);
       if (error) throw error;
       setBlocked(null);
       toast.success(`Unblocked ${decodedEmail}`);
@@ -270,7 +270,7 @@ export default function StaffClientDetail() {
     }))) return;
     setBusyAction(true);
     try {
-      const { error } = await supabase.from("imported_clients").delete().eq("id", imported.id);
+      const { error } = await apiQuery("imported_clients").delete().eq("id", imported.id);
       if (error) throw error;
       toast.success("Client deleted");
       navigate("/staff/clients");
@@ -301,7 +301,7 @@ export default function StaffClientDetail() {
     try {
       // Update all appointments for this client
       if (appts.length) {
-        const { error: aerr } = await supabase
+        const { error: aerr } = await apiQuery
           .from("appointments")
           .update({
             client_first_name: first,
@@ -314,14 +314,14 @@ export default function StaffClientDetail() {
         if (aerr) throw aerr;
       }
       if (profile?.id) {
-        const { error: perr } = await supabase
+        const { error: perr } = await apiQuery
           .from("client_profiles")
           .update({ first_name: first, last_name: last, email, phone: phoneVal || null, dob: dobVal || null })
           .eq("id", profile.id);
         if (perr) throw perr;
       }
       if (imported?.id) {
-        const { error: ierr } = await supabase
+        const { error: ierr } = await apiQuery
           .from("imported_clients")
           .update({ first_name: first, last_name: last, email, phone: phoneVal || null, dob: dobVal || null })
           .eq("id", imported.id);
@@ -417,7 +417,7 @@ export default function StaffClientDetail() {
               onClick={async () => {
                 setBusyAction(true);
                 try {
-                  const { error } = await supabase.from("client_profiles")
+                  const { error } = await apiQuery("client_profiles")
                     .update({ is_lead: false })
                     .eq("id", profile.id);
                   if (error) throw error;
@@ -729,7 +729,7 @@ export default function StaffClientDetail() {
                         onClick={async () => {
                           setRegenSaleId(r.id);
                           try {
-                            const { data, error } = await supabase.functions.invoke(
+                            const { data, error } = await ApiClient.post(
                               "generate-sale-receipt-pdf",
                               { body: { saleId: r.id } },
                             );
@@ -901,9 +901,9 @@ function CreditsPanel({ clientEmail }: { clientEmail: string }) {
   const refresh = async () => {
     setLoading(true);
     const [{ data: bal }, { data: hist }, { data: svc }] = await Promise.all([
-      supabase.from("client_credit_balances" as any).select("balance_cents").eq("client_email", clientEmail).maybeSingle(),
-      supabase.from("client_credits").select("id, amount_cents, reason, note, created_at, kind, service_label, units, redeemed_at").ilike("client_email", clientEmail).order("created_at", { ascending: false }),
-      supabase.from("services").select("id, name, price_cents, price_note").eq("is_active", true).order("name"),
+      apiQuery("client_credit_balances" as any).select("balance_cents").eq("client_email", clientEmail).maybeSingle(),
+      apiQuery("client_credits").select("id, amount_cents, reason, note, created_at, kind, service_label, units, redeemed_at").ilike("client_email", clientEmail).order("created_at", { ascending: false }),
+      apiQuery("services").select("id, name, price_cents, price_note").eq("is_active", true).order("name"),
     ]);
     setBalance((bal as any)?.balance_cents ?? 0);
     setHistory((hist as any) ?? []);
@@ -926,7 +926,7 @@ function CreditsPanel({ clientEmail }: { clientEmail: string }) {
 
   const submit = async () => {
     if (!reason.trim()) { toast.error("Reason is required"); return; }
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await authService.getSession();
     let payload: any = {
       client_email: clientEmail,
       reason: reason.trim(),
@@ -946,7 +946,7 @@ function CreditsPanel({ clientEmail }: { clientEmail: string }) {
       payload.amount_cents = computedServiceValueCents;
     }
     setSaving(true);
-    const { error } = await supabase.from("client_credits").insert(payload);
+    const { error } = await apiQuery("client_credits").insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Credit issued");

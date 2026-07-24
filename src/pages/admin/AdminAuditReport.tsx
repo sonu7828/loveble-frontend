@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { format, subDays, startOfDay, endOfDay, eachDayOfInterval } from "date-fns";
 import {
@@ -90,7 +90,7 @@ export default function AdminAuditReport() {
 
     if (enabled.phi) {
       promises.push((async () => {
-        let q = supabase.from("phi_access_log").select("*")
+        let q = apiQuery("phi_access_log").select("*")
           .gte("created_at", fromIso).lte("created_at", toIso)
           .order("created_at", { ascending: false }).limit(5000);
         if (clientQ) q = q.ilike("client_email", `%${clientQ}%`);
@@ -113,7 +113,7 @@ export default function AdminAuditReport() {
 
     if (enabled.clinical) {
       promises.push((async () => {
-        const { data } = await supabase.from("clinical_audit_log").select("*")
+        const { data } = await apiQuery("clinical_audit_log").select("*")
           .gte("created_at", fromIso).lte("created_at", toIso)
           .order("created_at", { ascending: false }).limit(5000);
         for (const r of (data ?? []) as any[]) {
@@ -133,7 +133,7 @@ export default function AdminAuditReport() {
 
     if (enabled.consent_signed) {
       promises.push((async () => {
-        let q = supabase.from("consent_signatures")
+        let q = apiQuery("consent_signatures")
           .select("id, appointment_id, consent_form_id, client_email, signed_full_name, signed_at, decision, signing_mode, form_version")
           .gte("signed_at", fromIso).lte("signed_at", toIso)
           .order("signed_at", { ascending: false }).limit(5000);
@@ -155,7 +155,7 @@ export default function AdminAuditReport() {
 
     if (enabled.consent_email) {
       promises.push((async () => {
-        let q = supabase.from("consent_email_log")
+        let q = apiQuery("consent_email_log")
           .select("id, appointment_id, consent_form_id, recipient_email, template_name, source, status, reminder_number, created_at")
           .gte("created_at", fromIso).lte("created_at", toIso)
           .order("created_at", { ascending: false }).limit(5000);
@@ -177,7 +177,7 @@ export default function AdminAuditReport() {
 
     if (enabled.appointment) {
       promises.push((async () => {
-        const { data } = await supabase.from("appointment_audit_log").select("*")
+        const { data } = await apiQuery("appointment_audit_log").select("*")
           .gte("created_at", fromIso).lte("created_at", toIso)
           .order("created_at", { ascending: false }).limit(5000);
         for (const r of (data ?? []) as any[]) {
@@ -201,7 +201,7 @@ export default function AdminAuditReport() {
     const ids = Array.from(actorIds);
     let names: Record<string, string> = {};
     if (ids.length) {
-      const { data } = await supabase.from("staff_profiles")
+      const { data } = await apiQuery("staff_profiles")
         .select("user_id, full_name").in("user_id", ids);
       for (const s of (data ?? []) as any[]) names[s.user_id] = s.full_name;
     }

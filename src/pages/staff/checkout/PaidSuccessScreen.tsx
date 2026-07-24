@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { fmt, LineItem } from "./shared";
 
 type Props = {
@@ -21,9 +21,9 @@ export function PaidSuccessScreen({ sale, items, redirectSecs, backHref }: Props
     (async () => {
       if (!sale?.id || !sale?.client_email) return;
       const [{ data: ledger }, { data: settings }, { data: bal }] = await Promise.all([
-        supabase.from("client_points_ledger").select("delta, reason").eq("sale_id", sale.id),
-        supabase.from("client_points_settings").select("point_value_cents").eq("id", true).maybeSingle(),
-        supabase.rpc("get_points_balance", { _client_email: sale.client_email }),
+        apiQuery("client_points_ledger").select("delta, reason").eq("sale_id", sale.id),
+        apiQuery("client_points_settings").select("point_value_cents").eq("id", true).maybeSingle(),
+        apiQuery("get_points_balance", { _client_email: sale.client_email }),
       ]);
       if (!alive) return;
       const earned = (ledger ?? []).filter((r: any) => r.reason === "earned").reduce((s: number, r: any) => s + (r.delta ?? 0), 0);

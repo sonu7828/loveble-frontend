@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,10 +40,10 @@ export function ClientTreatmentPlansCard({ clientEmail }: { clientEmail: string 
   const load = async () => {
     setLoading(true);
     const [{ data: p }, { data: t }] = await Promise.all([
-      (supabase as any).from("client_treatment_plans")
+      (apiQuery as any).from("client_treatment_plans")
         .select("id,name,total_sessions,sessions_used,status,purchased_at,expires_at,price_cents")
         .eq("client_email", clientEmail.toLowerCase()).order("purchased_at", { ascending: false }),
-      (supabase as any).from("treatment_plan_templates").select("id,name,total_sessions,price_cents,validity_days").eq("is_active", true).order("name"),
+      (apiQuery as any).from("treatment_plan_templates").select("id,name,total_sessions,price_cents,validity_days").eq("is_active", true).order("name"),
     ]);
     setPlans(p ?? []);
     setTemplates(t ?? []);
@@ -58,7 +58,7 @@ export function ClientTreatmentPlansCard({ clientEmail }: { clientEmail: string 
   const sell = async () => {
     if (!tplId) return;
     setBusy(true);
-    const { data: newId, error } = await (supabase as any).rpc("purchase_treatment_plan", {
+    const { data: newId, error } = await (apiQuery as any).rpc("purchase_treatment_plan", {
       _template_id: tplId, _client_email: clientEmail, _notes: notes || null,
     });
     if (error) { setBusy(false); return toast.error(error.message); }
@@ -67,7 +67,7 @@ export function ClientTreatmentPlansCard({ clientEmail }: { clientEmail: string 
       const newExpiry = overrideDays === 0
         ? null
         : new Date(Date.now() + overrideDays * 86400000).toISOString();
-      const { error: upErr } = await (supabase as any)
+      const { error: upErr } = await (apiQuery as any)
         .from("client_treatment_plans")
         .update({ expires_at: newExpiry })
         .eq("id", newId);
@@ -80,14 +80,14 @@ export function ClientTreatmentPlansCard({ clientEmail }: { clientEmail: string 
 
   const redeem = async (id: string) => {
     if (!(await confirmDialog({ title: "Redeem one session?", confirmLabel: "Redeem" }))) return;
-    const { error } = await (supabase as any).rpc("redeem_treatment_plan_session", { _plan_id: id });
+    const { error } = await (apiQuery as any).rpc("redeem_treatment_plan_session", { _plan_id: id });
     if (error) return toast.error(error.message);
     toast.success("Session redeemed"); load();
   };
 
   const refund = async (id: string) => {
     const reason = window.prompt("Refund reason? (optional)") ?? null;
-    const { error } = await (supabase as any).rpc("refund_treatment_plan", { _plan_id: id, _reason: reason });
+    const { error } = await (apiQuery as any).rpc("refund_treatment_plan", { _plan_id: id, _reason: reason });
     if (error) return toast.error(error.message);
     toast.success("Refunded"); load();
   };

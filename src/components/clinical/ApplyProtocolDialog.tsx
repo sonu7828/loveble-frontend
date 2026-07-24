@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase as supabaseTyped } from "@/integrations/supabase/client";
-const supabase = supabaseTyped as any;
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -45,7 +44,7 @@ export function ApplyProtocolDialog({
   async function loadPreview() {
     if (!versionId) return;
     setPreviewing(true);
-    const { data } = await supabase
+    const { data } = await apiQuery
       .from("clinical_protocol_versions")
       .select("indication, titration, max_dose, contraindications, monitoring, red_flags")
       .eq("id", versionId)
@@ -59,7 +58,7 @@ export function ApplyProtocolDialog({
     setResult(null);
     setLoading(true);
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("clinical_protocols")
         .select("id, title, category, current_version_id, clinical_protocol_versions!clinical_protocols_current_version_fk(id, version_number, signed_by_name, signed_at)")
         .not("current_version_id", "is", null)
@@ -84,7 +83,7 @@ export function ApplyProtocolDialog({
   async function apply() {
     if (!versionId) return;
     setSubmitting(true);
-    const { data, error } = await supabase.functions.invoke("generate-protocol-pdf", {
+    const { data, error } = await ApiClient.post("generate-protocol-pdf", {
       body: {
         version_id: versionId,
         client_email: clientEmail,

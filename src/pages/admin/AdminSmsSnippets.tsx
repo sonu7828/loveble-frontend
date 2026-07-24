@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ export default function AdminSmsSnippets() {
 
   async function load() {
     setBusy(true);
-    const { data, error } = await supabase
+    const { data, error } = await apiQuery
       .from("sms_snippets" as any)
       .select("*")
       .order("category")
@@ -56,7 +56,7 @@ export default function AdminSmsSnippets() {
       return;
     }
     const max = Math.max(0, ...rows.filter((r) => r.category === draft.category).map((r) => r.sort_order));
-    const { error } = await supabase.from("sms_snippets" as any).insert({
+    const { error } = await apiQuery("sms_snippets" as any).insert({
       label: draft.label.trim(),
       category: draft.category,
       body: draft.body.trim(),
@@ -69,13 +69,13 @@ export default function AdminSmsSnippets() {
   async function remove(id: string) {
     const ok = await confirmDialog({ title: "Delete snippet?", description: "This cannot be undone." });
     if (!ok) return;
-    const { error } = await supabase.from("sms_snippets" as any).delete().eq("id", id);
+    const { error } = await apiQuery("sms_snippets" as any).delete().eq("id", id);
     if (error) toast.error(error.message);
     else await load();
   }
 
   async function toggle(s: Snippet) {
-    const { error } = await supabase.from("sms_snippets" as any).update({ is_active: !s.is_active } as any).eq("id", s.id);
+    const { error } = await apiQuery("sms_snippets" as any).update({ is_active: !s.is_active } as any).eq("id", s.id);
     if (error) toast.error(error.message);
     else await load();
   }

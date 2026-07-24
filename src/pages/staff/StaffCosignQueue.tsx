@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, Navigate } from "react-router-dom";
 import { Loader2, ClipboardCheck, ChevronRight } from "lucide-react";
@@ -30,7 +30,7 @@ export default function StaffCosignQueue() {
     if (!isAdmin && !isNP && !isMedicalDirector) { setBusy(false); return; }
     let cancel = false;
     (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await apiQuery
         .from("clinical_notes")
         .select("id, appointment_id, client_email, client_first_name, client_last_name, service_name, category, provider_name, provider_role, signed_at, status")
         .eq("requires_cosign", true)

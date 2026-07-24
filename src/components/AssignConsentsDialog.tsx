@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,8 +25,8 @@ export function AssignConsentsDialog({ open, onOpenChange, appointmentId, client
     if (!open) return;
     setLoading(true);
     Promise.all([
-      supabase.from("consent_forms").select("id, title, slug, is_optional, is_universal").eq("is_active", true).order("title"),
-      supabase.from("appointment_consents").select("consent_form_id").eq("appointment_id", appointmentId),
+      apiQuery("consent_forms").select("id, title, slug, is_optional, is_universal").eq("is_active", true).order("title"),
+      apiQuery("appointment_consents").select("consent_form_id").eq("appointment_id", appointmentId),
     ]).then(([f, a]) => {
       setForms(f.data ?? []);
       setAlready(new Set((a.data ?? []).map((x: any) => x.consent_form_id)));
@@ -38,7 +38,7 @@ export function AssignConsentsDialog({ open, onOpenChange, appointmentId, client
   const submit = async () => {
     if (picked.size === 0) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("assign-consent-forms", {
+    const { data, error } = await ApiClient.post("assign-consent-forms", {
       body: { appointmentId, consentFormIds: [...picked] },
     });
     setBusy(false);

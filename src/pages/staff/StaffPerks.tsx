@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Loader2, Gift, Cake, Sparkles, Play } from "lucide-react";
@@ -41,8 +41,8 @@ export default function StaffPerks() {
   const load = async () => {
     setBusy(true);
     const [s, g] = await Promise.all([
-      supabase.from("app_settings").select("id, perks_birthday_enabled, perks_birthday_amount_cents, perks_birthday_validity_days, perks_anniversary_enabled, perks_anniversary_amount_cents, perks_anniversary_validity_days").limit(1).maybeSingle(),
-      supabase.from("perk_grants").select("*").order("created_at", { ascending: false }).limit(50),
+      apiQuery("app_settings").select("id, perks_birthday_enabled, perks_birthday_amount_cents, perks_birthday_validity_days, perks_anniversary_enabled, perks_anniversary_amount_cents, perks_anniversary_validity_days").limit(1).maybeSingle(),
+      apiQuery("perk_grants").select("*").order("created_at", { ascending: false }).limit(50),
     ]);
     if (s.data) setSettings(s.data as Settings);
     if (g.data) setGrants(g.data as Grant[]);
@@ -61,7 +61,7 @@ export default function StaffPerks() {
   const save = async () => {
     if (!settings) return;
     setSaving(true);
-    const { error } = await supabase.from("app_settings").update({
+    const { error } = await apiQuery("app_settings").update({
       perks_birthday_enabled: settings.perks_birthday_enabled,
       perks_birthday_amount_cents: settings.perks_birthday_amount_cents,
       perks_birthday_validity_days: settings.perks_birthday_validity_days,
@@ -77,7 +77,7 @@ export default function StaffPerks() {
   const runNow = async () => {
     setRunning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-perks");
+      const { data, error } = await ApiClient.post("send-perks");
       if (error) throw error;
       const granted = (data as any)?.granted?.length ?? 0;
       toast({ title: "Perks run complete", description: `${granted} new voucher(s) issued.` });

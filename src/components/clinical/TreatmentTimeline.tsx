@@ -3,7 +3,7 @@
 // and wellness doses into one scrollable column. Computes a simple "due now"
 // prediction for neurotoxin based on the typical 12-week return.
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, Syringe, Droplet, Zap, Pill, AlertCircle, CalendarClock } from "lucide-react";
 import { format, differenceInWeeks, addWeeks, formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
@@ -36,7 +36,7 @@ export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const { data: notes } = await supabase
+      const { data: notes } = await apiQuery
         .from("clinical_notes")
         .select("id, created_at, category, service_name, provider_name, status")
         .ilike("client_email", clientEmail)
@@ -51,10 +51,10 @@ export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
       }
 
       const [neuroRes, fillerRes, energyRes, wellnessRes] = await Promise.all([
-        supabase.from("clinical_note_neurotoxin").select("clinical_note_id, product, total_units").in("clinical_note_id", ids),
-        supabase.from("clinical_note_filler").select("clinical_note_id, product, syringes_used, areas").in("clinical_note_id", ids),
-        supabase.from("clinical_note_energy").select("clinical_note_id, device, settings, areas").in("clinical_note_id", ids),
-        supabase.from("clinical_note_wellness").select("clinical_note_id, product, dose, service_type").in("clinical_note_id", ids),
+        apiQuery("clinical_note_neurotoxin").select("clinical_note_id, product, total_units").in("clinical_note_id", ids),
+        apiQuery("clinical_note_filler").select("clinical_note_id, product, syringes_used, areas").in("clinical_note_id", ids),
+        apiQuery("clinical_note_energy").select("clinical_note_id, device, settings, areas").in("clinical_note_id", ids),
+        apiQuery("clinical_note_wellness").select("clinical_note_id, product, dose, service_type").in("clinical_note_id", ids),
       ]);
       const neuroMap = new Map((neuroRes.data ?? []).map((r: any) => [r.clinical_note_id, r]));
       const fillerMap = new Map((fillerRes.data ?? []).map((r: any) => [r.clinical_note_id, r]));

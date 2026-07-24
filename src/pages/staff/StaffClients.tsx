@@ -1,7 +1,7 @@
 import { confirmDialog, promptDialog } from "@/components/ui/confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { format } from "date-fns";
@@ -49,7 +49,7 @@ export default function StaffClients() {
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
 
   const reloadAccounts = async () => {
-    const { data } = await supabase.from("client_profiles").select("email, is_lead, first_name, last_name, phone, lead_captured_at, lead_source").limit(5000);
+    const { data } = await apiQuery("client_profiles").select("email, is_lead, first_name, last_name, phone, lead_captured_at, lead_source").limit(5000);
     setAccountEmails(new Set((data ?? []).map((r: any) => (r.email || "").toLowerCase())));
     const leadRows = (data ?? []).filter((r: any) => r.is_lead);
     setLeadEmails(new Set(leadRows.map((r: any) => (r.email || "").toLowerCase())));
@@ -64,7 +64,7 @@ export default function StaffClients() {
   };
 
   const reloadBlocked = async () => {
-    const { data } = await supabase.from("blocked_clients").select("email");
+    const { data } = await apiQuery("blocked_clients").select("email");
     setBlockedEmails(new Set((data ?? []).map((r: any) => (r.email || "").toLowerCase())));
   };
 
@@ -73,7 +73,7 @@ export default function StaffClients() {
     const all: ImportedClient[] = [];
     const PAGE = 1000;
     for (let from = 0; from < 20000; from += PAGE) {
-      const { data, error } = await supabase.from("imported_clients")
+      const { data, error } = await apiQuery("imported_clients")
         .select("id, first_name, last_name, email, phone, dob, gender, notes, invited_at")
         .order("created_at", { ascending: false })
         .range(from, from + PAGE - 1);
@@ -89,7 +89,7 @@ export default function StaffClients() {
       const all: any[] = [];
       const PAGE = 1000;
       for (let from = 0; from < 50000; from += PAGE) {
-        let qy = supabase.from("appointments")
+        let qy = apiQuery("appointments")
           .select("id, client_first_name, client_last_name, client_email, client_phone, client_dob, status, start_at, service_id, staff_id")
           .order("start_at", { ascending: false })
           .range(from, from + PAGE - 1);
@@ -106,7 +106,7 @@ export default function StaffClients() {
       const sids = [...new Set(list.map((a) => a.service_id))];
       const apptIds = list.map((a) => a.id);
       const [{ data: svcs }, apsvMap] = await Promise.all([
-        sids.length ? supabase.from("services").select("id, name").in("id", sids) : Promise.resolve({ data: [] as any[] }),
+        sids.length ? apiQuery("services").select("id, name").in("id", sids) : Promise.resolve({ data: [] as any[] }),
         fetchApptServiceNames(apptIds),
       ]);
       setItems(list.map((a) => ({
@@ -162,7 +162,7 @@ export default function StaffClients() {
   const sendInvite = async (client: { first_name: string; email: string }, importedId?: string) => {
     setSendingEmail(client.email);
     try {
-      const { error } = await supabase.functions.invoke("staff-send-client-invite", {
+      const { error } = await ApiClient.post("staff-send-client-invite", {
         body: {
           recipientEmail: client.email,
           clientName: client.first_name,
@@ -170,7 +170,7 @@ export default function StaffClients() {
       });
       if (error) throw error;
       if (importedId) {
-        await supabase.from("imported_clients").update({ invited_at: new Date().toISOString() }).eq("id", importedId);
+        await apiQuery("imported_clients").update({ invited_at: new Date().toISOString() }).eq("id", importedId);
         await reloadImported();
       }
       toast.success(`Invite sent to ${client.email}`);
@@ -288,15 +288,15 @@ export default function StaffClients() {
     if (!importPreview?.rows.length) return;
     setImporting(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await authService.getSession();
       const payload = importPreview.rows.map((r) => ({ ...r, imported_by: u.user?.id ?? null }));
-      const { error, count } = await supabase
+      const { error, count } = await apiQuery
         .from("imported_clients")
         .upsert(payload, { onConflict: "email", ignoreDuplicates: false, count: "exact" });
       if (error) throw error;
 
       // Sync to GoHighLevel (best-effort, batched)
-      supabase.functions.invoke("ghl-sync-contact", {
+      ApiClient.post("ghl-sync-contact", {
         body: {
           contacts: payload.map((r) => ({
             email: r.email,
@@ -352,7 +352,7 @@ export default function StaffClients() {
       let ok = 0, fail = 0;
       for (let i = 0; i < contacts.length; i += 50) {
         const chunk = contacts.slice(i, i + 50);
-        const { data, error } = await supabase.functions.invoke("ghl-sync-contact", { body: { contacts: chunk } });
+        const { data, error } = await ApiClient.post("ghl-sync-contact", { body: { contacts: chunk } });
         if (error) { fail += chunk.length; continue; }
         for (const r of (data?.results ?? [])) r.ok ? ok++ : fail++;
       }
@@ -368,14 +368,14 @@ export default function StaffClients() {
   const bulkInviteUnclaimed = async () => {
     setBulkInviting(true);
     try {
-      const { data: dry, error: dryErr } = await supabase.functions.invoke("staff-bulk-invite-clients", {
+      const { data: dry, error: dryErr } = await ApiClient.post("staff-bulk-invite-clients", {
         body: { dryRun: true },
       });
       if (dryErr) throw dryErr;
       const n = dry?.toInvite ?? 0;
       if (!n) { toast.info("No unclaimed clients to invite — everyone already has an account."); return; }
       if (!(await confirmDialog({ title: `Send ${n} activation invite${n === 1 ? "" : "s"}?`, description: "Sent only to clients who haven't signed up yet. Invites are de-duplicated, safe to re-run.", confirmLabel: "Send invites" }))) return;
-      const { data, error } = await supabase.functions.invoke("staff-bulk-invite-clients", { body: {} });
+      const { data, error } = await ApiClient.post("staff-bulk-invite-clients", { body: {} });
       if (error) throw error;
       toast.success(`Queued ${data?.sent ?? 0} invites${data?.failed ? ` (${data.failed} failed)` : ""}`);
     } catch (e: any) {
@@ -396,8 +396,8 @@ export default function StaffClients() {
     if (reason === null) return;
     setBusyEmail(c.email);
     try {
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("blocked_clients").upsert(
+      const { data: u } = await authService.getSession();
+      const { error } = await apiQuery("blocked_clients").upsert(
         { email: c.email.toLowerCase(), reason: reason || null, blocked_by: u.user?.id ?? null },
         { onConflict: "email" },
       );
@@ -413,7 +413,7 @@ export default function StaffClients() {
     if (!(await confirmDialog({ title: `Unblock ${email}?`, description: "They will be able to book again.", confirmLabel: "Unblock" }))) return;
     setBusyEmail(email);
     try {
-      const { error } = await supabase.from("blocked_clients").delete().eq("email", email.toLowerCase());
+      const { error } = await apiQuery("blocked_clients").delete().eq("email", email.toLowerCase());
       if (error) throw error;
       await reloadBlocked();
       toast.success(`Unblocked ${email}`);
@@ -439,7 +439,7 @@ export default function StaffClients() {
     }))) return;
     setBusyEmail(c.email);
     try {
-      const { error } = await supabase.from("imported_clients").delete().eq("id", c.imported_id);
+      const { error } = await apiQuery("imported_clients").delete().eq("id", c.imported_id);
       if (error) throw error;
       await reloadImported();
       toast.success("Client deleted");

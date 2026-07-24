@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { inventoryService, ProductLot as Lot } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Plus, AlertTriangle, PackageX, PackageSearch, Boxes, Flame, Pencil } from "lucide-react";
@@ -43,13 +43,8 @@ export default function StaffInventory() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("product_lots")
-      .select("*")
-      .order("product_name", { ascending: true })
-      .order("expiration_date", { ascending: true, nullsFirst: false });
-    if (error) toast.error(error.message);
-    setLots((data ?? []) as Lot[]);
+    const data = await inventoryService.getLots();
+    setLots(data as Lot[]);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -84,10 +79,8 @@ export default function StaffInventory() {
     if (next == null) return;
     const n = Number(next);
     if (Number.isNaN(n) || n < 0) { toast.error("Invalid quantity"); return; }
-    const { error } = await supabase.rpc("adjust_lot", {
-      _lot_id: lot.id, _new_quantity: n, _reason: "adjust", _notes: null,
-    });
-    if (error) toast.error(error.message); else { toast.success("Updated"); load(); }
+    const ok = await inventoryService.adjustLot(lot.id, n, "adjust");
+    if (!ok) toast.error("Failed to update lot"); else { toast.success("Updated"); load(); }
   };
 
   const deactivate = async (lot: Lot) => {
@@ -96,8 +89,8 @@ export default function StaffInventory() {
       description: "It will be hidden from chart pickers. Movement history is kept.",
       confirmLabel: "Deactivate", destructive: true,
     }))) return;
-    const { error } = await supabase.from("product_lots").update({ is_active: false }).eq("id", lot.id);
-    if (error) toast.error(error.message); else { toast.success("Deactivated"); load(); }
+    const ok = await inventoryService.deactivateLot(lot.id);
+    if (!ok) toast.error("Failed to deactivate"); else { toast.success("Deactivated"); load(); }
   };
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -248,11 +241,8 @@ function LotHistory({ lotId }: { lotId: string }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     setLoading(true);
-    supabase.from("inventory_movements")
-      .select("*")
-      .eq("lot_id", lotId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => { setRows(data ?? []); setLoading(false); });
+    inventoryService.getMovements(lotId)
+      .then((data) => { setRows(data ?? []); setLoading(false); });
   }, [lotId]);
   if (loading) return <div className="mt-4 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin inline mr-2" />Loading…</div>;
   if (rows.length === 0) return <div className="mt-4 text-xs text-muted-foreground">No movements yet.</div>;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { format, formatDistanceToNow } from "date-fns";
 import { Loader2, Filter, Calendar as CalIcon, User as UserIcon, FileText, ShieldCheck, Stethoscope, FileCheck2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -75,7 +75,7 @@ export function UnifiedActivityFeed() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("staff_profiles").select("user_id, full_name").not("user_id", "is", null).order("full_name");
+      const { data } = await apiQuery("staff_profiles").select("user_id, full_name").not("user_id", "is", null).order("full_name");
       setStaff((data ?? []) as StaffOpt[]);
     })();
   }, []);
@@ -87,28 +87,28 @@ export function UnifiedActivityFeed() {
       const fromISO = startOfDayISO(new Date(from));
       const toISO = endOfDayISO(new Date(to));
 
-      const appointmentsQ = supabase
+      const appointmentsQ = apiQuery
         .from("appointment_audit_log")
         .select("id, appointment_id, actor_user_id, action, from_status, to_status, notes, created_at")
         .gte("created_at", fromISO).lte("created_at", toISO)
         .order("created_at", { ascending: false })
         .limit(500);
 
-      const phiQ = supabase
+      const phiQ = apiQuery
         .from("phi_access_log")
         .select("id, actor_user_id, actor_name, resource_type, resource_id, client_email, action, route, created_at")
         .gte("created_at", fromISO).lte("created_at", toISO)
         .order("created_at", { ascending: false })
         .limit(500);
 
-      const clinicalQ = supabase
+      const clinicalQ = apiQuery
         .from("clinical_audit_log")
         .select("id, actor_user_id, actor_name, resource_type, resource_id, action, metadata, created_at")
         .gte("created_at", fromISO).lte("created_at", toISO)
         .order("created_at", { ascending: false })
         .limit(500);
 
-      const consentQ = supabase
+      const consentQ = apiQuery
         .from("consent_validation_log")
         .select("id, appointment_id, client_email, missing_form_ids, source, created_at")
         .gte("created_at", fromISO).lte("created_at", toISO)
@@ -127,10 +127,10 @@ export function UnifiedActivityFeed() {
 
       const [{ data: staffData }, { data: apptData }] = await Promise.all([
         actorIds.size
-          ? supabase.from("staff_profiles").select("user_id, full_name").in("user_id", [...actorIds])
+          ? apiQuery("staff_profiles").select("user_id, full_name").in("user_id", [...actorIds])
           : Promise.resolve({ data: [] as any[] }),
         apptIds.size
-          ? supabase.from("appointments").select("id, client_first_name, client_last_name, client_email").in("id", [...apptIds])
+          ? apiQuery("appointments").select("id, client_first_name, client_last_name, client_email").in("id", [...apptIds])
           : Promise.resolve({ data: [] as any[] }),
       ]);
       const nameByUser: Record<string, string> = {};

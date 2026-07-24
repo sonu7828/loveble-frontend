@@ -1,6 +1,6 @@
 import { defineTool, type ToolContext } from "@lovable.dev/mcp-js";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@apiQuery/apiQuery-js";
 
 function client(ctx: ToolContext) {
   return createClient(

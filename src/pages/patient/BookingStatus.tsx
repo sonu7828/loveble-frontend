@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, useRef } from "react";
+import { useParams, Link } from "react-router-dom";
+import { ApiClient } from "@/services/api";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { CheckCircle2, Clock, MapPin, XCircle, Loader2, CalendarIcon, FileText, FileCheck2, AlertCircle, PenLine, RotateCcw, Hourglass } from "lucide-react";
 
@@ -32,11 +34,9 @@ const BookingStatus = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-booking?token=${encodeURIComponent(token)}`;
-      const r = await fetch(url, { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } });
-      if (!r.ok) throw new Error(`Server returned ${r.status}`);
-      const d = await r.json();
-      setData(d);
+      const res = await ApiClient.get(`/booking?token=${encodeURIComponent(token)}`);
+      if (res.error) throw new Error(res.error);
+      setData(res.data);
     } catch (e) {
       setLoadError((e as Error).message || "Could not load appointment");
     } finally {
@@ -55,7 +55,7 @@ const BookingStatus = () => {
     if (data.status === "pending") {
       interval = window.setInterval(() => { refetch(); }, 15000);
     }
-    const channel = supabase
+    const channel = apiQuery
       .channel(`booking-status-${data.id}`)
       .on(
         "postgres_changes",
@@ -73,7 +73,7 @@ const BookingStatus = () => {
       .subscribe();
     return () => {
       if (interval) window.clearInterval(interval);
-      supabase.removeChannel(channel);
+      apiQuery.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.id, data?.status]);
@@ -312,7 +312,7 @@ const PublicRescheduleDialog = ({ open, onOpenChange, appt, token, onDone }: { o
   const submit = async () => {
     if (!slot) { toast.error("Pick a time"); return; }
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("public-reschedule-appointment", {
+    const { data, error } = await ApiClient.post("public-reschedule-appointment", {
       body: { token, newStartAt: slot },
     });
     setBusy(false);
@@ -356,7 +356,7 @@ const PublicCancelDialog = ({ open, onOpenChange, token, within48, onDone }: { o
   const submit = async () => {
     setBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke("public-cancel-appointment", { body: { token, reason } });
+      const { data, error } = await ApiClient.post("public-cancel-appointment", { body: { token, reason } });
       if (error || data?.error) {
         toast.error(data?.error || error?.message || "Could not cancel");
         return;

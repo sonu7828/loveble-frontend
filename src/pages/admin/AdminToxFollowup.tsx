@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,13 +35,13 @@ export default function AdminToxFollowup() {
   async function load() {
     setLoading(true);
     // Neurotoxin category
-    const { data: cat } = await supabase.from("service_categories").select("id").eq("slug", "neurotoxins").maybeSingle();
+    const { data: cat } = await apiQuery("service_categories").select("id").eq("slug", "neurotoxins").maybeSingle();
     if (!cat?.id) { setRows([]); setLoading(false); return; }
 
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
     const until = new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(); // 5–30 days ago window
 
-    const { data: appts, error } = await supabase
+    const { data: appts, error } = await apiQuery
       .from("appointments")
       .select("id,end_at,client_first_name,client_last_name,client_email,client_phone,day7_tox_sms_sent_at,service_id,staff_id,status")
       .eq("status", "completed")
@@ -57,9 +57,9 @@ export default function AdminToxFollowup() {
     const emails = Array.from(new Set((appts ?? []).map((a: any) => String(a.client_email || "").toLowerCase()).filter(Boolean)));
 
     const [svcRes, staffRes, replyRes] = await Promise.all([
-      svcIds.length ? supabase.from("services").select("id,name,category_id").in("id", svcIds) : Promise.resolve({ data: [] as any[] }),
-      staffIds.length ? supabase.from("staff_profiles").select("id,full_name").in("id", staffIds) : Promise.resolve({ data: [] as any[] }),
-      emails.length ? supabase.from("sms_messages").select("client_email,created_at,direction").in("client_email", emails).eq("direction", "inbound").gte("created_at", since) : Promise.resolve({ data: [] as any[] }),
+      svcIds.length ? apiQuery("services").select("id,name,category_id").in("id", svcIds) : Promise.resolve({ data: [] as any[] }),
+      staffIds.length ? apiQuery("staff_profiles").select("id,full_name").in("id", staffIds) : Promise.resolve({ data: [] as any[] }),
+      emails.length ? apiQuery("sms_messages").select("client_email,created_at,direction").in("client_email", emails).eq("direction", "inbound").gte("created_at", since) : Promise.resolve({ data: [] as any[] }),
     ]);
 
     const svcMap = new Map((svcRes.data ?? []).map((s: any) => [s.id, s]));
@@ -125,11 +125,11 @@ export default function AdminToxFollowup() {
         `Hi ${r.client_first_name ?? ""}, it's Radiantilyk — just checking in on your ${r.service_name ?? "treatment"}! ` +
         `By now your ${productLabel} should be kicking in nicely. Final results show around day ${finalDays}. ` +
         `Let me know if you have any questions!`;
-      const { error } = await supabase.functions.invoke("send-sms-via-ghl", {
+      const { error } = await ApiClient.post("send-sms-via-ghl", {
         body: { appointmentId: r.id, template: "day7-tox-checkin-manual", body, skipOptInCheck: true },
       });
       if (error) throw error;
-      await supabase.from("appointments").update({ day7_tox_sms_sent_at: new Date().toISOString() } as any).eq("id", r.id);
+      await apiQuery("appointments").update({ day7_tox_sms_sent_at: new Date().toISOString() } as any).eq("id", r.id);
       toast.success("Sent");
       await load();
     } catch (e: any) {
@@ -142,7 +142,7 @@ export default function AdminToxFollowup() {
   async function runCron() {
     setRunning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-day7-tox-checkins");
+      const { data, error } = await ApiClient.post("send-day7-tox-checkins");
       if (error) throw error;
       toast.success(`Cron run: ${(data as any)?.sent ?? 0} sent, ${(data as any)?.skipped ?? 0} skipped`);
       await load();

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -19,7 +19,7 @@ export function LifetimeToxCard({ clientEmail }: { clientEmail: string }) {
     if (!clientEmail) return;
     (async () => {
       setLoading(true);
-      const { data } = await (supabase as any)
+      const { data } = await (apiQuery as any)
         .from("client_tox_lifetime")
         .select("product, lifetime_units, units_last_12mo, last_visit_at, visit_count")
         .eq("client_email", clientEmail.toLowerCase())

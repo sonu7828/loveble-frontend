@@ -1,6 +1,6 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,8 +58,8 @@ export default function StaffAvailability() {
   useEffect(() => {
     (async () => {
       const [s, l] = await Promise.all([
-        supabase.from("staff_profiles").select("id, full_name").eq("is_active", true),
-        supabase.from("locations").select("id, name").eq("is_active", true),
+        apiQuery("staff_profiles").select("id, full_name").eq("is_active", true),
+        apiQuery("locations").select("id, name").eq("is_active", true),
       ]);
       setStaffList(s.data ?? []);
       setLocations(l.data ?? []);
@@ -69,7 +69,7 @@ export default function StaffAvailability() {
 
   const reload = async (sid: string) => {
     setLoading(true);
-    const { data } = await supabase.from("weekly_schedules").select("*").eq("staff_id", sid);
+    const { data } = await apiQuery("weekly_schedules").select("*").eq("staff_id", sid);
     setScheds(data ?? []);
     setLoading(false);
   };
@@ -87,7 +87,7 @@ export default function StaffAvailability() {
   };
 
   const toggleActive = async (s: Sched) => {
-    const { error } = await supabase.from("weekly_schedules").update({ is_active: !s.is_active }).eq("id", s.id);
+    const { error } = await apiQuery("weekly_schedules").update({ is_active: !s.is_active }).eq("id", s.id);
     if (error) { toast.error(error.message); return; }
     setScheds((prev) => prev.map((x) => x.id === s.id ? { ...x, is_active: !x.is_active } : x));
     toast.success(s.is_active ? "Hidden from booking" : "Visible to clients");
@@ -130,8 +130,8 @@ export default function StaffAvailability() {
       weeks_of_month: form.recurrence === "nth_weekday_of_month" ? form.weeks_of_month : null,
     };
     const { error } = form.id
-      ? await supabase.from("weekly_schedules").update(payload).eq("id", form.id)
-      : await supabase.from("weekly_schedules").insert(payload);
+      ? await apiQuery("weekly_schedules").update(payload).eq("id", form.id)
+      : await apiQuery("weekly_schedules").insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Saved");
@@ -141,7 +141,7 @@ export default function StaffAvailability() {
 
   const remove = async (s: Sched) => {
     if (!(await confirmDialog({ title: "Delete this schedule block?", destructive: true, confirmLabel: "Delete" }))) return;
-    const { error } = await supabase.from("weekly_schedules").delete().eq("id", s.id);
+    const { error } = await apiQuery("weekly_schedules").delete().eq("id", s.id);
     if (error) { toast.error(error.message); return; }
     setScheds((prev) => prev.filter((x) => x.id !== s.id));
     toast.success("Deleted");

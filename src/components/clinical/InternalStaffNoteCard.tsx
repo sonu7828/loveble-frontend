@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Loader2, Save, Pencil, StickyNote } from "lucide-react";
 import { toast } from "sonner";
@@ -28,9 +28,9 @@ export function InternalStaffNoteCard({ profileId, initialNote, updatedAt, onSav
   const save = async () => {
     setSaving(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await authService.getSession();
       const nowIso = new Date().toISOString();
-      const { error } = await supabase
+      const { error } = await apiQuery
         .from("client_profiles")
         .update({
           internal_staff_note: value.trim() || null,

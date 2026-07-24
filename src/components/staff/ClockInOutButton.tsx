@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Clock, Loader2, Play, Square } from "lucide-react";
@@ -24,7 +24,7 @@ export function ClockInOutButton({ compact = false }: { compact?: boolean }) {
 
   const load = useCallback(async () => {
     if (!staffId) { setLoading(false); return; }
-    const { data } = await supabase
+    const { data } = await apiQuery
       .from("staff_time_entries")
       .select("id, clock_in, clock_out")
       .eq("staff_id", staffId)
@@ -46,7 +46,7 @@ export function ClockInOutButton({ compact = false }: { compact?: boolean }) {
   const clockIn = async () => {
     if (!staffId) return;
     setWorking(true);
-    const { error } = await supabase.from("staff_time_entries").insert({ staff_id: staffId });
+    const { error } = await apiQuery("staff_time_entries").insert({ staff_id: staffId });
     setWorking(false);
     if (error) return toast.error(error.message);
     toast.success("Clocked in");
@@ -55,7 +55,7 @@ export function ClockInOutButton({ compact = false }: { compact?: boolean }) {
   const clockOut = async () => {
     if (!entry) return;
     setWorking(true);
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("staff_time_entries")
       .update({ clock_out: new Date().toISOString() })
       .eq("id", entry.id);

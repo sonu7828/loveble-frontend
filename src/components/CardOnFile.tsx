@@ -6,7 +6,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, Lock } from "lucide-react";
 import { functionErrorMessage } from "@/lib/functionError";
 
@@ -97,7 +97,7 @@ function CardForm({
       }
 
       // Now create the SetupIntent on the server
-      const { data, error: fnErr } = await supabase.functions.invoke(
+      const { data, error: fnErr } = await ApiClient.post(
         "payments-create-setup-intent",
         { body: { email, name, phone } },
       );

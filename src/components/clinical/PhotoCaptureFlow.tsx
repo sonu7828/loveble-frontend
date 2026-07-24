@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Camera, Loader2, RefreshCw, Check, AlertTriangle, ShieldCheck, ImagePlus, Eye, EyeOff } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { toast } from "sonner";
 import { PhotoLightingHint } from "./PhotoLightingHint";
 import { PhotoConsentDialog } from "./PhotoConsentDialog";
@@ -66,7 +66,7 @@ export function PhotoCaptureFlow(props: Props) {
     (async () => {
       const email = clientEmail.toLowerCase();
       // 1) Legacy/standalone consent record
-      const { data: legacy } = await supabase
+      const { data: legacy } = await apiQuery
         .from("photo_consent_records")
         .select("id, revoked_at")
         .ilike("client_email", email)
@@ -79,7 +79,7 @@ export function PhotoCaptureFlow(props: Props) {
       //    forms named "Media Release", "Image Use Authorization", etc.
       //    are recognized — previously only forms whose slug/title contained
       //    the literal substring "photo" would count, false-blocking capture.
-      const { data: forms } = await supabase
+      const { data: forms } = await apiQuery
         .from("consent_forms")
         .select("id, slug, title")
         .or("slug.ilike.%photo%,slug.ilike.%media%,slug.ilike.%image%,title.ilike.%photo%,title.ilike.%media%,title.ilike.%image%");
@@ -88,7 +88,7 @@ export function PhotoCaptureFlow(props: Props) {
       // (indeterminate) — capture stays unblocked rather than false-failing.
       if (formIds.length === 0) { if (!cancelled) setHasConsent(null); return; }
 
-      const { data: sigs } = await supabase
+      const { data: sigs } = await apiQuery
         .from("consent_signatures")
         .select("id, expires_at, decision")
         .ilike("client_email", email)
@@ -107,7 +107,7 @@ export function PhotoCaptureFlow(props: Props) {
     if (!open || !clientEmail) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("clinical_photo_meta")
         .select("storage_path, created_at")
         .ilike("client_email", clientEmail)
@@ -116,7 +116,7 @@ export function PhotoCaptureFlow(props: Props) {
         .limit(1);
       const path = data?.[0]?.storage_path;
       if (!path) { if (!cancelled) { setGhostUrl(null); setGhostPath(null); } return; }
-      const { data: s } = await supabase.storage.from("clinical-photos").createSignedUrl(path, 600);
+      const { data: s } = await ApiClient.createSignedUrl(path, 600);
       if (!cancelled) { setGhostUrl(s?.signedUrl ?? null); setGhostPath(path); }
     })();
     return () => { cancelled = true; };
@@ -159,12 +159,12 @@ export function PhotoCaptureFlow(props: Props) {
     try {
       const ext = mime.includes("png") ? "png" : "jpg";
       const key = `${noteId}/${kind}/${Date.now()}-${angle}.${ext}`;
-      const { error } = await supabase.storage.from("clinical-photos").upload(key, blob, {
+      const { error } = await ApiClient.upload(key, blob, {
         contentType: mime, upsert: false,
       });
       if (error) throw error;
-      const { data: u } = await supabase.auth.getUser();
-      const { error: mErr } = await supabase.from("clinical_photo_meta").insert({
+      const { data: u } = await authService.getSession();
+      const { error: mErr } = await apiQuery("clinical_photo_meta").insert({
         storage_path: key,
         clinical_note_id: noteId,
         appointment_id: appointmentId ?? null,

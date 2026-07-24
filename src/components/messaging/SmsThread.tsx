@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -56,7 +56,7 @@ export function SmsThread({
   // Load snippets (staff only)
   useEffect(() => {
     if (viewerRole !== "staff") return;
-    supabase
+    apiQuery
       .from("sms_snippets" as any)
       .select("id,label,body,category")
       .eq("is_active", true)
@@ -73,7 +73,7 @@ export function SmsThread({
 
   const load = async () => {
     setLoading(true);
-    let q = supabase
+    let q = apiQuery
       .from("sms_messages")
       .select("id, client_email, appointment_id, direction, body, sender_role, created_at, read_by_staff_at, read_by_client_at")
       .ilike("client_email", emailKey)
@@ -95,7 +95,7 @@ export function SmsThread({
 
   // Realtime
   useEffect(() => {
-    const channel = supabase
+    const channel = apiQuery
       .channel(`sms_thread_${emailKey}_${appointmentId ?? "all"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "sms_messages" }, (payload) => {
         const row = (payload.new ?? payload.old) as ThreadMessage | undefined;
@@ -105,7 +105,7 @@ export function SmsThread({
         load();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { apiQuery.removeChannel(channel); };
   }, [emailKey, appointmentId]);
 
   // Auto-scroll to bottom on new messages
@@ -126,7 +126,7 @@ export function SmsThread({
     if (unread.length === 0) return;
     const now = new Date().toISOString();
     const patch = viewerRole === "staff" ? { read_by_staff_at: now } : { read_by_client_at: now };
-    supabase
+    apiQuery
       .from("sms_messages")
       .update(patch)
       .in("id", unread.map((m) => m.id))
@@ -151,7 +151,7 @@ export function SmsThread({
     setSending(true);
     try {
       if (viewerRole === "client") {
-        const { data, error } = await supabase.functions.invoke("client-send-sms", {
+        const { data, error } = await ApiClient.post("client-send-sms", {
           body: { message: body, appointmentId: appointmentId ?? null },
         });
         if (error || (data as any)?.error) {
@@ -163,7 +163,7 @@ export function SmsThread({
         const payload = appointmentId
           ? { appointmentId, message: body, overrideOptIn: true }
           : { clientEmail: emailKey, message: body };
-        const { data, error } = await supabase.functions.invoke(fn, { body: payload });
+        const { data, error } = await ApiClient.post(fn, { body: payload });
         if (error || (data as any)?.error) {
           toast.error((data as any)?.error || error?.message || "Could not send SMS");
           return;

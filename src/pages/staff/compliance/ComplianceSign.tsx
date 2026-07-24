@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,12 +43,12 @@ export default function ComplianceSign() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authService.getSession();
       if (!user) { nav("/staff/login"); return; }
 
       const [{ data: p }, { data: sp }] = await Promise.all([
-        supabase.from("compliance_protocols").select("*").eq("id", protocolId).maybeSingle(),
-        supabase.from("staff_profiles").select("id, full_name, license_number").eq("user_id", user.id).maybeSingle(),
+        apiQuery("compliance_protocols").select("*").eq("id", protocolId).maybeSingle(),
+        apiQuery("staff_profiles").select("id, full_name, license_number").eq("user_id", user.id).maybeSingle(),
       ]);
 
       if (!p) { toast.error("Protocol not found"); nav("/staff/compliance"); return; }
@@ -72,7 +72,7 @@ export default function ComplianceSign() {
     if (!canSubmit) { toast.error("Complete all initials, name, signature, and confirmation."); return; }
     setSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await authService.getSession();
       if (!user) throw new Error("Not signed in");
 
       // Best-effort IP capture
@@ -88,7 +88,7 @@ export default function ComplianceSign() {
       const buf = await crypto.subtle.digest("SHA-256", enc);
       const bodyHash = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
-      const { data: sig, error } = await supabase
+      const { data: sig, error } = await apiQuery
         .from("compliance_signatures")
         .insert({
           protocol_id: protocol.id,
@@ -112,7 +112,7 @@ export default function ComplianceSign() {
       if (error || !sig) throw new Error(error?.message || "Could not save signature");
 
       // Generate PDF in background
-      supabase.functions.invoke("generate-compliance-pdf", { body: { signatureId: sig.id } }).then(({ error: e }) => {
+      ApiClient.post("generate-compliance-pdf", { body: { signatureId: sig.id } }).then(({ error: e }) => {
         if (e) console.error("PDF gen failed", e);
       });
 

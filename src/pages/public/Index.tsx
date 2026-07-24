@@ -6,7 +6,7 @@ import { usePreferredLocation } from "@/hooks/usePreferredLocation";
 import { useEffect, useState } from "react";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import drFobiImg from "@/assets/dr-fobi.jpg";
 import heroLeftImg from "@/assets/hero-left.png";
 import heroRightImg from "@/assets/hero-right.png";
@@ -43,7 +43,7 @@ const Index = () => {
   const [rotationOffset, setRotationOffset] = useState(0);
 
   useEffect(() => {
-    supabase.from("locations").select("slug, google_place_id, google_review_url").eq("slug", "san-jose")
+    apiQuery("locations").select("slug, google_place_id, google_review_url").eq("slug", "san-jose")
       .then(({ data }) => {
         const sj = (data ?? []).find((r: any) => r.slug === "san-jose");
         setPlaceIds({
@@ -52,7 +52,7 @@ const Index = () => {
         });
       });
 
-    supabase
+    apiQuery
       .from("public_testimonials" as any)
       .select("id, comment, first_name, location_city, rating")
       .eq("rating", 5)

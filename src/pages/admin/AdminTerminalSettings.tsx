@@ -1,6 +1,6 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +22,8 @@ export default function AdminTerminalSettings() {
   const load = async () => {
     setLoading(true);
     const [{ data: locs }, { data: readerRows, error: readerError }] = await Promise.all([
-      supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
-      supabase.from("terminal_readers").select("*").eq("is_active", true).order("created_at", { ascending: false }),
+      apiQuery("locations").select("id, name").eq("is_active", true).order("name"),
+      apiQuery("terminal_readers").select("*").eq("is_active", true).order("created_at", { ascending: false }),
     ]);
     const locationRows = locs ?? [];
     const locationNames = Object.fromEntries(locationRows.map((l: any) => [l.id, l.name]));
@@ -44,7 +44,7 @@ export default function AdminTerminalSettings() {
   const register = async () => {
     if (!locationId || !code || !label) { toast.error("Fill in all fields"); return; }
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("terminal-register-reader", {
+    const { data, error } = await ApiClient.post("terminal-register-reader", {
       body: { locationId, registrationCode: code.trim(), label: label.trim() },
     });
     setBusy(false);
@@ -54,7 +54,7 @@ export default function AdminTerminalSettings() {
 
   const removeReader = async (id: string) => {
     if (!(await confirmDialog({ title: "Remove this reader?", destructive: true, confirmLabel: "Remove" }))) return;
-    await supabase.from("terminal_readers").update({ is_active: false }).eq("id", id);
+    await apiQuery("terminal_readers").update({ is_active: false }).eq("id", id);
     load();
   };
 

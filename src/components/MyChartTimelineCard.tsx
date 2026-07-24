@@ -5,7 +5,7 @@
 // touch-up window per category, and photos the provider has shared with the
 // patient (clinical_photo_meta.is_shared_with_patient = true).
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { getClientSession } from "@/hooks/useClientAuth";
 import { addDays, addMonths, format, formatDistanceToNowStrict } from "date-fns";
 import { Loader2, Download, Syringe, Droplet, Zap, Pill, FileText, CalendarClock, Image as ImageIcon } from "lucide-react";
@@ -77,7 +77,7 @@ export function MyChartTimelineCard() {
         if (!e) return;
         setEmail(e);
 
-        const { data: notes } = await supabase
+        const { data: notes } = await apiQuery
           .from("clinical_notes")
           .select("id, created_at, category, service_name, provider_name, status")
           .ilike("client_email", e)
@@ -92,11 +92,11 @@ export function MyChartTimelineCard() {
         }
 
         const [neuro, filler, energy, wellness, sharedPhotos] = await Promise.all([
-          supabase.from("clinical_note_neurotoxin" as any).select("clinical_note_id, product, total_units, lot_number, expiration_date").in("clinical_note_id", ids),
-          supabase.from("clinical_note_filler" as any).select("clinical_note_id, product, syringes_used, areas, lot_entries").in("clinical_note_id", ids),
-          supabase.from("clinical_note_energy" as any).select("clinical_note_id, device, areas").in("clinical_note_id", ids),
-          supabase.from("clinical_note_wellness" as any).select("clinical_note_id, product, dose, service_type, lot_number, expiration_date").in("clinical_note_id", ids),
-          supabase.from("clinical_photo_meta" as any)
+          apiQuery("clinical_note_neurotoxin" as any).select("clinical_note_id, product, total_units, lot_number, expiration_date").in("clinical_note_id", ids),
+          apiQuery("clinical_note_filler" as any).select("clinical_note_id, product, syringes_used, areas, lot_entries").in("clinical_note_id", ids),
+          apiQuery("clinical_note_energy" as any).select("clinical_note_id, device, areas").in("clinical_note_id", ids),
+          apiQuery("clinical_note_wellness" as any).select("clinical_note_id, product, dose, service_type, lot_number, expiration_date").in("clinical_note_id", ids),
+          apiQuery("clinical_photo_meta" as any)
             .select("storage_path, clinical_note_id")
             .in("clinical_note_id", ids)
             .eq("is_shared_with_patient", true),
@@ -111,7 +111,7 @@ export function MyChartTimelineCard() {
         const capped = (sharedPhotos.data ?? []).slice(0, 200);
         await Promise.all(capped.map(async (p: any) => {
           try {
-            const { data } = await supabase.storage.from("clinical-photos").createSignedUrl(p.storage_path, 600);
+            const { data } = await ApiClient.createSignedUrl(p.storage_path, 600);
             if (!data?.signedUrl) return;
             const arr = photosByNote.get(p.clinical_note_id) ?? [];
             arr.push(data.signedUrl);

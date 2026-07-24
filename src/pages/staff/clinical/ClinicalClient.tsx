@@ -1,7 +1,7 @@
 // Per-client clinical view: GFE status + chart note timeline + per-visit packets.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, ShieldCheck, ShieldAlert, FilePlus, FileText, Download, CalendarDays, Stethoscope, ClipboardList, Mic } from "lucide-react";
@@ -32,10 +32,10 @@ export default function ClinicalClient() {
     (async () => {
       setLoading(true);
       const [{ data: g }, { data: n }, { data: e }, { data: a }] = await Promise.all([
-        supabase.from("gfe_records").select("*").ilike("client_email", decoded).order("signed_at", { ascending: false }),
-        supabase.from("clinical_notes").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }),
-        supabase.from("clinical_encounters").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }),
-        supabase.from("appointments").select("client_first_name, client_last_name, client_email")
+        apiQuery("gfe_records").select("*").ilike("client_email", decoded).order("signed_at", { ascending: false }),
+        apiQuery("clinical_notes").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }),
+        apiQuery("clinical_encounters").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }),
+        apiQuery("appointments").select("client_first_name, client_last_name, client_email")
           .ilike("client_email", decoded).order("start_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
       setGfes(g ?? []);
@@ -70,7 +70,7 @@ export default function ClinicalClient() {
   async function downloadVisit(date: string) {
     setDownloadingDate(date);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-visit-compiled-pdf", {
+      const { data, error } = await ApiClient.post("generate-visit-compiled-pdf", {
         body: { client_email: decoded, visit_date: date },
       });
       if (error) throw error;

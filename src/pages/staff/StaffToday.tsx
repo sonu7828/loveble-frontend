@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -384,7 +384,7 @@ function StandardStaffToday() {
   const load = useCallback(async () => {
     setLoading(true);
     const { start: dStart, end: dEnd } = clinicTodayBounds();
-    let q = supabase.from("appointments").select("*")
+    let q = apiQuery("appointments").select("*")
       .gte("start_at", dStart).lte("start_at", dEnd)
       .not("status", "in", "(cancelled,denied)").order("start_at");
     if (!canSeeAll && staffId) q = q.eq("staff_id", staffId);
@@ -398,10 +398,10 @@ function StandardStaffToday() {
       const lids = [...new Set(list.map(a => a.location_id))];
       const aids = list.map(a => a.id);
       const [{ data: svcs }, { data: stf }, { data: locs }, { data: sl }, apsvMap] = await Promise.all([
-        supabase.from("services").select("id, name").in("id", sids),
-        supabase.from("staff_profiles").select("id, full_name").in("id", stids),
-        supabase.from("locations").select("id, name").in("id", lids),
-        supabase.from("sales").select("id, status, total_cents, appointment_id, created_at")
+        apiQuery("services").select("id, name").in("id", sids),
+        apiQuery("staff_profiles").select("id, full_name").in("id", stids),
+        apiQuery("locations").select("id, name").in("id", lids),
+        apiQuery("sales").select("id, status, total_cents, appointment_id, created_at")
           .in("appointment_id", aids)
           .order("created_at", { ascending: false }),
         fetchApptServiceNames(aids),
@@ -428,9 +428,9 @@ function StandardStaffToday() {
       const emails = [...new Set(list.map(a => (a.client_email ?? "").toLowerCase()).filter(Boolean))];
       const [{ data: intakes }, { count: missingConsentCount }] = await Promise.all([
         emails.length
-          ? supabase.from("client_intake_submissions").select("client_email").in("client_email", emails)
+          ? apiQuery("client_intake_submissions").select("client_email").in("client_email", emails)
           : Promise.resolve({ data: [] as any[] }),
-        supabase.from("appointment_consents").select("appointment_id", { count: "exact", head: true })
+        apiQuery("appointment_consents").select("appointment_id", { count: "exact", head: true })
           .in("appointment_id", aids).eq("signed", false),
       ]);
       const intakeEmails = new Set((intakes ?? []).map((r: any) => (r.client_email ?? "").toLowerCase()));
@@ -469,13 +469,13 @@ function StandardStaffToday() {
       toast.warning("Remember to add a card on file from the client chart.");
     }
     setWorking(a.id);
-    const { error } = await supabase.from("appointments").update({
+    const { error } = await apiQuery("appointments").update({
       status: "arrived",
       checked_in_at: new Date().toISOString(),
       checked_in_by: user?.id ?? null,
     }).eq("id", a.id);
     if (error) { toast.error(error.message); setWorking(null); return false; }
-    await supabase.from("appointment_audit_log").insert({
+    await apiQuery("appointment_audit_log").insert({
       appointment_id: a.id, action: "checked_in",
       from_status: a.status as any, to_status: "arrived" as any, actor_user_id: user?.id ?? null,
     });
@@ -492,7 +492,7 @@ function StandardStaffToday() {
       confirmLabel: "Mark complete",
     }))) return;
     setWorking(a.id);
-    const { data, error } = await supabase.functions.invoke("mark-appointment-complete", {
+    const { data, error } = await ApiClient.post("mark-appointment-complete", {
       body: { appointmentId: a.id },
     });
     setWorking(null);
@@ -517,19 +517,19 @@ function StandardStaffToday() {
     setWorking(a.id);
     try {
       if (hasCard) {
-        const { data, error } = await supabase.functions.invoke("payments-charge-no-show", {
+        const { data, error } = await ApiClient.post("payments-charge-no-show", {
           body: { appointmentId: a.id, amountCents: 20000 },
         });
         if (error || (data as any)?.error) throw new Error((data as any)?.error ?? error?.message ?? "Charge failed");
         toast.success("Charged $200 — marked no-show");
       } else {
-        const { error } = await supabase.from("appointments")
+        const { error } = await apiQuery("appointments")
           .update({ status: "no_show", no_show_charged_at: new Date().toISOString() })
           .eq("id", a.id);
         if (error) throw new Error(error.message);
         toast.success("Marked no-show");
       }
-      await supabase.from("appointment_audit_log").insert({
+      await apiQuery("appointment_audit_log").insert({
         appointment_id: a.id, action: "no_show" as any,
         from_status: a.status as any, to_status: "no_show" as any, actor_user_id: user?.id ?? null,
       });

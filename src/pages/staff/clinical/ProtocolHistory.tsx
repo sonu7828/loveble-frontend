@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { supabase as supabaseTyped } from "@/integrations/supabase/client";
-const supabase = supabaseTyped as any;
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, ArrowLeft, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
@@ -17,8 +16,8 @@ export default function ProtocolHistory() {
     if (!protocolId || authLoading) return;
     (async () => {
       const [{ data: p }, { data: vs }] = await Promise.all([
-        (supabase as any).from("clinical_protocols").select("title").eq("id", protocolId).maybeSingle(),
-        (supabase as any).from("clinical_protocol_versions").select("id, version_number, status, signed_at, signed_by_name, created_at").eq("protocol_id", protocolId).order("version_number", { ascending: false }),
+        (apiQuery as any).from("clinical_protocols").select("title").eq("id", protocolId).maybeSingle(),
+        (apiQuery as any).from("clinical_protocol_versions").select("id, version_number, status, signed_at, signed_by_name, created_at").eq("protocol_id", protocolId).order("version_number", { ascending: false }),
       ]);
       setTitle((p as any)?.title ?? "");
       setVersions(vs ?? []);

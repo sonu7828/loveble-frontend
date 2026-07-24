@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { staffService } from "@/services/api";
 
 export interface UnifiedStaffMember {
   id: string;
@@ -12,12 +12,16 @@ export interface UnifiedStaffMember {
 export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> {
   let remote: UnifiedStaffMember[] = [];
   try {
-    const { data } = await supabase
-      .from("staff_profiles")
-      .select("id, full_name, title, email, is_active")
-      .eq("is_active", true)
-      .order("full_name");
-    if (data) remote = data as UnifiedStaffMember[];
+    const data = await staffService.getStaffProfiles();
+    if (data) {
+      remote = data.map((s) => ({
+        id: s.id,
+        full_name: s.full_name,
+        title: s.role ? s.role.replace("_", " ").toUpperCase() : "Staff Provider",
+        email: s.email || null,
+        is_active: s.is_active,
+      }));
+    }
   } catch (e) {}
 
   const demoMembers: any[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");

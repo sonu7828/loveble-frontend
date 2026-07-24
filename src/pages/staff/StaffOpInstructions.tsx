@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,11 +43,11 @@ export default function StaffOpInstructions({ kind, embedded = false }: { kind: 
   const cfg = COPY[kind];
 
   const load = async () => {
-    const { data: services } = await supabase
+    const { data: services } = await apiQuery
       .from("services")
       .select("id, name, category_id, is_active, service_categories(slug, display_order), display_order")
       .eq("is_active", true);
-    const { data: existing } = await supabase.from(cfg.table as any).select("*");
+    const { data: existing } = await apiQuery(cfg.table as any).select("*");
     const byId = new Map((existing ?? []).map((p: any) => [p.service_id, p]));
     const merged: Row[] = (services ?? [])
       .sort((a: any, b: any) =>
@@ -84,7 +84,7 @@ export default function StaffOpInstructions({ kind, embedded = false }: { kind: 
       body_markdown: active.body_markdown,
       last_edited_by: user?.id ?? null,
     };
-    const { error } = await supabase.from(cfg.table as any).upsert(payload, { onConflict: "service_id" });
+    const { error } = await apiQuery(cfg.table as any).upsert(payload, { onConflict: "service_id" });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Saved");

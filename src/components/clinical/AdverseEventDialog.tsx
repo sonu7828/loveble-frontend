@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -55,7 +55,7 @@ export function AdverseEventDialog({
 
   async function save() {
     setSaving(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await authService.getSession();
     const payload = {
       client_email: clientEmail.toLowerCase(),
       client_first_name: clientFirstName,
@@ -73,7 +73,7 @@ export function AdverseEventDialog({
       notes: form.notes || null,
       reported_by: u.user?.id ?? null,
     };
-    const { error } = await supabase.from("adverse_events").insert(payload as any);
+    const { error } = await apiQuery("adverse_events").insert(payload as any);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Adverse event logged");
@@ -139,7 +139,7 @@ export function AdverseEventList({ clientEmail }: { clientEmail: string }) {
   useEffect(() => {
     if (!clientEmail) return;
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("adverse_events")
         .select("*")
         .eq("client_email", clientEmail.toLowerCase())

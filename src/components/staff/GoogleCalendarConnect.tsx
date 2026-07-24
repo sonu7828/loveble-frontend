@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Loader2, Calendar as CalendarIcon, CheckCircle2, Unlink } from "lucide-react";
 import { toast } from "sonner";
@@ -21,7 +21,7 @@ export default function GoogleCalendarConnect({ staffId }: Props) {
 
   const load = async () => {
     if (!staffId) { setLoading(false); return; }
-    const { data } = await supabase
+    const { data } = await apiQuery
       .from("staff_google_oauth")
       .select("google_email, connected_at")
       .eq("staff_id", staffId)
@@ -36,7 +36,7 @@ export default function GoogleCalendarConnect({ staffId }: Props) {
     if (!staffId) return;
     setConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("google-oauth-start", {
+      const { data, error } = await ApiClient.post("google-oauth-start", {
         body: { return_url: window.location.href },
       });
       if (error) throw error;
@@ -53,7 +53,7 @@ export default function GoogleCalendarConnect({ staffId }: Props) {
     if (!staffId) return;
     setDisconnecting(true);
     try {
-      const { error } = await supabase
+      const { error } = await apiQuery
         .from("staff_google_oauth")
         .delete()
         .eq("staff_id", staffId);

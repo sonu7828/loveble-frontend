@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MiniSignaturePad } from "@/components/clinical/MiniSignaturePad";
@@ -23,7 +23,7 @@ export function SavedSignatureCard({ staffId, defaultName = "" }: Props) {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("staff_profiles")
         .select("saved_signature_png, saved_signature_name, signature_saved_at")
         .eq("id", staffId)
@@ -43,7 +43,7 @@ export function SavedSignatureCard({ staffId, defaultName = "" }: Props) {
     if (!png || png.length < 100) { toast.error("Please draw your signature first."); return; }
     if (!name.trim()) { toast.error("Please enter your full legal name."); return; }
     setSaving(true);
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("staff_profiles")
       .update({
         saved_signature_png: png,
@@ -60,7 +60,7 @@ export function SavedSignatureCard({ staffId, defaultName = "" }: Props) {
   async function clear() {
     if (!(await confirmDialog({ title: "Remove saved signature?", description: "You will need to draw your signature again manually on chart notes.", destructive: true, confirmLabel: "Remove Signature" }))) return;
     setSaving(true);
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("staff_profiles")
       .update({
         saved_signature_png: null,

@@ -2,7 +2,7 @@
 // checkout Eligibility strip auto-suggests the right discount.
 import { useEffect, useState } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ export function ClientPerksCard({ clientEmail }: Props) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("client_perks" as any)
         .select("is_healthcare_worker, is_friend")
         .eq("client_email", email)
@@ -41,8 +41,8 @@ export function ClientPerksCard({ clientEmail }: Props) {
     const prev = perks;
     setPerks({ ...perks, [key]: value });
     setSaving(key);
-    const { data: userRes } = await supabase.auth.getUser();
-    const { error } = await supabase
+    const { data: userRes } = await authService.getSession();
+    const { error } = await apiQuery
       .from("client_perks" as any)
       .upsert(
         {

@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { MiniSignaturePad } from "./MiniSignaturePad";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { toast } from "sonner";
 
 const CONSENT_BODY = `I authorize Radiantilyk Aesthetic to capture clinical photographs of me at every visit as part of my medical record.
@@ -35,7 +35,7 @@ export function PhotoConsentDialog({
   async function save() {
     if (!sigPng || !name.trim()) { toast.error("Signature and full name required."); return; }
     setSaving(true);
-    const { error } = await supabase.from("photo_consent_records").insert({
+    const { error } = await apiQuery("photo_consent_records").insert({
       client_email: clientEmail.toLowerCase(),
       signature_png: sigPng,
       signed_name: name.trim(),

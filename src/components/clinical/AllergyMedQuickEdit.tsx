@@ -4,7 +4,7 @@
 // if none exists, creates an "amendment" intake submission so the data
 // flows back through the alerts banner on next load.
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,7 @@ export function AllergyMedQuickEdit({ open, onOpenChange, clientEmail, onSaved }
     if (!email) return;
     setLoading(true);
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("client_intake_submissions")
         .select("id, allergies, allergies_other, current_medications, current_medications_other")
         .ilike("client_email", email)
@@ -68,12 +68,12 @@ export function AllergyMedQuickEdit({ open, onOpenChange, clientEmail, onSaved }
       };
       let error: any = null;
       if (latestId) {
-        ({ error } = await supabase
+        ({ error } = await apiQuery
           .from("client_intake_submissions")
           .update(payload)
           .eq("id", latestId));
       } else {
-        ({ error } = await supabase
+        ({ error } = await apiQuery
           .from("client_intake_submissions")
           .insert({
             ...payload,

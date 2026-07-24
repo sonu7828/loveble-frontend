@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
-import { supabase as supabaseTyped } from "@/integrations/supabase/client";
-const supabase = supabaseTyped as any;
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -151,7 +150,7 @@ export default function EncounterEditor() {
     if (!email) return;
     let cancelled = false;
     (async () => {
-      const { data: cp } = await supabase
+      const { data: cp } = await apiQuery
         .from("client_profiles")
         .select("dob")
         .ilike("email", email)
@@ -167,7 +166,7 @@ export default function EncounterEditor() {
   useEffect(() => {
     if (isNew) return;
     (async () => {
-      const { data: enc, error } = await supabase.from("clinical_encounters").select("*").eq("id", id).maybeSingle();
+      const { data: enc, error } = await apiQuery("clinical_encounters").select("*").eq("id", id).maybeSingle();
       if (error || !enc) { toast.error("Encounter not found"); navigate(-1); return; }
       setEncounterId(enc.id);
       setStatus(enc.status);
@@ -186,9 +185,9 @@ export default function EncounterEditor() {
       setPdfs({ clinical_pdf_url: enc.clinical_pdf_url, handout_pdf_url: enc.handout_pdf_url });
 
       const [{ data: labsRows }, { data: rxRows }, { data: fuRows }] = await Promise.all([
-        supabase.from("clinical_encounter_labs").select("*").eq("encounter_id", enc.id),
-        supabase.from("clinical_encounter_prescriptions").select("*").eq("encounter_id", enc.id),
-        supabase.from("clinical_encounter_followups").select("*").eq("encounter_id", enc.id).maybeSingle(),
+        apiQuery("clinical_encounter_labs").select("*").eq("encounter_id", enc.id),
+        apiQuery("clinical_encounter_prescriptions").select("*").eq("encounter_id", enc.id),
+        apiQuery("clinical_encounter_followups").select("*").eq("encounter_id", enc.id).maybeSingle(),
       ]);
       setLabs((labsRows ?? []).map((l: any) => ({ ...l, drawn_on: l.drawn_on ?? "" })));
       setRx((rxRows ?? []).map((r: any) => ({ ...r })));
@@ -235,10 +234,10 @@ export default function EncounterEditor() {
         encounter_id: encId, analyte: l.analyte, value: l.value || null, unit: l.unit || null,
         drawn_on: l.drawn_on || null, source: l.source, notes: l.notes || null,
       }));
-    const { error: labDelErr } = await supabase.from("clinical_encounter_labs").delete().eq("encounter_id", encId);
+    const { error: labDelErr } = await apiQuery("clinical_encounter_labs").delete().eq("encounter_id", encId);
     if (labDelErr) throw new Error(`Could not clear previous labs: ${labDelErr.message}`);
     if (labRows.length) {
-      const { error: labInsErr } = await supabase.from("clinical_encounter_labs").insert(labRows);
+      const { error: labInsErr } = await apiQuery("clinical_encounter_labs").insert(labRows);
       if (labInsErr) throw new Error(`Could not save labs: ${labInsErr.message}`);
     }
 
@@ -249,17 +248,17 @@ export default function EncounterEditor() {
         frequency: r.frequency || null, duration: r.duration || null, dispense: r.dispense || null,
         refills: r.refills ?? 0, titration: r.titration ?? [], notes: r.notes || null,
       }));
-    const { error: rxDelErr } = await supabase.from("clinical_encounter_prescriptions").delete().eq("encounter_id", encId);
+    const { error: rxDelErr } = await apiQuery("clinical_encounter_prescriptions").delete().eq("encounter_id", encId);
     if (rxDelErr) throw new Error(`Could not clear previous prescriptions: ${rxDelErr.message}`);
     if (rxRows.length) {
-      const { error: rxInsErr } = await supabase.from("clinical_encounter_prescriptions").insert(rxRows);
+      const { error: rxInsErr } = await apiQuery("clinical_encounter_prescriptions").insert(rxRows);
       if (rxInsErr) throw new Error(`Could not save prescriptions: ${rxInsErr.message}`);
     }
 
     if (visitType === "follow_up" && !isAcne) {
-      const { error: fuDelErr } = await supabase.from("clinical_encounter_followups").delete().eq("encounter_id", encId);
+      const { error: fuDelErr } = await apiQuery("clinical_encounter_followups").delete().eq("encounter_id", encId);
       if (fuDelErr) throw new Error(`Could not clear previous follow-up: ${fuDelErr.message}`);
-      const { error: fuInsErr } = await supabase.from("clinical_encounter_followups").insert({
+      const { error: fuInsErr } = await apiQuery("clinical_encounter_followups").insert({
         encounter_id: encId,
         tolerability: followup.tolerability || null,
         adverse_events: followup.adverse_events || null,
@@ -291,12 +290,12 @@ export default function EncounterEditor() {
     };
     let encId = encounterId;
     if (!encId) {
-      const { data, error } = await supabase.from("clinical_encounters").insert(payload).select("id").maybeSingle();
+      const { data, error } = await apiQuery("clinical_encounters").insert(payload).select("id").maybeSingle();
       if (error || !data) { setSaving(false); toast.error(error?.message ?? "Save failed"); return null; }
       encId = data.id; setEncounterId(encId);
       window.history.replaceState(null, "", `/staff/clinical/encounters/${encId}`);
     } else {
-      const { error } = await supabase.from("clinical_encounters").update(payload).eq("id", encId);
+      const { error } = await apiQuery("clinical_encounters").update(payload).eq("id", encId);
       if (error) { setSaving(false); toast.error(error.message); return null; }
     }
     try {
@@ -318,14 +317,14 @@ export default function EncounterEditor() {
     if (!encId) return;
     setSigning(true);
     // Mark signed in DB
-    const { error: uErr } = await supabase.from("clinical_encounters").update({
+    const { error: uErr } = await apiQuery("clinical_encounters").update({
       status: "signed",
       signed_by_name: signerName, signed_by_license: signerLicense || null,
       signature_png: signaturePng, signed_at: new Date().toISOString(),
     }).eq("id", encId);
     if (uErr) { setSigning(false); toast.error(uErr.message); return; }
     // Generate PDFs
-    const { data, error } = await supabase.functions.invoke("generate-encounter-pdf", { body: { encounter_id: encId } });
+    const { data, error } = await ApiClient.post("generate-encounter-pdf", { body: { encounter_id: encId } });
     setSigning(false);
     if (error) { toast.error(error.message); return; }
     const r = data as any;

@@ -1,4 +1,3 @@
-import { auth, defineMcp } from "@lovable.dev/mcp-js";
 import whoami from "./tools/whoami";
 import listAppointments from "./tools/list-appointments";
 import searchClients from "./tools/search-clients";
@@ -9,21 +8,12 @@ import listServices from "./tools/list-services";
 import listStaff from "./tools/list-staff";
 import listClinicalNotes from "./tools/list-clinical-notes";
 
-// Construct the OAuth issuer from the Supabase project ref so it matches the
-// direct supabase.co discovery document (never the .lovable.cloud proxy).
-// Vite inlines VITE_SUPABASE_PROJECT_ID at build time so this stays import-safe.
-const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
-
-export default defineMcp({
+export default {
   name: "radiantilyk-mcp",
-  title: "Radiantilyk Aesthetic",
+  title: "Radiantilyk Aesthetic API",
   version: "0.2.0",
   instructions:
-    "Tools for the Radiantilyk Aesthetic staff app. All tools act as the signed-in staff user and respect Row-Level Security. Read-only. PHI-sensitive tools (search_clients, get_client_summary, list_clinical_notes) return protected health information — use only when the task requires it.",
-  auth: auth.oauth.issuer({
-    issuer: `https://${projectRef}.supabase.co/auth/v1`,
-    acceptedAudiences: "authenticated",
-  }),
+    "Tools for the Radiantilyk Aesthetic staff app connecting to custom Node.js API backend.",
   tools: [
     whoami,
     listTodaysSchedule,
@@ -35,4 +25,4 @@ export default defineMcp({
     listServices,
     listStaff,
   ],
-});
+};

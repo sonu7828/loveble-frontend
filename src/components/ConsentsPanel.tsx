@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Loader2, FileCheck2, FileX2, Download, RefreshCw, AlertCircle, Mail, MailX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -54,7 +54,7 @@ export function ConsentsPanel({ appointmentId, initialPdfUrl }: Props) {
       setLoading(true);
 
       // 1) Booked services for procedure-mapping labels
-      const { data: apsv } = await supabase
+      const { data: apsv } = await apiQuery
         .from("appointment_services")
         .select("service_id, services(name)")
         .eq("appointment_id", appointmentId);
@@ -63,7 +63,7 @@ export function ConsentsPanel({ appointmentId, initialPdfUrl }: Props) {
       const nameById = new Map(services.map((s) => [s.id, s.name]));
 
       // Also resolve the client_email so we can look up prior signatures from other appointments
-      const { data: apptRow } = await supabase
+      const { data: apptRow } = await apiQuery
         .from("appointments")
         .select("client_email")
         .eq("id", appointmentId)
@@ -71,17 +71,17 @@ export function ConsentsPanel({ appointmentId, initialPdfUrl }: Props) {
       const clientEmail = (apptRow?.client_email ?? "").toLowerCase();
 
       const [assignedRes, sigRes, scRes] = await Promise.all([
-        supabase
+        apiQuery
           .from("appointment_consents")
           .select("consent_form_id, signed, consent_forms!inner(id, title, slug, is_optional, is_active, is_universal, version)")
           .eq("appointment_id", appointmentId),
-        supabase
+        apiQuery
           .from("consent_signatures")
           .select("id, consent_form_id, signed_full_name, signature_png, signed_at, decision, form_version, expires_at, appointment_id, consent_forms!inner(title, slug)")
           .eq("appointment_id", appointmentId)
           .order("signed_at", { ascending: true }),
         serviceIds.length
-          ? supabase.from("service_consents").select("service_id, consent_form_id").in("service_id", serviceIds)
+          ? apiQuery("service_consents").select("service_id, consent_form_id").in("service_id", serviceIds)
           : Promise.resolve({ data: [] as any[] }),
       ]);
 
@@ -98,7 +98,7 @@ export function ConsentsPanel({ appointmentId, initialPdfUrl }: Props) {
         .map((a) => a.consent_form_id);
       const priorByForm = new Map<string, SigRow>();
       if (clientEmail && missingFromAppt.length) {
-        const { data: prior } = await supabase
+        const { data: prior } = await apiQuery
           .from("consent_signatures")
           .select("id, consent_form_id, signed_full_name, signature_png, signed_at, decision, form_version, expires_at, appointment_id")
           .eq("client_email", clientEmail)
@@ -166,7 +166,7 @@ export function ConsentsPanel({ appointmentId, initialPdfUrl }: Props) {
       setItems(unified);
 
       // Email send log for this appointment
-      const { data: logRows } = await supabase
+      const { data: logRows } = await apiQuery
         .from("consent_email_log")
         .select("id, recipient_email, template_name, source, status, error_message, reminder_number, forms_count, created_at")
         .eq("appointment_id", appointmentId)
@@ -186,7 +186,7 @@ export function ConsentsPanel({ appointmentId, initialPdfUrl }: Props) {
 
   const regenerate = async () => {
     setRegen(true);
-    const { data, error } = await supabase.functions.invoke("generate-consent-pdf", {
+    const { data, error } = await ApiClient.post("generate-consent-pdf", {
       body: { appointmentId },
     });
     setRegen(false);

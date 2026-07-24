@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Search, X as XIcon, Info } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ChevronDown, Search, X as XIcon } from "lucide-react";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import { CANCELLATION_POLICY_LONG } from "@/lib/cancellationPolicy";
@@ -75,9 +75,9 @@ const Services = () => {
 
   useEffect(() => {
     Promise.all([
-      supabase.from("service_categories").select("*").eq("is_active", true).order("display_order"),
-      supabase.from("services").select("*").eq("is_active", true).order("display_order"),
-      supabase.from("promo_slots").select("promo_group, slot_at, claimed_appointment_id").order("slot_at"),
+      apiQuery("service_categories").select("*").eq("is_active", true).order("display_order"),
+      apiQuery("services").select("*").eq("is_active", true).order("display_order"),
+      apiQuery("promo_slots").select("promo_group, slot_at, claimed_appointment_id").order("slot_at"),
     ]).then(([c, s, ps]) => {
       setCats(c.data ?? []);
       const rows = (s.data ?? []) as any[];

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
@@ -14,8 +14,8 @@ export default function StaffAdverseEvents() {
   useEffect(() => {
     (async () => {
       const [a, v] = await Promise.all([
-        supabase.from("adverse_events").select("*").order("event_date", { ascending: false }).limit(200),
-        supabase.from("vo_protocol_runs").select("*").order("started_at", { ascending: false }).limit(100),
+        apiQuery("adverse_events").select("*").order("event_date", { ascending: false }).limit(200),
+        apiQuery("vo_protocol_runs").select("*").order("started_at", { ascending: false }).limit(100),
       ]);
       setAe(a.data ?? []);
       setVo(v.data ?? []);

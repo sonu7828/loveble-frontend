@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import {
   Users, ShieldCheck, BookOpen, ShieldAlert, CheckCircle2,
   Lock, HardDrive, Eye, Activity, ArrowUpRight, Laptop, Building2,
@@ -45,10 +45,10 @@ export default function AdminHub() {
     const loadComplianceData = async () => {
       try {
         const [{ count: policyPendingCount }, { count: vendorPendingCount }, { count: breachCount }, { data: phiLogs }] = await Promise.all([
-          supabase.from("hipaa_policies" as any).select("id", { count: "exact", head: true }).eq("status", "draft"),
-          supabase.from("vendors" as any).select("id", { count: "exact", head: true }).neq("baa_status", "signed"),
-          supabase.from("breach_reports" as any).select("id", { count: "exact", head: true }).eq("status", "open"),
-          supabase.from("phi_access_log" as any).select("id, action, resource, created_at, user_id").order("created_at", { ascending: false }).limit(5),
+          apiQuery("hipaa_policies" as any).select("id", { count: "exact", head: true }).eq("status", "draft"),
+          apiQuery("vendors" as any).select("id", { count: "exact", head: true }).neq("baa_status", "signed"),
+          apiQuery("breach_reports" as any).select("id", { count: "exact", head: true }).eq("status", "open"),
+          apiQuery("phi_access_log" as any).select("id, action, resource, created_at, user_id").order("created_at", { ascending: false }).limit(5),
         ]);
 
         if (!isMounted) return;

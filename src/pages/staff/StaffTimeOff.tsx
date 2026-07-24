@@ -1,6 +1,6 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,8 +38,8 @@ export default function StaffTimeOff() {
   useEffect(() => {
     (async () => {
       const [s, l] = await Promise.all([
-        supabase.from("staff_profiles").select("id, full_name").eq("is_active", true),
-        supabase.from("locations").select("id, name").eq("is_active", true),
+        apiQuery("staff_profiles").select("id, full_name").eq("is_active", true),
+        apiQuery("locations").select("id, name").eq("is_active", true),
       ]);
       setStaffList(s.data ?? []);
       setLocations(l.data ?? []);
@@ -49,7 +49,7 @@ export default function StaffTimeOff() {
 
   const load = async (sid: string) => {
     setLoading(true);
-    const { data } = await supabase.from("schedule_overrides").select("*")
+    const { data } = await apiQuery("schedule_overrides").select("*")
       .eq("staff_id", sid).gte("end_at", new Date().toISOString()).order("start_at");
     setItems((data ?? []) as Override[]);
     setLoading(false);
@@ -66,7 +66,7 @@ export default function StaffTimeOff() {
       : `${date}T${endTime}:00`;
     if (new Date(ed) <= new Date(sd)) { toast.error("End must be after start"); return; }
     setSaving(true);
-    const { error } = await supabase.from("schedule_overrides").insert({
+    const { error } = await apiQuery("schedule_overrides").insert({
       staff_id: activeStaff,
       location_id: locationId || null,
       start_at: new Date(sd).toISOString(),
@@ -84,7 +84,7 @@ export default function StaffTimeOff() {
 
   const remove = async (id: string) => {
     if (!(await confirmDialog({ title: "Remove this entry?", destructive: true, confirmLabel: "Remove" }))) return;
-    const { error } = await supabase.from("schedule_overrides").delete().eq("id", id);
+    const { error } = await apiQuery("schedule_overrides").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     setItems((prev) => prev.filter((x) => x.id !== id));
   };

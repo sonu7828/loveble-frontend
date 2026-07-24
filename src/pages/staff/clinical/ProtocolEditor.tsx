@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { supabase as supabaseTyped } from "@/integrations/supabase/client";
-const supabase = supabaseTyped as any;
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,11 +61,11 @@ export default function ProtocolEditor() {
     if (authLoading || !id) return;
     (async () => {
       // id may be a version id OR a protocol id (older links). Try version first.
-      let { data: ver } = await (supabase as any).from("clinical_protocol_versions").select("*").eq("id", id).maybeSingle();
+      let { data: ver } = await (apiQuery as any).from("clinical_protocol_versions").select("*").eq("id", id).maybeSingle();
       let protoId = (ver as any)?.protocol_id ?? null;
       if (!ver) {
         // Fall back: treat id as a protocol id and load its current (or latest) version
-        const { data: proto1 } = await (supabase as any)
+        const { data: proto1 } = await (apiQuery as any)
           .from("clinical_protocols")
           .select("id, current_version_id")
           .eq("id", id)
@@ -74,11 +73,11 @@ export default function ProtocolEditor() {
         if (proto1) {
           protoId = proto1.id;
           if (proto1.current_version_id) {
-            const r = await (supabase as any).from("clinical_protocol_versions").select("*").eq("id", proto1.current_version_id).maybeSingle();
+            const r = await (apiQuery as any).from("clinical_protocol_versions").select("*").eq("id", proto1.current_version_id).maybeSingle();
             ver = r.data;
           }
           if (!ver) {
-            const r2 = await (supabase as any)
+            const r2 = await (apiQuery as any)
               .from("clinical_protocol_versions")
               .select("*")
               .eq("protocol_id", proto1.id)
@@ -91,7 +90,7 @@ export default function ProtocolEditor() {
       }
       if (!ver) { setLoading(false); return; }
       setV(normalize(ver as Version));
-      const { data: proto } = await (supabase as any).from("clinical_protocols").select("id, title, category, slug, current_version_id").eq("id", protoId ?? (ver as any).protocol_id).maybeSingle();
+      const { data: proto } = await (apiQuery as any).from("clinical_protocols").select("id, title, category, slug, current_version_id").eq("id", protoId ?? (ver as any).protocol_id).maybeSingle();
       setP(proto as Protocol);
       setLoading(false);
     })();
@@ -116,7 +115,7 @@ export default function ProtocolEditor() {
   async function save() {
     if (!v) return;
     setSaving(true);
-    const { error } = await (supabase as any).from("clinical_protocol_versions").update({
+    const { error } = await (apiQuery as any).from("clinical_protocol_versions").update({
       indication: v.indication, regulatory_basis: v.regulatory_basis,
       contraindications: v.contraindications, baseline_labs: v.baseline_labs,
       followup_labs: v.followup_labs, titration: v.titration,
@@ -132,10 +131,10 @@ export default function ProtocolEditor() {
 
   async function newDraftFromCurrent() {
     if (!v || !p || !user) return;
-    const { data: last } = await (supabase as any).from("clinical_protocol_versions")
+    const { data: last } = await (apiQuery as any).from("clinical_protocol_versions")
       .select("version_number").eq("protocol_id", p.id).order("version_number", { ascending: false }).limit(1).maybeSingle();
     const nextNum = ((last?.version_number as number) ?? 0) + 1;
-    const { data: created, error } = await (supabase as any).from("clinical_protocol_versions").insert({
+    const { data: created, error } = await (apiQuery as any).from("clinical_protocol_versions").insert({
       protocol_id: p.id, version_number: nextNum, status: "draft", created_by: user.id,
       indication: v.indication, regulatory_basis: v.regulatory_basis,
       contraindications: v.contraindications, baseline_labs: v.baseline_labs,
@@ -156,7 +155,7 @@ export default function ProtocolEditor() {
       return;
     }
     setSigning(true);
-    const { error: vErr } = await (supabase as any).from("clinical_protocol_versions").update({
+    const { error: vErr } = await (apiQuery as any).from("clinical_protocol_versions").update({
       status: "published",
       signed_by_user_id: user.id,
       signed_by_name: sigName.trim(),
@@ -164,13 +163,13 @@ export default function ProtocolEditor() {
       signed_at: new Date().toISOString(),
     }).eq("id", v.id);
     if (vErr) { setSigning(false); toast.error(vErr.message); return; }
-    const { error: pErr } = await (supabase as any).from("clinical_protocols")
+    const { error: pErr } = await (apiQuery as any).from("clinical_protocols")
       .update({ current_version_id: v.id }).eq("id", p.id);
     setSigning(false);
     if (pErr) { toast.error(pErr.message); return; }
     setSignOpen(false);
     toast.success(`Published v${v.version_number}`);
-    const { data: refreshed } = await (supabase as any).from("clinical_protocol_versions").select("*").eq("id", v.id).maybeSingle();
+    const { data: refreshed } = await (apiQuery as any).from("clinical_protocol_versions").select("*").eq("id", v.id).maybeSingle();
     if (refreshed) setV(normalize(refreshed as Version));
   }
 

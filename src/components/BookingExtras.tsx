@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { CalendarPlus, MapPin, Bell, ListChecks, Loader2 } from "lucide-react";
 
@@ -113,7 +113,7 @@ export function PreVisitChecklist({ serviceIds, serviceNames }: { serviceIds: st
   const [rows, setRows] = useState<PreOpRow[] | null>(null);
   useEffect(() => {
     if (!serviceIds.length) { setRows([]); return; }
-    supabase.from("service_pre_op_instructions")
+    apiQuery("service_pre_op_instructions")
       .select("service_id, title, body_markdown")
       .in("service_id", serviceIds)
       .then(({ data }) => setRows((data ?? []).filter((r: any) => (r.body_markdown ?? "").trim()) as PreOpRow[]));

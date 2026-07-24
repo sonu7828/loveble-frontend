@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Check, ChevronRight, Sparkles, X } from "lucide-react";
 
@@ -27,9 +27,9 @@ export function OnboardingChecklist() {
     if (localStorage.getItem(storageKey) === "1") { setDismissed(true); return; }
     (async () => {
       const [{ data: gc }, { data: prof }, { data: avail }] = await Promise.all([
-        supabase.from("staff_google_oauth").select("id").eq("staff_id", staffId).maybeSingle(),
-        supabase.from("staff_profiles").select("bio").eq("id", staffId).maybeSingle(),
-        supabase.from("weekly_schedules").select("id").eq("staff_id", staffId).limit(1),
+        apiQuery("staff_google_oauth").select("id").eq("staff_id", staffId).maybeSingle(),
+        apiQuery("staff_profiles").select("bio").eq("id", staffId).maybeSingle(),
+        apiQuery("weekly_schedules").select("id").eq("staff_id", staffId).limit(1),
       ]);
       setItems([
         { id: "calendar", label: "Connect your Google Calendar", to: "/staff/profile", done: !!gc },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,7 @@ export default function SharedOwnerCalendarCard() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data } = await apiQuery
         .from("app_settings")
         .select("shared_google_calendar_id")
         .eq("id", 1)
@@ -36,7 +36,7 @@ export default function SharedOwnerCalendarCard() {
     setSaving(true);
     try {
       const v = value.trim() || null;
-      const { error } = await supabase
+      const { error } = await apiQuery
         .from("app_settings")
         .update({ shared_google_calendar_id: v } as any)
         .eq("id", 1);

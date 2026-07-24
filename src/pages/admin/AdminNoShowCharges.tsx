@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Loader2, AlertTriangle, CreditCard, CheckCircle2 } from "lucide-react";
@@ -38,7 +38,7 @@ export default function AdminNoShowCharges() {
     setBusy(true);
     // Past appointments, status=no_show OR (approved/pending but end_at < now-1h), no charge yet.
     const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
+    const { data, error } = await apiQuery
       .from("appointments")
       .select("id, start_at, end_at, status, client_first_name, client_last_name, client_email, client_phone, stripe_payment_method_id, no_show_charge_id, no_show_charged_at, checked_in_at, staff_id, service_id")
       .is("no_show_charge_id", null)
@@ -67,7 +67,7 @@ export default function AdminNoShowCharges() {
   const charge = async (r: Row) => {
     setWorking(r.id);
     try {
-      const { data, error } = await supabase.functions.invoke("payments-charge-no-show", {
+      const { data, error } = await ApiClient.post("payments-charge-no-show", {
         body: { appointmentId: r.id, amountCents: NO_SHOW_AMOUNT_CENTS },
       });
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -89,7 +89,7 @@ export default function AdminNoShowCharges() {
     });
     if (!ok) return;
     setWorking(r.id);
-    const { error } = await supabase
+    const { error } = await apiQuery
       .from("appointments")
       .update({ status: newStatus, no_show_charged_at: new Date().toISOString() })
       .eq("id", r.id);

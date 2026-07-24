@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Camera, Loader2, Check, ExternalLink, Trash2, Sparkles, GitCompare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -42,7 +42,7 @@ export function ClientUploadedPhotosCard({ clientEmail }: { clientEmail: string 
     setCheckingId(p.id);
     try {
       const baseline = photos.find(x => x.id !== p.id && !!x.url)?.url ?? null;
-      const { data, error } = await supabase.functions.invoke("ai-photo-quality-check", {
+      const { data, error } = await ApiClient.post("ai-photo-quality-check", {
         body: { current_url: p.url, baseline_url: baseline, intent: p.caption ?? null },
       });
       if (error) throw error;
@@ -62,7 +62,7 @@ export function ClientUploadedPhotosCard({ clientEmail }: { clientEmail: string 
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await apiQuery
       .from("client_uploaded_photos" as any)
       .select("id, appointment_id, storage_path, caption, uploaded_at, reviewed_at")
       .ilike("client_email", clientEmail)
@@ -72,7 +72,7 @@ export function ClientUploadedPhotosCard({ clientEmail }: { clientEmail: string 
     const rows = (data as any as Photo[]) ?? [];
 
     const signed = await Promise.all(rows.map(async (p) => {
-      const { data: s } = await supabase.storage
+      const { data: s } = await apiQuery.storage
         .from("client-uploaded-photos")
         .createSignedUrl(p.storage_path, 60 * 60);
       return { ...p, url: s?.signedUrl };
@@ -84,8 +84,8 @@ export function ClientUploadedPhotosCard({ clientEmail }: { clientEmail: string 
   useEffect(() => { load(); }, [clientEmail]);
 
   const markReviewed = async (p: Photo) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("client_uploaded_photos" as any)
+    const { data: { user } } = await authService.getSession();
+    const { error } = await apiQuery("client_uploaded_photos" as any)
       .update({ reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
       .eq("id", p.id);
     if (error) return toast.error(error.message);
@@ -95,9 +95,9 @@ export function ClientUploadedPhotosCard({ clientEmail }: { clientEmail: string 
 
   const remove = async (p: Photo) => {
     if (!(await confirmDialog({ title: "Delete this photo?", description: "Removes it from the chart and storage. Cannot be undone.", destructive: true, confirmLabel: "Delete" }))) return;
-    const { error } = await supabase.from("client_uploaded_photos" as any).delete().eq("id", p.id);
+    const { error } = await apiQuery("client_uploaded_photos" as any).delete().eq("id", p.id);
     if (error) return toast.error(error.message);
-    await supabase.storage.from("client-uploaded-photos").remove([p.storage_path]);
+    await ApiClient.remove([p.storage_path]);
     setPhotos(ps => ps.filter(x => x.id !== p.id));
     toast.success("Photo deleted");
   };
