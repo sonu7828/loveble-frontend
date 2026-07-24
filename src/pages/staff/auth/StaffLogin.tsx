@@ -48,10 +48,9 @@ export default function StaffLogin() {
   const reason = sp.get("reason");
   const nextParam = sp.get("next");
   const roleParam = sp.get("role");
-  // Only allow same-origin relative paths to prevent open redirects.
   const nextPath = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
     ? nextParam
-    : "/staff/today";
+    : null; // null means we'll derive the target from roles at redirect time
 
   const [step, setStep] = useState<Step>("credentials");
   const [mode, setMode] = useState<Mode>("loading");
@@ -133,14 +132,23 @@ export default function StaffLogin() {
         if (uid) {
           const { data: rData } = await apiQuery("user_roles").select("role").eq("user_id", uid);
           const userRoles = (rData ?? []).map((x: any) => x.role);
-          isPrivileged = userRoles.includes("admin") || userRoles.includes("staff") || userRoles.includes("nurse_practitioner");
+          isPrivileged = userRoles.includes("admin") || userRoles.includes("staff") ||
+            userRoles.includes("nurse_practitioner") || userRoles.includes("privacy_officer");
         }
 
         if (!isPrivileged) {
           // Non-privileged users (receptionists, schedulers, etc.) bypass mandatory MFA enrollment
           setStep("redirecting");
           setMode("ready");
-          setTimeout(() => navigate(nextPath, { replace: true }), 350);
+          let fallbackTarget = "/staff/today";
+          try {
+            const { data: { session: fs } } = await supabase.auth.getSession();
+            if (fs?.user?.id) {
+              const { data: frd } = await supabase.from("user_roles").select("role").eq("user_id", fs.user.id);
+              fallbackTarget = resolveRedirectTarget((frd ?? []).map((x: any) => x.role));
+            }
+          } catch { /* keep fallback */ }
+          setTimeout(() => navigate(nextPath ?? fallbackTarget, { replace: true }), 350);
           return;
         }
 
