@@ -78,17 +78,8 @@ function MedicalDirectorDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [reviews, setReviews] = useState([
-    { id: "REV-101", client: "Sarah Jenkins", provider: "Nurse Practitioner Jessica", service: "Botox 50 Units + Lip Filler", date: "Today, 1:15 PM", type: "RN Chart Note" },
-    { id: "REV-102", client: "Elena Rostova", provider: "RN Amanda Cole", service: "Microneedling + RF", date: "Today, 11:30 AM", type: "Good Faith Exam (GFE)" },
-    { id: "REV-103", client: "Marcus Vance", provider: "RN Amanda Cole", service: "Laser Hair Reduction - Brazilian", date: "Yesterday", type: "RN Chart Note" },
-  ]);
-
-  const [pendingOrders, setPendingOrders] = useState([
-    { id: "ORD-201", type: "Prescription", detail: "Lidocaine 5% Topical Cream - 30g", patient: "Sarah Jenkins", prescriber: "NP Jessica", date: "Today, 2:00 PM" },
-    { id: "ORD-202", type: "Lab Order", detail: "Comprehensive Metabolic Panel (CMP) + CBC", patient: "Michael Chen", prescriber: "Dr. Kamaren", date: "Today, 10:45 AM" },
-    { id: "ORD-203", type: "Prescription", detail: "Doxycycline 100mg Oral Capsules", patient: "Elena Rostova", prescriber: "NP Jessica", date: "Yesterday" },
-  ]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
 
   const handleOrderAction = (id: string, action: "approve" | "reject") => {
     setPendingOrders(prev => prev.filter(o => o.id !== id));
@@ -106,8 +97,8 @@ function MedicalDirectorDashboard() {
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="font-serif text-xl sm:text-2xl font-medium tracking-tight">Medical Director Control Hub</h1>
-            <Badge variant="outline" className="bg-violet-500/10 text-violet-600 border-violet-500/20 font-medium px-2.5 py-0.5 text-xs">
-              <Stethoscope className="h-3.5 w-3.5 mr-1 text-violet-600" /> Supervising Physician Oversight
+            <Badge variant="outline" className="bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20 font-medium px-2.5 py-0.5 text-xs">
+              <Stethoscope className="h-3.5 w-3.5 mr-1 text-purple-600" /> Supervising Physician Oversight
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -117,7 +108,7 @@ function MedicalDirectorDashboard() {
 
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card text-xs">
-            <span className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
             <span className="text-muted-foreground font-medium">{directorName}</span>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate("/staff/clinical/cosign")} className="h-9 rounded-xl text-xs gap-1.5">
@@ -129,19 +120,21 @@ function MedicalDirectorDashboard() {
 
       {/* 4 Top KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-violet-500/30 transition rounded-xl">
+        {/* KPI 1: Pending Signatures */}
+        <Card className="p-4 border border-border bg-card shadow-xs hover:border-purple-500/30 transition rounded-xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Pending Signatures</span>
-            <div className="h-8 w-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-              <FileCheck className="h-4 w-4 text-violet-600" />
+            <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+              <FileCheck className="h-4 w-4 text-purple-600" />
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{reviews.length} Notes</div>
-          <div className="text-[11px] text-violet-600 font-medium mt-1">
+          <div className="text-[11px] text-purple-600 font-medium mt-1">
             Requires MD co-signature
           </div>
         </Card>
 
+        {/* KPI 2: Pending Prescription Approvals */}
         <Card className="p-4 border border-border bg-card shadow-xs hover:border-amber-500/30 transition rounded-xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Prescription Approvals</span>
@@ -157,6 +150,7 @@ function MedicalDirectorDashboard() {
           </div>
         </Card>
 
+        {/* KPI 3: Pending Lab Orders */}
         <Card className="p-4 border border-border bg-card shadow-xs hover:border-sky-500/30 transition rounded-xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Pending Lab Orders</span>
@@ -172,6 +166,7 @@ function MedicalDirectorDashboard() {
           </div>
         </Card>
 
+        {/* KPI 4: Active Providers */}
         <Card className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Active Providers</span>
@@ -179,7 +174,7 @@ function MedicalDirectorDashboard() {
               <UserCheck className="h-4 w-4 text-emerald-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">6 Clinical Staff</div>
+          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">0 Clinical Staff</div>
           <div className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
             <CheckCircle2 className="h-3 w-3" /> Supervising NP / RN Injectors
           </div>
@@ -192,12 +187,12 @@ function MedicalDirectorDashboard() {
         {/* LEFT MAIN SECTIONS */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Section 1: Pending Clinical Reviews */}
+          {/* Section 1: Pending Clinical Reviews Table Box */}
           <Card className="p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <h2 className="font-serif text-lg font-normal tracking-tight flex items-center gap-2">
-                  <Stethoscope className="h-4 w-4 text-violet-600" /> Pending Clinical Reviews & Co-Signatures
+                  <Stethoscope className="h-4 w-4 text-purple-600" /> Pending Clinical Reviews & Co-Signatures
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">RN chart notes and Good Faith Exams requiring supervising physician sign-off.</p>
               </div>
@@ -219,29 +214,41 @@ function MedicalDirectorDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {reviews.map((r) => (
-                      <tr key={r.id} className="hover:bg-muted/30 transition">
-                        <td className="p-3 font-semibold text-foreground">{r.client}</td>
-                        <td className="p-3 text-muted-foreground">{r.provider}</td>
-                        <td className="p-3">
-                          <div className="font-medium text-foreground">{r.service}</div>
-                          <div className="text-[10px] text-muted-foreground">{r.type}</div>
-                        </td>
-                        <td className="p-3 text-muted-foreground">{r.date}</td>
-                        <td className="p-3 text-right">
-                          <Button size="sm" className="h-7 text-xs rounded-lg bg-violet-600 hover:bg-violet-700 text-white" onClick={() => navigate("/staff/clinical/cosign")}>
-                            Review & Sign
-                          </Button>
+                    {reviews.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-10 text-muted-foreground">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <FileCheck className="h-8 w-8 text-muted-foreground/40" />
+                            <span className="font-medium text-xs">No pending clinical reviews or co-signatures required.</span>
+                            <span className="text-[11px] text-muted-foreground">Chart notes submitted by RNs and NPs will appear here for review.</span>
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      reviews.map((r) => (
+                        <tr key={r.id} className="hover:bg-muted/30 transition">
+                          <td className="p-3 font-semibold text-foreground">{r.client}</td>
+                          <td className="p-3 text-muted-foreground">{r.provider}</td>
+                          <td className="p-3">
+                            <div className="font-medium text-foreground">{r.service}</div>
+                            <div className="text-[10px] text-muted-foreground">{r.type}</div>
+                          </td>
+                          <td className="p-3 text-muted-foreground">{r.date}</td>
+                          <td className="p-3 text-right">
+                            <Button size="sm" className="h-7 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white" onClick={() => navigate("/staff/clinical/cosign")}>
+                              Review & Sign
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
           </Card>
 
-          {/* Section 2: Pending Orders (Rx & Labs) with Approve / Reject */}
+          {/* Section 2: Pending Orders Box with Approve / Reject Action Buttons */}
           <Card className="p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
@@ -254,7 +261,11 @@ function MedicalDirectorDashboard() {
             </div>
 
             {pendingOrders.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-6">All clinical orders and prescriptions approved.</p>
+              <div className="text-center py-10 border border-dashed border-border rounded-xl bg-muted/10 space-y-1">
+                <Pill className="h-8 w-8 text-muted-foreground/40 mx-auto" />
+                <p className="text-xs font-medium text-foreground">No pending prescription approvals or lab orders.</p>
+                <p className="text-[11px] text-muted-foreground">Orders submitted by clinical staff will appear here with Approve and Reject actions.</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {pendingOrders.map((ord) => (
@@ -290,11 +301,11 @@ function MedicalDirectorDashboard() {
         {/* SMALL RIGHT SIDEBAR (1 COL) */}
         <div className="space-y-6">
 
-          {/* Today's Summary */}
+          {/* Today's Clinical Summary */}
           <Card className="p-4 sm:p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="font-serif text-base font-normal tracking-tight flex items-center gap-2">
-                <Activity className="h-4 w-4 text-violet-600" /> Today's Clinical Summary
+                <Activity className="h-4 w-4 text-purple-600" /> Today's Clinical Summary
               </h3>
               <Badge variant="outline" className="text-[10px]">Active</Badge>
             </div>
@@ -302,11 +313,11 @@ function MedicalDirectorDashboard() {
             <div className="space-y-3 text-xs">
               <div className="flex justify-between items-center text-muted-foreground">
                 <span>Chart Notes Co-Signed Today</span>
-                <span className="font-bold text-foreground">8 Notes</span>
+                <span className="font-bold text-foreground">0 Notes</span>
               </div>
               <div className="flex justify-between items-center text-muted-foreground">
                 <span>Prescriptions E-Signed</span>
-                <span className="font-bold text-foreground">5 Scripts</span>
+                <span className="font-bold text-foreground">0 Scripts</span>
               </div>
               <div className="flex justify-between items-center text-muted-foreground">
                 <span>Good Faith Exams Completed</span>
@@ -314,7 +325,7 @@ function MedicalDirectorDashboard() {
               </div>
               <div className="pt-2 border-t border-border flex justify-between items-center text-muted-foreground text-[11px]">
                 <span>Supervised Clinical Injectors</span>
-                <span className="font-semibold text-foreground">4 Active on Floor</span>
+                <span className="font-semibold text-foreground">0 Active on Floor</span>
               </div>
             </div>
           </Card>
@@ -325,25 +336,13 @@ function MedicalDirectorDashboard() {
               <h3 className="font-serif text-base font-normal tracking-tight flex items-center gap-2">
                 <Bell className="h-4 w-4 text-amber-600" /> Urgent Clinical Alerts
               </h3>
-              <Badge variant="outline" className="text-[10px]">2 New</Badge>
+              <Badge variant="outline" className="text-[10px]">0 New</Badge>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-1">
-                <div className="flex items-center justify-between font-medium text-amber-700">
-                  <span className="flex items-center gap-1.5"><Stethoscope className="h-3.5 w-3.5" /> High-Dose Botox Chart Note</span>
-                  <span className="text-[10px] opacity-75">15m ago</span>
-                </div>
-                <p className="text-muted-foreground text-[11px]">RN Amanda submitted a 75 Unit Botox chart note for patient Sarah Jenkins requiring MD co-signature.</p>
-              </div>
-
-              <div className="p-3 rounded-xl border border-violet-500/20 bg-violet-500/5 space-y-1">
-                <div className="flex items-center justify-between font-medium text-violet-700">
-                  <span className="flex items-center gap-1.5"><Pill className="h-3.5 w-3.5" /> RX Approval Request</span>
-                  <span className="text-[10px] opacity-75">1h ago</span>
-                </div>
-                <p className="text-muted-foreground text-[11px]">NP Jessica requested approval for 30g Lidocaine topical numbing compound.</p>
-              </div>
+            <div className="text-center py-6 border border-dashed border-border rounded-xl bg-muted/10 space-y-1">
+              <Bell className="h-6 w-6 text-muted-foreground/40 mx-auto" />
+              <p className="text-xs font-medium text-foreground">No urgent clinical alerts.</p>
+              <p className="text-[11px] text-muted-foreground">High-dose treatments and urgent prescription reviews will alert here.</p>
             </div>
           </Card>
 
