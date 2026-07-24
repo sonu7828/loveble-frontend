@@ -168,30 +168,25 @@ const App = () => (
           <Route element={<AdminLayout />}>
             <Route path="clinical-templates" element={<AdminOnly><AdminClinicalTemplates /></AdminOnly>} />
             <Route path="marketing-hub" element={<AdminOnly><AdminMarketingHub /></AdminOnly>} />
-            <Route path="team" element={<AdminOnly><AdminTeam /></AdminOnly>} />
             <Route path="payroll" element={<OwnerOnly><AdminPayroll /></OwnerOnly>} />
             <Route path="services" element={<AdminOnly><AdminServices /></AdminOnly>} />
             <Route path="model-applications" element={<AdminOnly><AdminModelApplications /></AdminOnly>} />
             <Route path="model-applications/:id" element={<AdminOnly><AdminModelApplicationDetail /></AdminOnly>} />
             <Route path="reports" element={<AdminOnly><AdminReports /></AdminOnly>} />
             <Route path="productivity" element={<AdminOnly><AdminProductivity /></AdminOnly>} />
-            <Route path="treatment-plans" element={<AdminOnly><AdminTreatmentPlans /></AdminOnly>} />
             <Route path="finances" element={<AdminOnly><AdminFinances /></AdminOnly>} />
             <Route path="audit" element={<AdminOnly><AdminAudit /></AdminOnly>} />
             <Route path="audit-report" element={<AdminOnly><AdminAuditReport /></AdminOnly>} />
             <Route path="terminal" element={<AdminOnly><AdminTerminalSettings /></AdminOnly>} />
             <Route path="pos-config" element={<AdminOnly><AdminPosConfig /></AdminOnly>} />
             <Route path="admin" element={<AdminOnly><AdminHub /></AdminOnly>} />
-            <Route path="security-officer" element={<AdminOnly><AdminSecurityOfficer /></AdminOnly>} />
             <Route path="vendors" element={<AdminOnly><AdminVendors /></AdminOnly>} />
-            <Route path="hipaa-policies" element={<AdminOnly><AdminHipaaPolicies /></AdminOnly>} />
             <Route path="no-show-charges" element={<AdminOnly><AdminNoShowCharges /></AdminOnly>} />
             <Route path="rewards" element={<AdminOnly><AdminRewards /></AdminOnly>} />
             <Route path="intake-status" element={<AdminOnly><AdminIntakeDashboard /></AdminOnly>} />
             <Route path="sms-snippets" element={<AdminOnly><AdminSmsSnippets /></AdminOnly>} />
             <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
             <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
-            <Route path="compliance/admin" element={<AdminOnly><ComplianceAdmin /></AdminOnly>} />
           </Route>
 
           <Route element={<StaffLayout />}>
@@ -225,7 +220,7 @@ const App = () => (
             <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="schedule" element={<Navigate to="/staff/my-schedule" replace />} />
-            <Route path="breach-report" element={<StaffBreachReport />} />
+            {/* breach-report moved to AdminLayout above */}
             <Route path="clinical" element={<StaffClinical />} />
             <Route path="clinical/notes" element={<ChartNotesIndex />} />
             <Route path="clinical/gfe" element={<GFEIndex />} />
@@ -248,6 +243,13 @@ const App = () => (
             <Route path="clinical/vo/:runId" element={<VoProtocolRun />} />
             <Route path="compliance" element={<MyCompliance />} />
             <Route path="compliance/sign/:protocolId" element={<ComplianceSign />} />
+            <Route path="team" element={<AdminTeam />} />
+            <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
+            <Route path="security-officer" element={<AdminSecurityOfficer />} />
+            <Route path="audit-report" element={<AdminAuditReport />} />
+            <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
+            <Route path="compliance/admin" element={<ComplianceAdmin />} />
+            <Route path="breach-report" element={<StaffBreachReport />} />
           </Route>
           </Route>
           <Route path="/waitlist" element={<Waitlist />} />
