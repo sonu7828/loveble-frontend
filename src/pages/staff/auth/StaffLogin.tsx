@@ -373,24 +373,39 @@ export default function StaffLogin() {
           </div>
 
           {/* Portal Switcher Tabs */}
-          <div className="flex items-center justify-between p-1 mb-3 rounded-xl bg-muted/60 border border-border text-[11px] font-medium">
+          <div className="grid grid-cols-3 gap-1 p-1 mb-4 rounded-xl bg-muted/50 border border-border/80 text-[11px] font-medium select-none">
             <Link
               to="/staff/login?role=admin"
-              className={`flex-1 py-1 rounded-lg transition text-center ${activeRole === "admin" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
+                activeRole === "admin"
+                  ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              }`}
             >
-              Admin Login
+              <span className="text-[11px]">👑</span>
+              <span>Admin</span>
             </Link>
             <Link
               to="/staff/login?role=staff"
-              className={`flex-1 py-1 rounded-lg transition text-center ${activeRole === "staff" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
+                activeRole === "staff"
+                  ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              }`}
             >
-              Staff Login
+              <span className="text-[11px]">🩺</span>
+              <span>Staff</span>
             </Link>
             <Link
               to="/staff/login?role=user"
-              className={`flex-1 py-1 rounded-lg transition text-center ${activeRole === "user" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
+                activeRole === "user"
+                  ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              }`}
             >
-              User Login
+              <span className="text-[11px]">👤</span>
+              <span>User</span>
             </Link>
           </div>
 
@@ -599,26 +614,38 @@ export default function StaffLogin() {
 
 function Stepper({ step }: { step: Step }) {
   const steps: { id: Step | "mfa"; label: string }[] = [
-    { id: "credentials", label: "Sign in" },
-    { id: "mfa", label: "Two-factor" },
+    { id: "credentials", label: "Credentials" },
+    { id: "mfa", label: "2FA Code" },
     { id: "redirecting", label: "Dashboard" },
   ];
   const activeIdx = step === "credentials" ? 0 : step === "redirecting" ? 2 : 1;
   return (
-    <div className="mb-3.5 flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground" aria-label="Sign-in progress">
-      {steps.map((s, i) => {
-        const isDone = i < activeIdx;
-        const isActive = i === activeIdx;
-        return (
-          <div key={s.id} className="flex items-center gap-1.5">
-            <div className={`h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-medium border ${isDone ? "bg-primary text-primary-foreground border-primary" : isActive ? "border-foreground text-foreground" : "border-border text-muted-foreground"}`}>
-              {isDone ? <Check className="h-2.5 w-2.5" /> : i + 1}
+    <div className="mb-4 px-1" aria-label="Sign-in progress">
+      <div className="flex items-center justify-between relative">
+        <div className="absolute top-2.5 left-6 right-6 h-0.5 bg-border -z-0" />
+        {steps.map((s, i) => {
+          const isDone = i < activeIdx;
+          const isActive = i === activeIdx;
+          return (
+            <div key={s.id} className="flex flex-col items-center gap-1 z-10 bg-card px-1">
+              <div
+                className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-semibold border transition ${
+                  isDone
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : isActive
+                    ? "bg-primary/10 border-primary text-primary ring-2 ring-primary/20 font-bold"
+                    : "border-border bg-background text-muted-foreground"
+                }`}
+              >
+                {isDone ? <Check className="h-3 w-3" /> : i + 1}
+              </div>
+              <span className={`text-[10px] font-medium tracking-tight ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
+                {s.label}
+              </span>
             </div>
-            <span className={isActive ? "text-foreground font-semibold" : ""}>{s.label}</span>
-            {i < steps.length - 1 && <span className="w-4 h-px bg-border mx-0.5" />}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

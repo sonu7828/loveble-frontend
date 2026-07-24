@@ -181,11 +181,11 @@ export default function AdminLayout() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-600 border border-amber-500/20">
-            <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-            <span className="hidden sm:inline">Admin Portal</span>
-            <span className="sm:hidden">Admin</span>
+        {/* Right Corner: Active Portal Name Badge */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-xs">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            <span>Admin Portal</span>
           </div>
         </div>
       </header>
