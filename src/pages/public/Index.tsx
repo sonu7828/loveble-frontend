@@ -103,34 +103,52 @@ const Index = () => {
           </div>
 
           {/* Center Card Panel — A quiet ritual of refinement */}
-          <div className="col-span-1 lg:col-span-4 flex items-center justify-center p-6 sm:p-10 bg-background lg:bg-secondary/40 dark:lg:bg-background">
-            <div className="w-full max-w-[460px] bg-card/95 dark:bg-card/90 text-card-foreground rounded-xl p-8 sm:p-12 shadow-xl border border-border text-center flex flex-col items-center justify-between min-h-[480px]">
-              {/* Header */}
-              <div className="w-full flex flex-col items-center">
-                <span className="text-[10px] sm:text-[11px] font-semibold tracking-[0.25em] text-primary uppercase">
+          <div className="col-span-1 lg:col-span-4 flex items-stretch justify-center bg-background lg:bg-[#f5f0eb] dark:lg:bg-background">
+            <div className="w-full max-w-[520px] bg-card/95 dark:bg-card/90 text-card-foreground flex flex-col justify-between min-h-[580px] lg:min-h-[680px] px-10 sm:px-14 pt-10 pb-0 border-x border-border">
+
+              {/* Top: Brand label + divider line */}
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] tracking-[0.28em] text-primary uppercase font-medium">
                   RADIANTILYK AESTHETIC
                 </span>
-                <div className="w-px h-8 bg-primary/30 my-3" />
+                <div className="w-px h-10 bg-primary/30 mt-3" />
               </div>
 
-              {/* Headline */}
-              <div className="my-4">
-                <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-card-foreground font-medium leading-[1.08] tracking-tight">
+              {/* Middle: Headline + location tag */}
+              <div className="flex flex-col gap-8 mt-6 mb-auto">
+                <h1 className="font-serif text-5xl sm:text-6xl lg:text-[4.25rem] text-card-foreground font-medium leading-[1.05] tracking-tight">
                   A quiet<br />
                   <span className="italic font-serif text-primary font-normal">ritual</span><br />
                   of refinement.
                 </h1>
+
+                {/* Location tag */}
+                <div className="flex items-start gap-3">
+                  <div className="w-0.5 h-8 bg-primary/60 rounded-full shrink-0 mt-0.5" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] tracking-[0.22em] text-muted-foreground uppercase font-medium">Considered Care</span>
+                    <span className="text-[11px] tracking-[0.18em] text-foreground uppercase font-semibold mt-0.5">San Jose</span>
+                  </div>
+                </div>
               </div>
 
-              {/* CTA Button */}
-              <div className="w-full mt-6">
+              {/* Bottom: Pagination dots + CTA button */}
+              <div className="flex flex-col items-center gap-5 mt-10">
+                {/* Dots */}
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary/25" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary/25" />
+                </div>
+                {/* Full-width button */}
                 <Button
                   asChild
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-4 h-auto text-xs font-medium tracking-[0.2em] uppercase rounded-lg shadow-md transition-all active:scale-[0.98]"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-5 h-auto text-xs font-medium tracking-[0.22em] uppercase rounded-none shadow-none transition-all active:scale-[0.98]"
                 >
                   <Link to={bookHref}>BOOK AN APPOINTMENT</Link>
                 </Button>
               </div>
+
             </div>
           </div>
 

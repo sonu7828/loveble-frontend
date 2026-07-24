@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Search, X as XIcon } from "lucide-react";
+import { ChevronDown, Search, X as XIcon, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
-import FinancingBadge from "@/components/FinancingBadge";
 import { CANCELLATION_POLICY_LONG } from "@/lib/cancellationPolicy";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
@@ -39,7 +38,6 @@ const CONCERN_FILTERS: { key: string; label: string; categoryIds?: string[]; key
   { key: "body", label: "Body & sculpt", categoryIds: ["c1000000-0000-0000-0000-000000000008"], keywords: /body|sculpt|contour|cellulite|tone/i },
   { key: "hair", label: "Hair removal", categoryIds: ["c1000000-0000-0000-0000-000000000009"], keywords: /hair removal|laser hair/i },
   { key: "weight", label: "Weight & wellness", categoryIds: ["c1000000-0000-0000-0000-000000000013", "c1000000-0000-0000-0000-000000000099"], keywords: /glp-?1|semaglutide|tirzepatide|weight|hrt|hormone|peptide|wellness/i },
-  
 ];
 
 function matchesConcern(s: Svc, c: Cat | undefined, concernKey: string | null): boolean {
@@ -58,7 +56,6 @@ function matchesQuery(s: Svc, c: Cat | undefined, q: string): boolean {
   return hay.includes(needle);
 }
 
-
 const Services = () => {
   usePageMeta({
     title: "Medspa Services & Pricing — Radiantilyk Aesthetic",
@@ -71,8 +68,11 @@ const Services = () => {
   const [svcs, setSvcs] = useState<Svc[]>([]);
   const [promoSlots, setPromoSlots] = useState<Record<string, string[]>>({});
   const [openId, setOpenId] = useState<string | null>(null);
+  const [openCatIds, setOpenCatIds] = useState<Record<string, boolean>>({});
+  const [showPolicy, setShowPolicy] = useState(false);
   const [query, setQuery] = useState("");
   const [concern, setConcern] = useState<string | null>(null);
+
   useEffect(() => {
     Promise.all([
       supabase.from("service_categories").select("*").eq("is_active", true).order("display_order"),
@@ -80,9 +80,6 @@ const Services = () => {
       supabase.from("promo_slots").select("promo_group, slot_at, claimed_appointment_id").order("slot_at"),
     ]).then(([c, s, ps]) => {
       setCats(c.data ?? []);
-      // Hide package/series SKUs from the public listing — they're duplicates of the
-      // base service and cause conflicting price display. Packages are applied via
-      // promos at checkout, not booked directly by the client.
       const rows = (s.data ?? []) as any[];
       setSvcs(rows.filter(r => !/\bpackage of\b/i.test(r.name ?? "")) as any);
       const byGroup: Record<string, string[]> = {};
@@ -93,6 +90,7 @@ const Services = () => {
       setPromoSlots(byGroup);
     });
   }, []);
+
   const fmtSlot = (iso: string) =>
     new Date(iso).toLocaleString("en-US", {
       timeZone: "America/Los_Angeles",
@@ -102,38 +100,77 @@ const Services = () => {
 
   const everessePromos = svcs.filter(s => s.promo_group?.startsWith("everesse-"));
 
+  const visibleByCat = useMemo(() => {
+    return cats.map(c => ({
+      cat: c,
+      list: svcs.filter(s =>
+        s.category_id === c.id &&
+        !s.promo_group &&
+        matchesConcern(s, c, concern) &&
+        matchesQuery(s, c, query),
+      ),
+    })).filter(x => x.list.length > 0);
+  }, [cats, svcs, concern, query]);
+
+  const totalVisible = useMemo(() => {
+    return visibleByCat.reduce((n, x) => n + x.list.length, 0);
+  }, [visibleByCat]);
+
+  const toggleAllCats = (expand: boolean) => {
+    const next: Record<string, boolean> = {};
+    if (expand) {
+      visibleByCat.forEach(x => { next[x.cat.id] = true; });
+    }
+    setOpenCatIds(next);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <SiteHeader />
-      <main className="flex-1 container mx-auto px-4 py-10 sm:py-16 max-w-4xl">
-        <p className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-primary mb-3 sm:mb-4">Our Services</p>
-        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl mb-6 sm:mb-8">Tailored for you.</h1>
-
-        <NurseDiscountBanner className="mb-6" />
-
-
-        <div className="rounded-2xl border border-border bg-secondary/40 p-4 sm:p-5 mb-10 text-xs sm:text-sm leading-relaxed">
-          <p>
-            <span className="font-medium">Cancellation policy.</span> {CANCELLATION_POLICY_LONG}
-          </p>
-          <p className="mt-2 text-muted-foreground text-[11px] sm:text-xs">
-            Some services are priced per unit or per syringe — your final investment is confirmed at your complimentary consultation.
-            Flexible financing through Cherry and Affirm. Custom treatment packages available.
-          </p>
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
+        {/* Compact Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-border">
+          <div>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-primary font-semibold">Our Services</span>
+            <h1 className="font-serif text-2xl sm:text-3xl text-foreground font-normal">Tailored for you.</h1>
+          </div>
+          <NurseDiscountBanner className="sm:w-auto shrink-0 justify-start sm:justify-end" />
         </div>
 
-        <FinancingBadge className="mb-8" />
+        {/* Collapsible Policy & Financing Info Strip */}
+        <div className="rounded-xl border-2 border-border bg-secondary/30 mb-5 text-xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowPolicy(!showPolicy)}
+            className="w-full flex items-center justify-between px-3.5 py-2.5 text-left hover:bg-secondary/50 transition-colors font-medium text-foreground/85"
+          >
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-primary shrink-0" />
+              <span>Cancellation Policy & Financing (Cherry / Affirm)</span>
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground text-[11px]">
+              <span>{showPolicy ? "Hide details" : "View policy & financing"}</span>
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showPolicy ? "rotate-180" : ""}`} />
+            </div>
+          </button>
+          {showPolicy && (
+            <div className="px-3.5 pb-3 pt-1.5 text-muted-foreground border-t border-border text-[11px] leading-relaxed space-y-2 bg-background/50">
+              <p><span className="font-semibold text-foreground">Cancellation policy:</span> {CANCELLATION_POLICY_LONG}</p>
+              <p>Flexible financing available through <a href="https://withcherry.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Cherry</a> and <a href="https://www.affirm.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Affirm</a> with soft credit check. Custom treatment packages confirmed during complimentary consultation.</p>
+            </div>
+          )}
+        </div>
 
-        {/* Inline search + concern filters */}
-        <div className="mb-10 space-y-3">
+        {/* Compact Search & Concern Filters */}
+        <div className="mb-6 space-y-2.5">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search services — botox, peel, laser hair, GLP-1…"
-              className="w-full rounded-full border border-border bg-background pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-full border border-border bg-background pl-9 pr-9 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               aria-label="Search services"
             />
             {query && (
@@ -142,21 +179,21 @@ const Services = () => {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 aria-label="Clear search"
               >
-                <XIcon className="h-4 w-4" />
+                <XIcon className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {CONCERN_FILTERS.map(c => {
               const active = concern === c.key;
               return (
                 <button
                   key={c.key}
                   onClick={() => setConcern(active ? null : c.key)}
-                  className={`text-xs sm:text-[13px] px-3 py-1.5 rounded-full border transition ${
+                  className={`text-[11px] sm:text-xs px-2.5 py-1 rounded-full border transition ${
                     active
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-secondary/40 border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                      ? "bg-primary text-primary-foreground border-primary font-medium"
+                      : "bg-secondary/40 border-border text-foreground/80 hover:text-foreground hover:border-primary"
                   }`}
                   aria-pressed={active}
                 >
@@ -167,52 +204,49 @@ const Services = () => {
             {(concern || query) && (
               <button
                 onClick={() => { setConcern(null); setQuery(""); }}
-                className="text-xs px-3 py-1.5 text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                className="text-[11px] px-2.5 py-1 text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
               >
                 Clear all
               </button>
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Can't decide? <Link to="/quiz" className="text-primary hover:underline">Take the 1-minute treatment finder →</Link>
-          </p>
         </div>
 
+        {/* Volnewmer Launch Special (Compact Banner) */}
         {everessePromos.length > 0 && (
-          <section className="mb-14 rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/10 via-secondary/40 to-background p-6 sm:p-8 shadow-elegant">
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <span className="text-[10px] uppercase tracking-[0.4em] text-primary">Limited Promotion</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">10 spots per service</span>
+          <section className="mb-6 rounded-2xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 via-secondary/40 to-background p-4 sm:p-5 shadow-xs">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="text-[9px] uppercase tracking-[0.3em] text-primary font-semibold">Limited Promotion</span>
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/40 font-medium">10 spots per service</span>
             </div>
-            <h2 className="font-serif text-3xl sm:text-4xl mb-2">Volnewmer (Everesse) — Launch Special</h2>
-            <p className="text-sm text-muted-foreground mb-5">
-              Korea's premier monopolar RF skin-tightening device. San Jose only · Launches July 18, 2026 ·
-              Performed exclusively by Kiem & Kamaren. Each service has its own 10 reservations.
+            <h2 className="font-serif text-xl sm:text-2xl mb-1">Volnewmer (Everesse) — Launch Special</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Korea's premier monopolar RF skin-tightening device. San Jose only · Launches July 18, 2026.
             </p>
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-3 gap-3">
               {everessePromos.map(s => {
                 const slots = (s.promo_group && promoSlots[s.promo_group]) || [];
                 const remaining = slots.length;
                 return (
-                  <div key={s.id} className="rounded-2xl border border-border bg-background/60 p-4 flex flex-col">
-                    <div className="text-sm font-medium mb-1">{s.name.replace(/^Everesse Promo — /, "")}</div>
-                    <div className="font-serif text-2xl text-primary">{formatPrice(s)}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">{s.duration_minutes} min</div>
+                  <div key={s.id} className="rounded-xl border border-border bg-background/70 p-3 flex flex-col">
+                    <div className="text-xs font-medium mb-0.5">{s.name.replace(/^Everesse Promo — /, "")}</div>
+                    <div className="font-serif text-xl text-primary">{formatPrice(s)}</div>
+                    <div className="text-[10px] text-muted-foreground">{s.duration_minutes} min</div>
                     {s.price_note && (
-                      <div className="text-[11px] text-muted-foreground mt-2 whitespace-pre-line">{s.price_note}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1 whitespace-pre-line line-clamp-2">{s.price_note}</div>
                     )}
-                    <div className="mt-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <div className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                       {remaining} of 10 spots open
                     </div>
                     {slots.length > 0 && (
-                      <ul className="mt-2 space-y-1 text-[11px] text-foreground/80 max-h-44 overflow-y-auto pr-1">
+                      <ul className="mt-1 space-y-0.5 text-[10px] text-foreground/80 max-h-24 overflow-y-auto pr-1">
                         {slots.map((iso) => (
                           <li key={iso} className="leading-snug">• {fmtSlot(iso)} PT</li>
                         ))}
                       </ul>
                     )}
-                    <Link to={`/book?service=${s.id}`} className="mt-3 text-xs text-primary hover:underline self-start">
-                      Reserve your spot →
+                    <Link to={`/book?service=${s.id}`} className="mt-2 text-xs text-primary hover:underline font-medium self-start">
+                      Reserve →
                     </Link>
                   </div>
                 );
@@ -221,98 +255,146 @@ const Services = () => {
           </section>
         )}
 
-        {(() => {
-          const visibleByCat = cats.map(c => ({
-            cat: c,
-            list: svcs.filter(s =>
-              s.category_id === c.id &&
-              !s.promo_group &&
-              matchesConcern(s, c, concern) &&
-              matchesQuery(s, c, query),
-            ),
-          })).filter(x => x.list.length > 0);
-          const totalVisible = visibleByCat.reduce((n, x) => n + x.list.length, 0);
-          if (totalVisible === 0) {
-            return (
-              <div className="rounded-2xl border border-border bg-secondary/30 p-8 text-center">
-                <p className="text-sm text-muted-foreground mb-3">No services match those filters.</p>
-                <button
-                  onClick={() => { setConcern(null); setQuery(""); }}
-                  className="text-sm text-primary hover:underline"
-                >
-                  Clear filters
-                </button>
-              </div>
-            );
-          }
-          return (
-        <div className="space-y-12">
-          {visibleByCat.map(({ cat: c, list }) => {
-            return (
-              <section key={c.id}>
-                <h2 className="font-serif text-3xl mb-2">{c.name}</h2>
-                {c.description && <p className="text-muted-foreground text-sm mb-5">{c.description}</p>}
-                <div className="grid sm:grid-cols-2 gap-x-8">
-                  {list.map(s => {
-                    const isOpen = openId === s.id;
-                    const hasDesc = !!s.description;
-                    return (
-                      <div key={s.id} className="border-b border-border">
-                        <button
-                          type="button"
-                          onClick={() => hasDesc && setOpenId(isOpen ? null : s.id)}
-                          aria-expanded={isOpen}
-                          className={`w-full flex items-start justify-between gap-4 py-3 text-left text-sm ${hasDesc ? "cursor-pointer hover:bg-secondary/30 -mx-2 px-2 rounded-md transition-colors" : "cursor-default"}`}
-                        >
-                          <div className="min-w-0 flex items-start gap-2">
-                            {hasDesc && (
-                              <ChevronDown
-                                className={`h-4 w-4 mt-0.5 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                                aria-hidden
-                              />
-                            )}
-                            <div className="min-w-0">
-                              <div>{s.name}</div>
-                              {s.price_note && (
-                                <div className="text-[11px] text-muted-foreground mt-0.5 whitespace-pre-line">{s.price_note}</div>
+        {/* Category Accordion Header Info & Controls */}
+        <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
+          <span className="font-medium">{visibleByCat.length} Categories ({totalVisible} Services)</span>
+          {!query && !concern && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => toggleAllCats(true)}
+                className="hover:text-primary transition-colors text-[11px] underline-offset-2 hover:underline"
+              >
+                Expand All
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => toggleAllCats(false)}
+                className="hover:text-primary transition-colors text-[11px] underline-offset-2 hover:underline"
+              >
+                Collapse All
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Service Categories list as Accordions */}
+        {visibleByCat.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-secondary/30 p-6 text-center">
+            <p className="text-xs sm:text-sm text-muted-foreground mb-2">No services match those filters.</p>
+            <button
+              onClick={() => { setConcern(null); setQuery(""); }}
+              className="text-xs text-primary hover:underline font-medium"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {visibleByCat.map(({ cat: c, list }) => {
+              const isSearching = !!(query || concern);
+              const isOpen = isSearching || !!openCatIds[c.id];
+              return (
+                <div key={c.id} className="rounded-xl border border-border bg-card overflow-hidden shadow-2xs transition-all">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isSearching) {
+                        setOpenCatIds(prev => ({ ...prev, [c.id]: !prev[c.id] }));
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-3 sm:p-3.5 text-left hover:bg-secondary/40 transition-colors"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="font-serif text-base sm:text-lg text-foreground font-medium">{c.name}</h2>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground font-sans font-medium">
+                          {list.length} {list.length === 1 ? "service" : "services"}
+                        </span>
+                      </div>
+                      {c.description && (
+                        <p className="text-muted-foreground text-xs line-clamp-1 mt-0.5">{c.description}</p>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${
+                        isOpen ? "rotate-180 text-primary" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-3 pb-3 sm:px-4 sm:pb-3.5 pt-1 border-t border-border bg-background/50">
+                      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
+                        {list.map(s => {
+                          const isSvcOpen = openId === s.id;
+                          const hasDesc = !!s.description;
+                          return (
+                            <div key={s.id} className="border-b border-border/70 last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0">
+                              <button
+                                type="button"
+                                onClick={() => hasDesc && setOpenId(isSvcOpen ? null : s.id)}
+                                aria-expanded={isSvcOpen}
+                                className={`w-full flex items-start justify-between gap-3 py-2 text-left text-xs sm:text-sm ${
+                                  hasDesc ? "cursor-pointer hover:bg-secondary/30 -mx-1.5 px-1.5 rounded-md transition-colors" : "cursor-default"
+                                }`}
+                              >
+                                <div className="min-w-0 flex items-start gap-1.5">
+                                  {hasDesc && (
+                                    <ChevronDown
+                                      className={`h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0 transition-transform ${
+                                        isSvcOpen ? "rotate-180" : ""
+                                      }`}
+                                      aria-hidden
+                                    />
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-medium text-foreground">{s.name}</div>
+                                    {s.price_note && (
+                                      <div className="text-[10px] text-muted-foreground mt-0.5 whitespace-pre-line leading-tight">
+                                        {s.price_note}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right whitespace-nowrap shrink-0">
+                                  <div className="font-semibold text-primary">{formatPrice(s)}</div>
+                                  <div className="text-[10px] text-muted-foreground">{s.duration_minutes} min</div>
+                                </div>
+                              </button>
+                              {isSvcOpen && hasDesc && (
+                                <div className="pb-2.5 pl-5 pr-1 text-xs leading-relaxed text-muted-foreground">
+                                  {s.description}
+                                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                    <Link to={`/services/${s.id}`} className="text-primary hover:underline text-[11px] font-medium">
+                                      Learn details →
+                                    </Link>
+                                    <Link to={`/book?service=${s.id}`} className="text-primary hover:underline text-[11px] font-medium">
+                                      Book this service →
+                                    </Link>
+                                  </div>
+                                </div>
                               )}
                             </div>
-                          </div>
-                          <div className="text-right whitespace-nowrap">
-                            <div className="font-medium">{formatPrice(s)}</div>
-                            <div className="text-[10px] text-muted-foreground">{s.duration_minutes} min</div>
-                          </div>
-                        </button>
-                        {isOpen && hasDesc && (
-                          <div className="pb-4 pl-6 pr-2 text-xs sm:text-[13px] leading-relaxed text-muted-foreground">
-                            {s.description}
-                            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-                              <Link to={`/services/${s.id}`} className="text-primary hover:underline text-xs">
-                                Learn more →
-                              </Link>
-                              <Link to={`/book?service=${s.id}`} className="text-primary hover:underline text-xs">
-                                Book this service →
-                              </Link>
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
                 </div>
-              </section>
-            );
-          })}
-        </div>
-          );
-        })()}
+              );
+            })}
+          </div>
+        )}
 
-        <div className="mt-16 text-center flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link to="/book" className="inline-flex items-center rounded-full bg-primary px-8 py-3 text-primary-foreground shadow-elegant hover:opacity-90">
+        {/* Bottom CTAs */}
+        <div className="mt-8 text-center flex flex-col sm:flex-row items-center justify-center gap-2.5">
+          <Link to="/book" className="inline-flex items-center rounded-full bg-primary px-6 py-2.5 text-xs sm:text-sm font-medium text-primary-foreground shadow-elegant hover:opacity-90 transition-opacity">
             Book Appointment
           </Link>
-          <Link to="/book?service=a1000000-0000-0000-0000-000000000002" className="inline-flex items-center rounded-full border border-primary px-8 py-3 text-primary hover:bg-primary/10">
-            Book Free Televisit Consultation
+          <Link to="/book?service=a1000000-0000-0000-0000-000000000002" className="inline-flex items-center rounded-full border border-primary px-6 py-2.5 text-xs sm:text-sm font-medium text-primary hover:bg-primary/10 transition-colors">
+            Book Free Consultation
           </Link>
         </div>
       </main>
@@ -322,3 +404,4 @@ const Services = () => {
 };
 
 export default Services;
+
