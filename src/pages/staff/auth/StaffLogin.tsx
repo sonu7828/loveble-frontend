@@ -69,22 +69,12 @@ export default function StaffLogin() {
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState<string>("");
 
-  // On mount, if user is already signed in, jump straight to the right step
+  // On mount or tab switch, show login portal ready
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await authService.getSession();
-      if (cancelled) return;
-      if (data.session) {
-        setEmail(data.session.user.email ?? "");
-        await beginMfa(cancelled);
-      } else {
-        setMode("ready");
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setMode("ready");
+    setStep("credentials");
+    setPendingDemoLogin(null);
+  }, [roleParam]);
 
   const beginMfa = async (cancelled?: boolean) => {
     setMode("loading");
@@ -192,13 +182,14 @@ export default function StaffLogin() {
     const cleanEmail = targetEmail.trim().toLowerCase();
     setEmail(cleanEmail);
     setPassword("12345678");
-    const roleLabel =
+    setCode("");
+    const roleName =
       cleanEmail === "admin@gmail.com" ? "Admin" :
-      cleanEmail === "md@gmail.com" ? "Medical Director" :
-      cleanEmail === "officer@gmail.com" ? "Security Officer" :
-      cleanEmail === "user@gmail.com" ? "Patient / User" :
+      cleanEmail.includes("medical") ? "Medical Director" :
+      cleanEmail.includes("security") || cleanEmail.includes("officer") ? "Security Officer" :
+      cleanEmail === "user@gmail.com" ? "Patient" :
       "Staff";
-    toast.info(`${roleLabel} credentials populated in Email & Password fields. Click Continue to sign in.`);
+    toast.info(`${roleName} credentials populated into Email & Password. Click Continue to proceed.`);
   };
 
   const submitCredentials = async (e: React.FormEvent) => {
@@ -219,14 +210,16 @@ export default function StaffLogin() {
     if (
       cleanEmail === "admin@gmail.com" ||
       cleanEmail === "staff@gmail.com" ||
+      cleanEmail === "securityofficer@gmail.com" ||
       cleanEmail === "officer@gmail.com" ||
+      cleanEmail === "medicaldirector@gmail.com" ||
       cleanEmail === "md@gmail.com"
     ) {
       const isAd = cleanEmail === "admin@gmail.com";
-      const isOfficer = cleanEmail === "officer@gmail.com";
-      const isMD = cleanEmail === "md@gmail.com";
+      const isOfficer = cleanEmail.includes("officer") || cleanEmail.includes("security");
+      const isMD = cleanEmail.includes("md") || cleanEmail.includes("medical");
       const roles: AppRole[] = isAd
-        ? ["admin"]
+        ? ["admin", "staff"]
         : isOfficer
         ? ["privacy_officer", "staff"]
         : isMD
@@ -234,9 +227,10 @@ export default function StaffLogin() {
         : ["staff"];
       setPendingDemoLogin({ cleanEmail, roles, isAd });
       setLoading(false);
+      setCode("");
       setStep("mfa-verify");
       setMode("ready");
-      toast.info("Credentials verified. Complete mandatory 2-Factor authentication (Code: 123456).");
+      toast.info("Credentials verified! Please enter 2-Factor code 123456 to access Dashboard.");
       return;
     }
 
@@ -437,19 +431,19 @@ export default function StaffLogin() {
                   <div className="grid grid-cols-3 gap-1.5">
                     <button
                       type="button"
-                      onClick={() => fillDemoCredentials("md@gmail.com")}
+                      onClick={() => fillDemoCredentials("medicaldirector@gmail.com")}
                       className="p-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition text-left text-[11px] font-medium cursor-pointer text-purple-900 dark:text-purple-300 flex flex-col justify-between"
                     >
-                      <div>🩺 <strong>MD</strong></div>
-                      <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">md@gmail.com</span>
+                      <div>🩺 <strong>Medical Director</strong></div>
+                      <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">medicaldirector@gmail.com</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => fillDemoCredentials("officer@gmail.com")}
+                      onClick={() => fillDemoCredentials("securityofficer@gmail.com")}
                       className="p-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition text-left text-[11px] font-medium cursor-pointer text-emerald-800 dark:text-emerald-300 flex flex-col justify-between"
                     >
-                      <div>🛡️ <strong>Officer</strong></div>
-                      <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">officer@gmail.com</span>
+                      <div>🛡️ <strong>Security Officer</strong></div>
+                      <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">securityofficer@gmail.com</span>
                     </button>
                     <button
                       type="button"
@@ -563,17 +557,21 @@ export default function StaffLogin() {
 
           {mode === "ready" && step === "mfa-verify" && (
             <form onSubmit={verifyLogin} className="space-y-3">
-              <p className="text-xs text-muted-foreground text-center">
-                Enter the 6-digit code from your authenticator app to continue.
-              </p>
-              <div>
-                <Label htmlFor="code" className="text-xs uppercase tracking-wider text-muted-foreground">Authentication code</Label>
-                <Input id="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus
-                  value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                  className="mt-1 h-9 text-center tracking-[0.4em] font-mono text-base" />
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-2 text-center text-xs space-y-1">
+                <div className="font-semibold text-foreground">🔒 Mandatory 2-Factor Authentication</div>
+                <div className="text-[11px] text-muted-foreground">
+                  Authentication Code: <code className="bg-background px-1.5 py-0.5 rounded border border-border font-mono font-bold text-primary">123456</code>
+                </div>
               </div>
-              <Button type="submit" disabled={busy || code.length !== 6} className="w-full rounded-full h-10 text-sm font-medium">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & continue"}
+              <div>
+                <Label htmlFor="code" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Enter 6-Digit Code</Label>
+                <Input id="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus
+                  placeholder="------"
+                  value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  className="mt-0.5 h-9 text-center tracking-[0.4em] font-mono text-base" />
+              </div>
+              <Button type="submit" disabled={busy || code.length !== 6} className="w-full rounded-full h-9 text-xs font-medium">
+                {busy ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : "Verify Code & Open Dashboard →"}
               </Button>
             </form>
           )}

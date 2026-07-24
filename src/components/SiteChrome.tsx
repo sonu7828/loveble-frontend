@@ -5,10 +5,23 @@ import { MapPin, Phone, Menu, X, Mail, UserCheck, Instagram, Facebook, Globe, Na
 import rkaLogo from "@/assets/rka-logo.webp";
 import ThemeToggle from "@/components/ThemeToggle";
 import NewsletterSignup from "@/components/NewsletterSignup";
+import { useAuth } from "@/hooks/useAuth";
 
 export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { user, isAdmin, isPrivacyOfficer, isStaff } = useAuth();
+
+  const accountPath = !user
+    ? "/staff/login"
+    : isAdmin
+    ? "/staff/admin"
+    : isPrivacyOfficer
+    ? "/staff/security-officer"
+    : isStaff
+    ? "/staff/today"
+    : "/account";
+
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   const skipToMain: React.MouseEventHandler<HTMLAnchorElement> = (e) => {
@@ -29,19 +42,24 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
       >
         Skip to main content
       </a>
-      <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-40">
-        <div className="container mx-auto px-4 sm:px-6 flex items-center justify-between py-3 gap-3">
-          <Link to="/" className="flex items-center gap-2.5 sm:gap-3 leading-tight min-w-0 md:mr-auto group">
-            <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-cover shadow-soft shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span className="font-serif text-base sm:text-xl font-medium tracking-tight truncate">
+      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border transition-colors">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3 group">
+            <img
+              src={rkaLogo}
+              alt="Radiantilyk Aesthetic"
+              className="h-10 w-10 object-contain rounded-full shadow-soft group-hover:scale-105 transition-transform"
+            />
+            <div className="flex flex-col">
+              <span className="font-serif text-lg tracking-tight font-medium text-foreground group-hover:text-primary transition-colors">
                 Radiantilyk Aesthetic
               </span>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground tracking-wider uppercase">
-                <span className="font-semibold text-primary">MEDSPA</span>
-                <span className="opacity-40">•</span>
-                <span className="hidden sm:flex items-center gap-1 font-normal normal-case text-[11px] text-muted-foreground truncate">
-                  <MapPin className="h-3 w-3 text-primary shrink-0" />
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium">
+                  MEDSPA
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                  <MapPin className="h-2.5 w-2.5 text-primary" />
                   San Jose · 2100 Curtner Ave, Ste 1B
                 </span>
               </div>
@@ -53,7 +71,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
                 <NavLink to="/" end className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Home</NavLink>
                 <NavLink to="/services" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Services & Pricing</NavLink>
                 <NavLink to="/model" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Model Application</NavLink>
-                <NavLink to="/account/auth" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>My Account</NavLink>
+                <NavLink to="/staff/login" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>My Account</NavLink>
               </>
             )}
             <ThemeToggle />
@@ -80,7 +98,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
               {!isPortal && (
                 <>
                   <NavLink to="/services" className="py-3 border-b border-border">Services & Pricing</NavLink>
-                  <NavLink to="/account/auth" className="py-3 border-b border-border">My Account</NavLink>
+                  <NavLink to="/staff/login" className="py-3 border-b border-border">My Account</NavLink>
                   <NavLink to="/model" className="py-3 border-b border-border">Become a Model</NavLink>
                   <NavLink to="/faq" className="py-3 border-b border-border">FAQ</NavLink>
                 </>
