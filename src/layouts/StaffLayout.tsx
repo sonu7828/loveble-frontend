@@ -291,51 +291,7 @@ export default function StaffLayout() {
         icon: Settings,
         show: true,
         children: [
-<<<<<<< HEAD
           { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
-=======
-<<<<<<< HEAD
-          { to: "/staff/calendar", label: "Calendar", icon: CalIcon },
-          { to: "/staff/my-schedule", label: "My Schedule", icon: CalIcon },
-          { to: "/staff/time-clock", label: "Time Clock", icon: Clock },
-        ],
-      },
-      {
-        key: "clients",
-        label: "Clients",
-        icon: UserCircle2,
-        show: true,
-        children: [
-          { to: "/staff/clients", label: "All Clients", icon: UserCircle2 },
-        ],
-      },
-
-      {
-        key: "security_officer",
-        label: "Security & Compliance",
-        icon: ShieldCheck,
-        show: isPrivacyOfficer,
-        children: [
-          { to: "/staff/security-officer", label: "Security Operations Center", icon: ShieldCheck },
-          { to: "/staff/hipaa-policies", label: "HIPAA Policy Approval", icon: BookOpen },
-          { to: "/staff/breach-report", label: "Incident & Breach Reports", icon: ShieldAlert },
-        ],
-      },
-      {
-        key: "clinical",
-        label: "Clinical",
-        icon: Stethoscope,
-        show: canClinical,
-        children: [
-          { to: "/staff/clinical", label: "Charts", icon: Stethoscope },
-          { to: "/staff/clinical/cosign", label: "Cosign Queue", icon: ShieldCheck },
-          { to: "/staff/clinical/safety", label: "Safety & Protocols", icon: ShieldAlert },
-          { to: "/staff/compliance", label: "My Compliance", icon: ShieldCheck },
-          { to: "/staff/inventory", label: "Inventory & Supplies", icon: Boxes },
-=======
-          { to: "/staff/me", label: "Settings", icon: Settings },
->>>>>>> e956be57fb5ca45c7d7b366890dc75d11e4b0c4a
->>>>>>> 63f3862a0674bad90f7db66229d840b04e4bb9aa
         ],
       },
     ];
