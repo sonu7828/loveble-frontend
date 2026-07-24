@@ -67,6 +67,10 @@ export class ApiTableQuery {
     return this;
   }
 
+  public not(column: string, operator: string, value: any): this {
+    return this;
+  }
+
   public ilike(column: string, pattern: string): this {
     return this;
   }
@@ -146,6 +150,12 @@ export class ApiTableQuery {
   public then(resolve: (res: { data: any; error: any; count: number }) => void, reject?: (reason: any) => void) {
     this.execute().then(resolve, reject);
   }
+}
+
+/** Minimal fake realtime channel (no-op since Express backend has no built-in realtime). */
+class FakeChannel {
+  on(_event: string, _filter: any, _cb?: Function): this { return this; }
+  subscribe(_cb?: Function): this { return this; }
 }
 
 export interface ApiQueryFunction {
