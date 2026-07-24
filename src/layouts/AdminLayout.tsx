@@ -27,7 +27,7 @@ interface NavItem {
 }
 
 export default function AdminLayout() {
-  const { user, loading, isAdmin, isPrivileged } = useAuth();
+  const { user, loading, isAdmin, isPrivileged, isPrivacyOfficer, isMedicalDirector } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -84,11 +84,11 @@ export default function AdminLayout() {
   if (!user) return <Navigate to="/staff/login" replace />;
   if (isPrivileged && !mfaOk) return <Navigate to="/staff/mfa" replace />;
 
-  if (!isAdmin) {
+  if (!isAdmin && !isPrivacyOfficer && !isMedicalDirector) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
-          <p className="text-sm font-medium mb-4">Access Denied. Admin privileges required.</p>
+          <p className="text-sm font-medium mb-4">Access Denied. Admin, Medical Director, or Security Officer privileges required.</p>
           <Button variant="outline" onClick={async () => { clearDemoAuthSession(); await supabase.auth.signOut(); navigate("/staff/login"); }}>Sign out</Button>
         </div>
       </div>
