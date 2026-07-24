@@ -121,21 +121,27 @@ export function useAuth(): AuthState {
   }, []);
 
   async function loadProfile(uid: string) {
-    const { data: access, error: accessError } = await (supabase as any).rpc("get_my_staff_access");
-    if (!accessError && access?.[0]) {
-      setRoles((access[0].roles ?? []) as AppRole[]);
-      setStaffId(access[0].staff_id ?? null);
-      setLoading(false);
-      return;
-    }
+    try {
+      const { data: access, error: accessError } = await (supabase as any).rpc("get_my_staff_access");
+      if (!accessError && access?.[0]) {
+        setRoles((access[0].roles ?? []) as AppRole[]);
+        setStaffId(access[0].staff_id ?? null);
+        return;
+      }
 
-    const [{ data: r }, { data: sp }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", uid),
-      supabase.from("staff_profiles").select("id").eq("user_id", uid).maybeSingle(),
-    ]);
-    setRoles((r ?? []).map((x) => x.role as AppRole));
-    setStaffId(sp?.id ?? null);
-    setLoading(false);
+      const [{ data: r }, { data: sp }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", uid),
+        supabase.from("staff_profiles").select("id").eq("user_id", uid).maybeSingle(),
+      ]);
+      setRoles((r ?? []).map((x) => x.role as AppRole));
+      setStaffId(sp?.id ?? null);
+    } catch (err) {
+      console.error("loadProfile error:", err);
+      setRoles([]);
+      setStaffId(null);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const isAdmin = roles.includes("admin");
