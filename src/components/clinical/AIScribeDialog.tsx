@@ -2,7 +2,6 @@
 // Uses Web Audio API + WAV encoding for reliable iOS/iPad/desktop capture.
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Mic, Square, Sparkles, ShieldAlert } from "lucide-react";

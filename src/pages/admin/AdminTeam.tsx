@@ -175,7 +175,7 @@ export default function AdminTeam() {
     });
     setBusy(null);
     if (error || data?.error) {
-      toast.error(data?.error || error?.message || "Could not send invite");
+      toast.error(data?.error || (typeof error === "string" ? error : (error as any)?.message) || "Could not send invite");
       return;
     }
     toast.success(`Invite sent to ${m.email}`);
@@ -186,7 +186,7 @@ export default function AdminTeam() {
     setBusy("all");
     const { data, error } = await ApiClient.post("staff-invite-send", { body: { all: true } });
     setBusy(null);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "Failed"); return; }
+    if (error || data?.error) { toast.error(data?.error || (typeof error === "string" ? error : (error as any)?.message) || "Failed"); return; }
     toast.success(`Sent ${data?.sent ?? 0} invites`);
     load();
   };
@@ -306,7 +306,7 @@ export default function AdminTeam() {
 
     setAddBusy(false);
     setAddOpen(false);
-    setDraft({ id: "", full_name: "", title: "", email: "", color: PALETTE[0], role: "staff", sendInvite: true });
+    setDraft({ id: "", full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "staff", sendInvite: true });
     load();
   };
 
