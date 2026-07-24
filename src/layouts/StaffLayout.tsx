@@ -144,7 +144,7 @@ export default function StaffLayout() {
           icon: Settings,
           show: true,
           children: [
-            { to: "/staff/me", label: "Settings", icon: Settings },
+            { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
           ],
         },
       ];
@@ -212,7 +212,7 @@ export default function StaffLayout() {
           icon: Settings,
           show: true,
           children: [
-            { to: "/staff/me", label: "Settings", icon: Settings },
+            { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
           ],
         },
       ];
@@ -291,7 +291,7 @@ export default function StaffLayout() {
         icon: Settings,
         show: true,
         children: [
-          { to: "/staff/me", label: "Settings", icon: Settings },
+          { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
         ],
       },
     ];
@@ -390,7 +390,7 @@ export default function StaffLayout() {
                 onClick={() => toggleGroup(g.key)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer select-none ${
                   hasActiveChild
-                    ? "bg-primary/10 text-primary"
+                    ? "text-primary font-semibold bg-primary/5"
                     : "text-foreground hover:bg-secondary/60"
                 }`}
               >
@@ -451,7 +451,6 @@ export default function StaffLayout() {
       </div>
 
       <div className="pt-3 mt-4 border-t border-border space-y-1">
-        <NavLink to="/staff/me" className={footerLinkCls} onClick={() => setOpen(false)}><UserCircle2 className="h-4 w-4" />My Profile</NavLink>
         <NavLink to="/staff/help" className={footerLinkCls} onClick={() => setOpen(false)}><BookOpen className="h-4 w-4" />Help / Handbook</NavLink>
         <div className="flex items-center justify-between px-3 py-1.5 text-xs font-medium text-muted-foreground rounded-lg">
           <span>Appearance</span>

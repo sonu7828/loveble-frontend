@@ -117,6 +117,9 @@ import AdminSecurityOfficer from "./pages/admin/AdminSecurityOfficer.tsx";
 import AdminModelApplications from "./pages/admin/AdminModelApplications.tsx";
 import AdminModelApplicationDetail from "./pages/admin/AdminModelApplicationDetail.tsx";
 
+import StaffClinicalReviews from "./pages/staff/StaffClinicalReviews.tsx";
+import StaffOrders from "./pages/staff/StaffOrders.tsx";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -172,15 +175,12 @@ const App = () => (
             <Route path="services" element={<AdminOnly><AdminServices /></AdminOnly>} />
             <Route path="model-applications" element={<AdminOnly><AdminModelApplications /></AdminOnly>} />
             <Route path="model-applications/:id" element={<AdminOnly><AdminModelApplicationDetail /></AdminOnly>} />
-            <Route path="reports" element={<AdminOnly><AdminReports /></AdminOnly>} />
             <Route path="productivity" element={<AdminOnly><AdminProductivity /></AdminOnly>} />
             <Route path="finances" element={<AdminOnly><AdminFinances /></AdminOnly>} />
             <Route path="audit" element={<AdminOnly><AdminAudit /></AdminOnly>} />
-            <Route path="audit-report" element={<AdminOnly><AdminAuditReport /></AdminOnly>} />
             <Route path="terminal" element={<AdminOnly><AdminTerminalSettings /></AdminOnly>} />
             <Route path="pos-config" element={<AdminOnly><AdminPosConfig /></AdminOnly>} />
             <Route path="admin" element={<AdminOnly><AdminHub /></AdminOnly>} />
-            <Route path="vendors" element={<AdminOnly><AdminVendors /></AdminOnly>} />
             <Route path="no-show-charges" element={<AdminOnly><AdminNoShowCharges /></AdminOnly>} />
             <Route path="rewards" element={<AdminOnly><AdminRewards /></AdminOnly>} />
             <Route path="intake-status" element={<AdminOnly><AdminIntakeDashboard /></AdminOnly>} />
@@ -193,6 +193,10 @@ const App = () => (
             <Route index element={<StaffToday />} />
             <Route path="dashboard" element={<Navigate to="/staff/today" replace />} />
             <Route path="today" element={<StaffToday />} />
+            <Route path="clinical-reviews" element={<StaffClinicalReviews />} />
+            <Route path="orders" element={<StaffOrders />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="vendors" element={<AdminVendors />} />
             <Route path="inbox" element={<StaffInbox />} />
             <Route path="calendar" element={<StaffCalendar />} />
             <Route path="messages" element={<StaffMessages />} />
@@ -220,7 +224,6 @@ const App = () => (
             <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="schedule" element={<Navigate to="/staff/my-schedule" replace />} />
-            {/* breach-report moved to AdminLayout above */}
             <Route path="clinical" element={<StaffClinical />} />
             <Route path="clinical/notes" element={<ChartNotesIndex />} />
             <Route path="clinical/gfe" element={<GFEIndex />} />

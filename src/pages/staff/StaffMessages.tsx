@@ -88,17 +88,21 @@ export default function StaffMessages() {
   // realtime: debounce list refresh so a burst of events triggers one reload
   const debounceRef = useRef<number | null>(null);
   useEffect(() => {
-    const ch = apiQuery
-      .channel("staff_messages_inbox")
-      .on("postgres_changes", { event: "*", schema: "public", table: "sms_messages" }, () => {
+    if (typeof apiQuery.channel === "function") {
+      const ch = apiQuery
+        .channel("staff_messages_inbox")
+        .on("postgres_changes", { event: "*", schema: "public", table: "sms_messages" }, () => {
+          if (debounceRef.current) window.clearTimeout(debounceRef.current);
+          debounceRef.current = window.setTimeout(() => { loadRef.current(); }, 600);
+        })
+        .subscribe();
+      return () => {
         if (debounceRef.current) window.clearTimeout(debounceRef.current);
-        debounceRef.current = window.setTimeout(() => { loadRef.current(); }, 600);
-      })
-      .subscribe();
-    return () => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-      apiQuery.removeChannel(ch);
-    };
+        if (typeof apiQuery.removeChannel === "function") {
+          apiQuery.removeChannel(ch);
+        }
+      };
+    }
   }, []);
 
   const totalUnread = useMemo(() => threads.reduce((sum, t) => sum + t.unread, 0), [threads]);

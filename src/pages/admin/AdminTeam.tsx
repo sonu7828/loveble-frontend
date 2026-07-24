@@ -47,7 +47,8 @@ interface PendingRequest {
 const PALETTE = ["#c97c5d", "#7c9dd1", "#a8c084", "#d4a3c4", "#e8b94b", "#8b7ec4", "#d97c7c", "#5db8a8"];
 
 export default function AdminTeam() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isMedicalDirector, isPrivacyOfficer, isStaff, isNP, isPrivileged } = useAuth();
+  const canAccessTeam = isAdmin || isMedicalDirector || isPrivacyOfficer || isStaff || isNP || isPrivileged;
   const [sp, setSp] = useSearchParams();
   const roleFilter = sp.get("role") || "all";
   const currentTab = sp.get("tab");
@@ -98,16 +99,12 @@ export default function AdminTeam() {
     setLoading(true);
     const { data: m } = await apiQuery("staff_profiles").select("id, user_id, full_name, title, email, bio, color, is_owner, is_active, created_at, updated_at, calendar_email, phone, license_number" as any).order("is_owner", { ascending: false }).order("created_at");
     const { data: pay } = await (apiQuery as any).from("staff_pay_config").select("staff_id, hourly_rate_cents, commission_percent");
+
     const payMap: Record<string, { hourly_rate_cents: number | null; commission_percent: number | null }> = {};
-    (pay ?? []).forEach((p: any) => { payMap[p.staff_id] = { hourly_rate_cents: p.hourly_rate_cents, commission_percent: p.commission_percent }; });
+    (pay ?? []).forEach((p: any) => { payMap[p.staff_id] = p; });
 
+    // Include local demo staff members
     const localDemoMembers: Member[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
-
-    const fetchedMembers = (m ?? []).map((row: any) => ({
-      ...row,
-      hourly_rate_cents: payMap[row.id]?.hourly_rate_cents ?? null,
-      commission_percent: payMap[row.id]?.commission_percent ?? null,
-    })) as Member[];
 
     const existingIds = new Set(fetchedMembers.map(x => x.id));
     const uniqueLocal = localDemoMembers.filter(x => !existingIds.has(x.id));
@@ -530,7 +527,7 @@ export default function AdminTeam() {
     }
   };
 
-  if (!isAdmin) return <div className="p-8 text-sm text-muted-foreground">Admins only.</div>;
+  if (!canAccessTeam) return <div className="p-8 text-sm text-muted-foreground">Access Restricted.</div>;
 
   const getMemberRoleFilterCount = (filter: string) => {
     return members.filter((m) => {

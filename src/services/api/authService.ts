@@ -99,18 +99,16 @@ export function getUserProfileByEmail(email: string): UserProfile {
 
 export const authService = {
   async getSession(): Promise<any> {
-    const token = localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token");
-    const storedUser = localStorage.getItem("user_profile") || sessionStorage.getItem("user_profile");
+    const token = sessionStorage.getItem("auth_token") || localStorage.getItem("auth_token");
+    const storedUser = sessionStorage.getItem("user_profile") || localStorage.getItem("user_profile");
 
     let user: UserProfile | null = null;
     if (storedUser) {
       try {
         user = JSON.parse(storedUser);
       } catch (e) {
-        user = getUserProfileByEmail("admin@gmail.com");
+        user = null;
       }
-    } else {
-      user = getUserProfileByEmail("admin@gmail.com");
     }
 
     const session = user ? { token: token || "demo-jwt-token", user } : null;
@@ -126,6 +124,8 @@ export const authService = {
   async login(email: string, password?: string): Promise<{ user: UserProfile; token: string } | null> {
     const res = await ApiClient.post<{ user: UserProfile; token: string }>("/auth/login", { email, password });
     if (res.data && res.data.token) {
+      sessionStorage.setItem("auth_token", res.data.token);
+      sessionStorage.setItem("user_profile", JSON.stringify(res.data.user));
       localStorage.setItem("auth_token", res.data.token);
       localStorage.setItem("user_profile", JSON.stringify(res.data.user));
       window.dispatchEvent(new Event("rka_demo_auth_change"));
@@ -134,6 +134,8 @@ export const authService = {
 
     // Default predefined profile
     const demoUser = getUserProfileByEmail(email);
+    sessionStorage.setItem("auth_token", "demo-token");
+    sessionStorage.setItem("user_profile", JSON.stringify(demoUser));
     localStorage.setItem("auth_token", "demo-token");
     localStorage.setItem("user_profile", JSON.stringify(demoUser));
     window.dispatchEvent(new Event("rka_demo_auth_change"));
@@ -162,11 +164,11 @@ export const authService = {
 
   async logout(): Promise<void> {
     await ApiClient.post("/auth/logout");
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("user_profile");
     sessionStorage.removeItem("auth_token");
     sessionStorage.removeItem("user_profile");
     sessionStorage.removeItem("rka_demo_session");
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user_profile");
     localStorage.removeItem("rka_demo_session");
     window.dispatchEvent(new Event("rka_demo_auth_change"));
   },
