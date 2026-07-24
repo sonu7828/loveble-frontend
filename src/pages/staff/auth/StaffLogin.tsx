@@ -69,11 +69,14 @@ export default function StaffLogin() {
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState<string>("");
 
-  // On mount or tab switch, show login portal ready
+  // On mount or tab switch, show login portal ready & clear form inputs
   useEffect(() => {
     setMode("ready");
     setStep("credentials");
     setPendingDemoLogin(null);
+    setEmail("");
+    setPassword("");
+    setCode("");
   }, [roleParam]);
 
   const beginMfa = async (cancelled?: boolean) => {
@@ -486,10 +489,10 @@ export default function StaffLogin() {
                 )}
               </div>
 
-              <form onSubmit={submitCredentials} className="space-y-2.5">
+              <form onSubmit={submitCredentials} className="space-y-2.5" autoComplete="off">
                 <div>
                   <Label htmlFor="email" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Email</Label>
-                  <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-0.5 h-8.5 text-xs" />
+                  <Input id="email" type="email" autoComplete="off" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-0.5 h-8.5 text-xs" />
                 </div>
                 <div>
                   <Label htmlFor="password" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Password</Label>
@@ -497,7 +500,7 @@ export default function StaffLogin() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
+                      autoComplete="new-password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}

@@ -116,6 +116,9 @@ import AdminSecurityOfficer from "./pages/admin/AdminSecurityOfficer.tsx";
 import AdminModelApplications from "./pages/admin/AdminModelApplications.tsx";
 import AdminModelApplicationDetail from "./pages/admin/AdminModelApplicationDetail.tsx";
 
+import StaffClinicalReviews from "./pages/staff/StaffClinicalReviews.tsx";
+import StaffOrders from "./pages/staff/StaffOrders.tsx";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -171,21 +174,19 @@ const App = () => (
             <Route path="services" element={<AdminOnly><AdminServices /></AdminOnly>} />
             <Route path="model-applications" element={<AdminOnly><AdminModelApplications /></AdminOnly>} />
             <Route path="model-applications/:id" element={<AdminOnly><AdminModelApplicationDetail /></AdminOnly>} />
-            <Route path="reports" element={<AdminOnly><AdminReports /></AdminOnly>} />
             <Route path="productivity" element={<AdminOnly><AdminProductivity /></AdminOnly>} />
             <Route path="finances" element={<AdminOnly><AdminFinances /></AdminOnly>} />
             <Route path="audit" element={<AdminOnly><AdminAudit /></AdminOnly>} />
-            <Route path="audit-report" element={<AdminOnly><AdminAuditReport /></AdminOnly>} />
             <Route path="terminal" element={<AdminOnly><AdminTerminalSettings /></AdminOnly>} />
             <Route path="pos-config" element={<AdminOnly><AdminPosConfig /></AdminOnly>} />
             <Route path="admin" element={<AdminOnly><AdminHub /></AdminOnly>} />
-            <Route path="vendors" element={<AdminOnly><AdminVendors /></AdminOnly>} />
             <Route path="no-show-charges" element={<AdminOnly><AdminNoShowCharges /></AdminOnly>} />
             <Route path="rewards" element={<AdminOnly><AdminRewards /></AdminOnly>} />
             <Route path="intake-status" element={<AdminOnly><AdminIntakeDashboard /></AdminOnly>} />
             <Route path="sms-snippets" element={<AdminOnly><AdminSmsSnippets /></AdminOnly>} />
             <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
             <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
+<<<<<<< HEAD
             <Route path="team" element={<AdminTeam />} />
             <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
             <Route path="security-officer" element={<AdminSecurityOfficer />} />
@@ -194,12 +195,18 @@ const App = () => (
             <Route path="breach-report" element={<AdminBreachReport />} />
             <Route path="me" element={<StaffMyProfile />} />
             <Route path="help" element={<StaffHelp />} />
+=======
+>>>>>>> 9272d63101eaf864f6072e457ffbe626869b1f10
           </Route>
 
           <Route element={<StaffLayout />}>
             <Route index element={<StaffToday />} />
             <Route path="dashboard" element={<Navigate to="/staff/today" replace />} />
             <Route path="today" element={<StaffToday />} />
+            <Route path="clinical-reviews" element={<StaffClinicalReviews />} />
+            <Route path="orders" element={<StaffOrders />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="vendors" element={<AdminVendors />} />
             <Route path="inbox" element={<StaffInbox />} />
             <Route path="calendar" element={<StaffCalendar />} />
             <Route path="messages" element={<StaffMessages />} />
@@ -227,7 +234,6 @@ const App = () => (
             <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="schedule" element={<Navigate to="/staff/my-schedule" replace />} />
-            {/* breach-report moved to AdminLayout above */}
             <Route path="clinical" element={<StaffClinical />} />
             <Route path="clinical/notes" element={<ChartNotesIndex />} />
             <Route path="clinical/gfe" element={<GFEIndex />} />
@@ -250,6 +256,13 @@ const App = () => (
             <Route path="clinical/vo/:runId" element={<VoProtocolRun />} />
             <Route path="compliance" element={<MyCompliance />} />
             <Route path="compliance/sign/:protocolId" element={<ComplianceSign />} />
+            <Route path="team" element={<AdminTeam />} />
+            <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
+            <Route path="security-officer" element={<AdminSecurityOfficer />} />
+            <Route path="audit-report" element={<AdminAuditReport />} />
+            <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
+            <Route path="compliance/admin" element={<ComplianceAdmin />} />
+            <Route path="breach-report" element={<StaffBreachReport />} />
           </Route>
           </Route>
           <Route path="/waitlist" element={<Waitlist />} />

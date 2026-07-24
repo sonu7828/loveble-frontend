@@ -161,15 +161,28 @@ class FakeChannel {
 export interface ApiQueryFunction {
   (tableName: string): ApiTableQuery;
   from: (tableName: string) => ApiTableQuery;
-  channel: (name: string) => FakeChannel;
+  channel: (channelName: string) => any;
   removeChannel: (ch: any) => void;
+  functions: {
+    invoke: (fnName: string, options?: any) => Promise<{ data: any; error: any }>;
+  };
 }
 
 export const apiQuery: ApiQueryFunction = Object.assign(
   (tableName: string) => new ApiTableQuery(tableName),
   {
     from: (tableName: string) => new ApiTableQuery(tableName),
-    channel: (_name: string) => new FakeChannel(),
-    removeChannel: (_ch: any) => { /* no-op */ },
+    channel: (name: string) => ({
+      on: (_event: any, _filter: any, _callback: any) => ({
+        subscribe: () => ({ name }),
+      }),
+      subscribe: () => ({ name }),
+    }),
+    removeChannel: (_ch: any) => {},
+    functions: {
+      invoke: async (fnName: string, _options?: any) => {
+        return { data: null, error: null };
+      },
+    },
   }
 );
