@@ -1,0 +1,2 @@
+UPDATE appointments SET google_event_owner_id = NULL WHERE id = '95d17568-2535-481c-8cad-68b1d4336fbc';
+DELETE FROM appointment_staff_calendar_events WHERE appointment_id = '95d17568-2535-481c-8cad-68b1d4336fbc';

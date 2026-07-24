@@ -1,0 +1,1 @@
+ALTER TABLE public.weekly_schedules ADD COLUMN IF NOT EXISTS effective_from date;

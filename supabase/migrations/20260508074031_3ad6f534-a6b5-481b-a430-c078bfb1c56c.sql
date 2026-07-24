@@ -1,0 +1,1 @@
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS calendar_sequence integer NOT NULL DEFAULT 0;

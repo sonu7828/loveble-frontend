@@ -1,0 +1,1 @@
+UPDATE public.services SET price_note = E'targeted area · full face/neck $900\nspot treatment $700' WHERE id = '57000000-0000-0000-0000-000000000004';

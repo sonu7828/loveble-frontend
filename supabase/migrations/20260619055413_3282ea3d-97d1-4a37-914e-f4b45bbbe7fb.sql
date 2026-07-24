@@ -1,0 +1,1 @@
+UPDATE public.staff_profiles SET is_active = false WHERE id = 'dddddddd-dddd-dddd-dddd-dddddddddddd';

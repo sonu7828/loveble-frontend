@@ -1,0 +1,1 @@
+ALTER TYPE public.clinical_note_category ADD VALUE IF NOT EXISTS 'consult';

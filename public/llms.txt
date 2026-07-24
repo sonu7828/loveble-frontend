@@ -1,0 +1,24 @@
+# Radiantilyk Aesthetic
+
+> Medspa in San Jose, California offering injectables, lasers, facials, body contouring, and medical wellness (GLP-1, HRT, peptides). Online booking, transparent pricing, and a 48-hour cancellation policy.
+
+Location:
+- San Jose — 2100 Curtner Ave, Ste 1B, San Jose, CA 95124
+
+All Medical Wellness services (GLP-1, HRT, Peptides) are provided by Kiem. No booking deposit is collected; a card on file is only charged for completed services or no-shows.
+
+## Pages
+
+- [Home](/): Overview of Radiantilyk Aesthetic, location, and what we do.
+- [Services & Pricing](/services): Full menu with prices, descriptions, and concern filters.
+- [Book an appointment](/book): Online booking with provider, date, and time.
+- [FAQ](/faq): Pricing, financing, pain, downtime, and cancellation policy.
+- [Journal](/journal): Treatment guides and educational articles.
+- [San Jose location](/san-jose): Address, parking, providers, and services.
+- [Quiz](/quiz): Treatment-finder quiz based on your concerns.
+- [Waitlist](/waitlist): Join the waitlist when preferred times are full.
+
+## Optional
+
+- [Privacy policy](/privacy)
+- [Terms of service](/terms)

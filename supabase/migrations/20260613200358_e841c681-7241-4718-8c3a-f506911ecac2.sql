@@ -1,0 +1,1 @@
+ALTER TYPE public.clinical_protocol_category ADD VALUE IF NOT EXISTS 'acne';

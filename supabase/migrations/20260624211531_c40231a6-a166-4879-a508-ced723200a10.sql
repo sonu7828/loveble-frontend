@@ -1,0 +1,1 @@
+UPDATE public.appointments SET checkin_sms_sent_at = now() WHERE id IN ('4541bbce-b869-4852-9b9e-75e9cd38d4c3','09ec590b-9a27-4597-bf1b-a8faa52a2635');

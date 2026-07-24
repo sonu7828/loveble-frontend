@@ -1,0 +1,100 @@
+project_id = "moqxtvbdgfambpmmslrr"
+
+[functions]
+  [functions.send-post-visit-checkins]
+    verify_jwt = false
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.create-booking]
+    verify_jwt = false
+  [functions.staff-update-appointment]
+    verify_jwt = false
+  [functions.staff-create-booking]
+    verify_jwt = false
+  [functions.staff-reschedule-appointment]
+    verify_jwt = false
+  [functions.google-calendar-sync]
+    verify_jwt = false
+  [functions.google-oauth-callback]
+    verify_jwt = false
+  [functions.public-cancel-appointment]
+    verify_jwt = false
+  [functions.public-reschedule-appointment]
+    verify_jwt = false
+  [functions.notify-cancellation]
+    verify_jwt = false
+  [functions.get-availability]
+    verify_jwt = false
+  [functions.get-service-consents]
+    verify_jwt = false
+  [functions.get-booking]
+    verify_jwt = false
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.staff-invite-accept]
+    verify_jwt = false
+  [functions.staff-invite-verify]
+    verify_jwt = false
+  [functions.send-transactional-email]
+    verify_jwt = false
+  [functions.pos-resend-receipt]
+    verify_jwt = false
+  [functions.preview-transactional-email]
+    verify_jwt = false
+  [functions.handle-email-unsubscribe]
+    verify_jwt = false
+  [functions.handle-email-suppression]
+    verify_jwt = false
+  [functions.payments-create-setup-intent]
+    verify_jwt = false
+  [functions.payments-webhook]
+    verify_jwt = false
+  [functions.payments-charge-no-show]
+    verify_jwt = true
+  [functions.generate-consent-pdf]
+    verify_jwt = false
+  [functions.ghl-sync-contact]
+    verify_jwt = false
+  [functions.ghl-sync-reminders]
+    verify_jwt = false
+  [functions.track-booking-attempt]
+    verify_jwt = false
+  [functions.process-booking-abandonment]
+    verify_jwt = false
+  [functions.submit-feedback]
+    verify_jwt = false
+  [functions.notify-waitlist-join]
+    verify_jwt = false
+  [functions.pos-create-or-get-sale]
+    verify_jwt = false
+  [functions.pos-update-sale]
+    verify_jwt = false
+  [functions.pos-finalize-sale]
+    verify_jwt = false
+  [functions.pos-confirm-payment]
+    verify_jwt = false
+  [functions.terminal-register-reader]
+    verify_jwt = false
+  [functions.terminal-list-readers]
+    verify_jwt = false
+  [functions.vouchers-issue]
+    verify_jwt = false
+  [functions.pos-refund-sale]
+    verify_jwt = false
+  [functions.run-marketing-campaign]
+    verify_jwt = false
+  [functions.send-monthly-report]
+    verify_jwt = false
+
+  [functions.send-sms-via-ghl]
+    verify_jwt = false
+  [functions.sms-appointment-confirmation]
+    verify_jwt = false
+  [functions.sms-appointment-reminders]
+    verify_jwt = false
+  [functions.send-appointment-sms]
+    verify_jwt = false
+  [functions.ghl-sms-webhook]
+    verify_jwt = false
+  [functions.client-send-sms]
+    verify_jwt = false

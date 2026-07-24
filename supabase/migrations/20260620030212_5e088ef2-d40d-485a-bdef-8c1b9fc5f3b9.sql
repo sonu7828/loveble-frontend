@@ -1,0 +1,1 @@
+DELETE FROM public.appointment_consents WHERE appointment_id = '72bacae4-6bb0-4412-abe4-7cb8ea8565a8';

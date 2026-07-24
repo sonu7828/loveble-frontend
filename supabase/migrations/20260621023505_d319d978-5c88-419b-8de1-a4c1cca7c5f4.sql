@@ -1,0 +1,1 @@
+UPDATE public.sales SET appointment_id = 'a4c7dd02-e20d-4f5b-a9e6-c04cde3abc44' WHERE id = '25be8ed9-5921-47bb-982e-f9cba77c9739';

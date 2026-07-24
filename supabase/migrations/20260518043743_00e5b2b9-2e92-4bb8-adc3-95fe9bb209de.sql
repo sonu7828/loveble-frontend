@@ -1,0 +1,1 @@
+ALTER TYPE sale_item_kind ADD VALUE IF NOT EXISTS 'custom';

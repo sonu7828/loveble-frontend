@@ -1,0 +1,1 @@
+ALTER TABLE public.clinical_notes ADD COLUMN IF NOT EXISTS summary text;

@@ -1,0 +1,12 @@
+UPDATE public.services SET name = 'Laser Hair Reduction – Upper Lip' WHERE id = '59000000-0000-0000-0000-000000000001';
+UPDATE public.services SET name = 'Laser Hair Reduction – Chin' WHERE id = '59000000-0000-0000-0000-000000000002';
+UPDATE public.services SET name = 'Laser Hair Reduction – Neck' WHERE id = '59000000-0000-0000-0000-000000000003';
+UPDATE public.services SET name = 'Laser Hair Reduction – Underarms' WHERE id = '59000000-0000-0000-0000-000000000004';
+UPDATE public.services SET name = 'Laser Hair Reduction – Bikini' WHERE id = '59000000-0000-0000-0000-000000000005';
+UPDATE public.services SET name = 'Laser Hair Reduction – Brazilian' WHERE id = '59000000-0000-0000-0000-000000000006';
+UPDATE public.services SET name = 'Laser Hair Reduction – Full Face' WHERE id = '59000000-0000-0000-0000-000000000007';
+UPDATE public.services SET name = 'Laser Hair Reduction – Abdomen' WHERE id = '59000000-0000-0000-0000-000000000008';
+UPDATE public.services SET name = 'Laser Hair Reduction – Arms' WHERE id = '59000000-0000-0000-0000-000000000009';
+UPDATE public.services SET name = 'Laser Hair Reduction – Chest' WHERE id = '59000000-0000-0000-0000-00000000000a';
+UPDATE public.services SET name = 'Laser Hair Reduction – Back' WHERE id = '59000000-0000-0000-0000-00000000000b';
+UPDATE public.services SET name = 'Laser Hair Reduction – Legs' WHERE id = '59000000-0000-0000-0000-00000000000c';

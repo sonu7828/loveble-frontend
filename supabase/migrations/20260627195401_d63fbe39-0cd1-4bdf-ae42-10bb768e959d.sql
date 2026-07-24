@@ -1,0 +1,2 @@
+DELETE FROM public.client_intake_submissions WHERE id='5c07cd76-a12d-4406-84eb-0dbfcfd6b4ac';
+UPDATE public.appointments SET intake_completed_at = NULL, intake_sent_at = NULL, intake_last_sent_at = NULL, intake_send_count = 0 WHERE id='d62e6ca6-f088-4b86-b04b-6d8e50e346f9';

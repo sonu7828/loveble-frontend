@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /staff
+Disallow: /account
+Disallow: /consents/
+Disallow: /booking/
+Disallow: /unsubscribe
+
+Sitemap: https://bookrka.com/sitemap.xml

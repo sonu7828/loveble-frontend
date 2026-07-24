@@ -1,0 +1,1 @@
+DELETE FROM public.service_providers WHERE staff_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';

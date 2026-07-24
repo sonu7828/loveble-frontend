@@ -1,0 +1,1 @@
+update marketing_campaigns set cta_url='https://bookrka.com/book?service=2fc20f89-0b58-450e-9417-837b6d433c78' where id='76ec60b6-f535-426e-8828-ee4ed9001761';

@@ -1,0 +1,1 @@
+ALTER TABLE public.imported_clients ADD COLUMN IF NOT EXISTS gender text;

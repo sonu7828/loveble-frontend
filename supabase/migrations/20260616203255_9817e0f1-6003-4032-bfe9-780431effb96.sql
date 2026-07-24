@@ -1,0 +1,1 @@
+ALTER VIEW public.client_tox_lifetime SET (security_invoker = true);
