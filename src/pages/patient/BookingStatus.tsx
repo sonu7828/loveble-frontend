@@ -51,27 +51,12 @@ const BookingStatus = () => {
     lastStatusRef.current = data.status;
     let interval: number | undefined;
     if (data.status === "pending") {
-      interval = window.setInterval(() => { refetch(); }, 15000);
+      interval = window.setInterval(async () => {
+        await refetch();
+      }, 15000);
     }
-    const channel = apiQuery
-      .channel(`booking-status-${data.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "appointments", filter: `id=eq.${data.id}` },
-        (payload) => {
-          const newStatus = (payload.new as any)?.status;
-          if (newStatus && newStatus !== lastStatusRef.current) {
-            lastStatusRef.current = newStatus;
-            refetch();
-            if (newStatus === "approved") toast.success("Your appointment has been approved!");
-            if (newStatus === "denied") toast.error("Your booking request was declined. We'll be in touch.");
-          }
-        }
-      )
-      .subscribe();
     return () => {
       if (interval) window.clearInterval(interval);
-      apiQuery.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.id, data?.status]);
@@ -314,7 +299,7 @@ const PublicRescheduleDialog = ({ open, onOpenChange, appt, token, onDone }: { o
       body: { token, newStartAt: slot },
     });
     setBusy(false);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "Could not reschedule"); return; }
+    if (error || data?.error) { toast.error(data?.error || error || "Could not reschedule"); return; }
     toast.success("Appointment rescheduled — confirmation email sent.");
     onOpenChange(false); onDone();
   };
@@ -356,7 +341,7 @@ const PublicCancelDialog = ({ open, onOpenChange, token, within48, onDone }: { o
     try {
       const { data, error } = await ApiClient.post("public-cancel-appointment", { body: { token, reason } });
       if (error || data?.error) {
-        toast.error(data?.error || error?.message || "Could not cancel");
+        toast.error(data?.error || error || "Could not cancel");
         return;
       }
       toast.success("Appointment cancelled.");

@@ -52,8 +52,7 @@ const Index = () => {
         });
       });
 
-    apiQuery
-      .from("public_testimonials" as any)
+    apiQuery("public_testimonials")
       .select("id, comment, first_name, location_city, rating")
       .eq("rating", 5)
       .order("created_at", { ascending: false })
