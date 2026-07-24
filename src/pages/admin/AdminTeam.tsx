@@ -231,23 +231,41 @@ export default function AdminTeam() {
 
       // Update active team list
       const existingTeam: Member[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
+      let teamFound = false;
       const updatedTeam = existingTeam.map(m => {
-        if (m.id === draft.id) {
+        if (m.id === draft.id || (m.email && email && m.email.toLowerCase() === m.email.toLowerCase())) {
+          teamFound = true;
           return {
             ...m,
             full_name: draft.full_name.trim(),
             title: draft.title.trim(),
             email,
             color: draft.color,
+            role: draft.role,
           };
         }
         return m;
       });
+      if (!teamFound && originalMember) {
+        updatedTeam.push({
+          ...originalMember,
+          full_name: draft.full_name.trim(),
+          title: draft.title.trim(),
+          email,
+          color: draft.color,
+          role: draft.role,
+        } as any);
+      }
       localStorage.setItem("rka_demo_team_members", JSON.stringify(updatedTeam));
 
       // Update in database if it exists there
       if (originalMember?.user_id) {
         try {
+          await supabase.from("user_roles").delete().eq("user_id", originalMember.user_id);
+          await supabase.from("user_roles").insert([
+            { user_id: originalMember.user_id, role: draft.role },
+            ...(draft.role !== "staff" ? [{ user_id: originalMember.user_id, role: "staff" as Role }] : [])
+          ]);
           await supabase.from("staff_profiles").update({
             full_name: draft.full_name.trim(),
             title: draft.title.trim(),
@@ -341,16 +359,46 @@ export default function AdminTeam() {
   };
 
   const updateRole = async (m: Member, newRole: Role) => {
-    if (!m.user_id) return;
-    setBusy(m.id);
-    const { error: delErr } = await supabase.from("user_roles").delete().eq("user_id", m.user_id);
-    if (delErr) { setBusy(null); toast.error(delErr.message); return; }
-    const toInsert: { user_id: string; role: Role }[] = [{ user_id: m.user_id, role: newRole }];
-    if (newRole === "admin" || newRole === "provider" || newRole === "scheduler" || newRole === "receptionist" || newRole === "nurse_practitioner" || newRole === "medical_director") toInsert.push({ user_id: m.user_id, role: "staff" });
-    const { error: insErr } = await supabase.from("user_roles").insert(toInsert);
-    setBusy(null);
-    if (insErr) { toast.error(insErr.message); return; }
-    toast.success(`Role updated to ${newRole}`);
+    // Save role into local demo team members & approved accounts
+    const localTeam: Member[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
+    let teamFound = false;
+    const updatedTeam = localTeam.map(x => {
+      if (x.id === m.id || (x.email && m.email && x.email.toLowerCase() === m.email.toLowerCase())) {
+        teamFound = true;
+        return { ...x, role: newRole };
+      }
+      return x;
+    });
+    if (!teamFound) {
+      updatedTeam.push({ ...m, role: newRole } as any);
+    }
+    localStorage.setItem("rka_demo_team_members", JSON.stringify(updatedTeam));
+
+    const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+    let appFound = false;
+    const updatedApproved = approvedAccounts.map(a => {
+      if (a.email && m.email && a.email.toLowerCase() === m.email.toLowerCase()) {
+        appFound = true;
+        return { ...a, role: newRole };
+      }
+      return a;
+    });
+    if (!appFound && m.email) {
+      updatedApproved.push({ email: m.email, full_name: m.full_name, role: newRole });
+    }
+    localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(updatedApproved));
+
+    if (m.user_id) {
+      setBusy(m.id);
+      const { error: delErr } = await supabase.from("user_roles").delete().eq("user_id", m.user_id);
+      if (!delErr) {
+        const toInsert: { user_id: string; role: Role }[] = [{ user_id: m.user_id, role: newRole }];
+        if (newRole !== "staff") toInsert.push({ user_id: m.user_id, role: "staff" });
+        await supabase.from("user_roles").insert(toInsert);
+      }
+      setBusy(null);
+    }
+    toast.success(`Role updated to ${ROLE_LABELS[newRole] || newRole}`);
     load();
   };
 
@@ -454,24 +502,6 @@ export default function AdminTeam() {
   };
 
   const resolveMemberRole = (m: Member): Role => {
-    const titleLower = (m.title || "").toLowerCase();
-    const inferredRoleFromTitle: Role | null =
-      titleLower.includes("medical director") || titleLower.includes("supervising physician")
-        ? "medical_director"
-        : titleLower.includes("nurse practitioner") || titleLower.includes("np")
-        ? "nurse_practitioner"
-        : titleLower.includes("physician") || titleLower.includes("practitioner") || titleLower.includes("provider") || titleLower.includes("injector")
-        ? "provider"
-        : titleLower.includes("security") || titleLower.includes("privacy")
-        ? "privacy_officer"
-        : titleLower.includes("receptionist")
-        ? "receptionist"
-        : titleLower.includes("scheduler")
-        ? "scheduler"
-        : null;
-
-    if (inferredRoleFromTitle) return inferredRoleFromTitle;
-
     const memberRoles = m.user_id ? (roles[m.user_id] ?? []) : [];
     const inv = invites[m.id];
     const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
@@ -479,10 +509,10 @@ export default function AdminTeam() {
       (a: any) => a.email && m.email && a.email.toLowerCase() === m.email.toLowerCase()
     );
 
-    return (
-      m.pending_role ||
+    const explicitRole =
       (m as any).role ||
       (matchedApproved?.role as Role) ||
+      m.pending_role ||
       (memberRoles.includes("admin")
         ? "admin"
         : memberRoles.includes("medical_director")
@@ -499,8 +529,19 @@ export default function AdminTeam() {
         ? "receptionist"
         : memberRoles.includes("staff")
         ? "staff"
-        : (inv?.role ?? "staff"))
-    );
+        : null);
+
+    if (explicitRole) return explicitRole as Role;
+
+    const titleLower = (m.title || "").toLowerCase();
+    if (titleLower.includes("medical director") || titleLower.includes("supervising physician")) return "medical_director";
+    if (titleLower.includes("nurse practitioner") || titleLower.includes("np")) return "nurse_practitioner";
+    if (titleLower.includes("physician") || titleLower.includes("practitioner") || titleLower.includes("provider") || titleLower.includes("injector")) return "provider";
+    if (titleLower.includes("security") || titleLower.includes("privacy")) return "privacy_officer";
+    if (titleLower.includes("receptionist")) return "receptionist";
+    if (titleLower.includes("scheduler")) return "scheduler";
+
+    return (inv?.role as Role) ?? "staff";
   };
 
   const getRoleBadge = (role: Role) => {
@@ -526,13 +567,26 @@ export default function AdminTeam() {
 
   if (!isAdmin) return <div className="p-8 text-sm text-muted-foreground">Admins only.</div>;
 
+  const getMemberRoleFilterCount = (filter: string) => {
+    return members.filter((m) => {
+      if (filter === "all") return true;
+      const r = resolveMemberRole(m);
+      if (filter === "admin") return r === "admin";
+      if (filter === "provider") return r === "provider";
+      if (filter === "md") return r === "medical_director";
+      if (filter === "np") return r === "nurse_practitioner";
+      if (filter === "staff") return r === "staff" || r === "receptionist" || r === "scheduler";
+      return true;
+    }).length;
+  };
+
   const filteredMembers = members.filter((m) => {
     if (roleFilter === "all") return true;
     const primaryRole = resolveMemberRole(m);
 
     if (roleFilter === "admin") return primaryRole === "admin";
     if (roleFilter === "md") return primaryRole === "medical_director";
-    if (roleFilter === "provider") return primaryRole === "provider" || primaryRole === "nurse_practitioner" || primaryRole === "medical_director";
+    if (roleFilter === "provider") return primaryRole === "provider";
     if (roleFilter === "np") return primaryRole === "nurse_practitioner";
     if (roleFilter === "staff") return primaryRole === "staff" || primaryRole === "receptionist" || primaryRole === "scheduler";
     return true;

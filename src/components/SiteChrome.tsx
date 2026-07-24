@@ -103,7 +103,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
 
 export const SiteFooter = () => (
   <footer className="border-t border-border bg-background text-foreground pt-16 pb-8 transition-colors duration-300">
-    <div className="container mx-auto px-6 md:px-10 grid gap-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+    <div className="container mx-auto px-6 md:px-10 grid gap-10 grid-cols-1 sm:grid-cols-3 items-start text-xs">
       {/* Column 1: Brand Info */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -113,10 +113,6 @@ export const SiteFooter = () => (
             <div className="text-[10px] uppercase tracking-widest text-primary font-semibold">MEDSPA</div>
           </div>
         </div>
-        <p className="flex items-start gap-1.5 text-muted-foreground text-[11px] leading-relaxed">
-          <MapPin className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-          <span>2100 Curtner Ave, Ste 18, San Jose, CA 95124</span>
-        </p>
         <p className="text-muted-foreground text-[11px] leading-relaxed italic">
           A quiet ritual of refinement. Luxury medspa in San Jose.
         </p>
@@ -170,28 +166,6 @@ export const SiteFooter = () => (
           <UserCheck className="h-3.5 w-3.5 text-primary" />
           Join the waitlist
         </Link>
-        <Link to="/staff" className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground pt-2 inline-block">
-          Staff Login →
-        </Link>
-      </div>
-
-      {/* Column 4: Hours */}
-      <div className="space-y-3">
-        <div className="font-serif text-sm font-semibold text-foreground uppercase tracking-wider">Hours</div>
-        <div className="space-y-1.5 text-muted-foreground text-[11px]">
-          <div className="flex justify-between gap-2 border-b border-border/60 pb-1">
-            <span>Mon — Fri</span>
-            <span className="font-medium text-foreground">9:00 AM — 5:00 PM</span>
-          </div>
-          <div className="flex justify-between gap-2 border-b border-border/60 pb-1">
-            <span>Sat</span>
-            <span className="font-medium text-foreground">9:00 AM — 2:00 PM</span>
-          </div>
-          <div className="flex justify-between gap-2 pb-1">
-            <span>Sun</span>
-            <span className="text-primary font-medium">Closed</span>
-          </div>
-        </div>
       </div>
     </div>
 

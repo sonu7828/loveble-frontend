@@ -158,21 +158,21 @@ export const StepConsentsAndPay = ({
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header & Booking Summary Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-4 border-b border-border/50">
+      {/* Header & Booking Summary — stacked vertically */}
+      <div className="flex flex-col gap-3 pb-4 mb-5 border-b border-border/50">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight">Card on file</h1>
           <p className="text-xs text-muted-foreground mt-0.5">No charge today — your card holds your appointment slot.</p>
         </div>
 
-        <div className="text-xs bg-secondary/60 border border-border/60 rounded-xl px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 shrink-0">
+        <div className="text-xs bg-secondary/60 border border-border/60 rounded-xl px-3 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span className="font-medium text-foreground">{summary.serviceName}</span>
           <span className="text-muted-foreground/40">•</span>
           <span className="text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3 text-primary/70" />
             {format(new Date(summary.startAt), "EEE, MMM d @ h:mm a")}
           </span>
-          <span className="text-muted-foreground/40 hidden sm:inline">•</span>
+          <span className="text-muted-foreground/40">•</span>
           <span className="text-muted-foreground flex items-center gap-1">
             <MapPin className="h-3 w-3 text-primary/70" />
             {summary.locationName} ({summary.staffName})

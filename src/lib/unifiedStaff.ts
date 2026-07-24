@@ -24,7 +24,20 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
   const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
   const pendingRequests: any[] = JSON.parse(localStorage.getItem("rka_pending_member_requests") || "[]");
 
-  const combined: UnifiedStaffMember[] = [...remote];
+  const approvedRoleMap = new Map<string, string>();
+  approvedAccounts.forEach((a) => {
+    if (a.email && a.role) approvedRoleMap.set(a.email.toLowerCase(), a.role);
+    if (a.full_name && a.role) approvedRoleMap.set(a.full_name.toLowerCase(), a.role);
+  });
+  demoMembers.forEach((d) => {
+    if (d.email && d.role) approvedRoleMap.set(d.email.toLowerCase(), d.role);
+    if (d.full_name && d.role) approvedRoleMap.set(d.full_name.toLowerCase(), d.role);
+  });
+
+  const combined: UnifiedStaffMember[] = remote.map((r) => ({
+    ...r,
+    role: (r.email && approvedRoleMap.get(r.email.toLowerCase())) || (r.full_name && approvedRoleMap.get(r.full_name.toLowerCase())) || r.role,
+  }));
   const existingNames = new Set(combined.map((x) => x.full_name.toLowerCase()));
 
   demoMembers.forEach((m: any) => {
@@ -34,6 +47,7 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
         full_name: m.full_name,
         title: m.title || "Staff Provider",
         email: m.email || null,
+        role: m.role || (m.email && approvedRoleMap.get(m.email.toLowerCase())),
         is_active: true,
       });
       existingNames.add(m.full_name.toLowerCase());
@@ -47,6 +61,7 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
         full_name: a.full_name,
         title: a.role ? a.role.replace("_", " ").toUpperCase() : "Staff Provider",
         email: a.email || null,
+        role: a.role,
         is_active: true,
       });
       existingNames.add(a.full_name.toLowerCase());
@@ -60,6 +75,7 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
         full_name: p.full_name,
         title: p.title || "Staff Provider",
         email: p.email || null,
+        role: p.role,
         is_active: true,
       });
       existingNames.add(p.full_name.toLowerCase());
@@ -75,7 +91,8 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
 
   defaultProviders.forEach((d) => {
     if (!existingNames.has(d.full_name.toLowerCase())) {
-      combined.push(d);
+      const updatedRole = (d.email && approvedRoleMap.get(d.email.toLowerCase())) || (d.full_name && approvedRoleMap.get(d.full_name.toLowerCase())) || d.role;
+      combined.push({ ...d, role: updatedRole });
       existingNames.add(d.full_name.toLowerCase());
     }
   });
