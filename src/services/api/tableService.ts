@@ -67,6 +67,10 @@ export class ApiTableQuery {
     return this;
   }
 
+  public not(column: string, operator: string, value: any): this {
+    return this;
+  }
+
   public ilike(column: string, pattern: string): this {
     return this;
   }
@@ -148,14 +152,24 @@ export class ApiTableQuery {
   }
 }
 
+/** Minimal fake realtime channel (no-op since Express backend has no built-in realtime). */
+class FakeChannel {
+  on(_event: string, _filter: any, _cb?: Function): this { return this; }
+  subscribe(_cb?: Function): this { return this; }
+}
+
 export interface ApiQueryFunction {
   (tableName: string): ApiTableQuery;
   from: (tableName: string) => ApiTableQuery;
+  channel: (name: string) => FakeChannel;
+  removeChannel: (ch: any) => void;
 }
 
 export const apiQuery: ApiQueryFunction = Object.assign(
   (tableName: string) => new ApiTableQuery(tableName),
   {
     from: (tableName: string) => new ApiTableQuery(tableName),
+    channel: (_name: string) => new FakeChannel(),
+    removeChannel: (_ch: any) => { /* no-op */ },
   }
 );

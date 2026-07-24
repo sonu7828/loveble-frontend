@@ -124,10 +124,7 @@ export default function StaffLayout() {
         children: [
           { to: "/staff/security-officer", label: "Security Operations Center", icon: ShieldCheck },
           { to: "/staff/hipaa-policies", label: "HIPAA Policy Approval", icon: BookOpen },
-          { to: "/staff/audit-report", label: "Audit & PHI Access Logs", icon: HistoryIcon },
           { to: "/staff/breach-report", label: "Incident & Breach Reports", icon: ShieldAlert },
-          { to: "/staff/vendors?tab=devices", label: "Device Inventory & Encryption", icon: Laptop },
-          { to: "/staff/vendors", label: "Vendor Management & BAAs", icon: Building2 },
         ],
       },
       {

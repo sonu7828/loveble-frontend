@@ -187,6 +187,14 @@ const App = () => (
             <Route path="sms-snippets" element={<AdminOnly><AdminSmsSnippets /></AdminOnly>} />
             <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
             <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
+            <Route path="team" element={<AdminTeam />} />
+            <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
+            <Route path="security-officer" element={<AdminSecurityOfficer />} />
+            <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
+            <Route path="compliance/admin" element={<ComplianceAdmin />} />
+            <Route path="breach-report" element={<StaffBreachReport />} />
+            <Route path="me" element={<StaffMyProfile />} />
+            <Route path="help" element={<StaffHelp />} />
           </Route>
 
           <Route element={<StaffLayout />}>
@@ -243,13 +251,6 @@ const App = () => (
             <Route path="clinical/vo/:runId" element={<VoProtocolRun />} />
             <Route path="compliance" element={<MyCompliance />} />
             <Route path="compliance/sign/:protocolId" element={<ComplianceSign />} />
-            <Route path="team" element={<AdminTeam />} />
-            <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
-            <Route path="security-officer" element={<AdminSecurityOfficer />} />
-            <Route path="audit-report" element={<AdminAuditReport />} />
-            <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
-            <Route path="compliance/admin" element={<ComplianceAdmin />} />
-            <Route path="breach-report" element={<StaffBreachReport />} />
           </Route>
           </Route>
           <Route path="/waitlist" element={<Waitlist />} />
