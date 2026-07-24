@@ -202,8 +202,8 @@ export default function PatientAccount() {
     }
     setUpdatingPass(true);
     try {
-      const { error } = await authService.updateUser({ password: passwordForm.newPassword });
-      if (error) throw error;
+      const res = await authService.updatePassword(passwordForm.newPassword);
+      if (!res.success) throw new Error(res.message);
       toast.success("Password updated successfully!");
       setPasswordForm({ newPassword: "", confirmPassword: "" });
     } catch (err: any) {
