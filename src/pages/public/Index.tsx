@@ -247,8 +247,8 @@ const Index = () => {
       </section>
 
       {/* Medical Director Section */}
-      <section className="border-t border-border bg-background py-20 px-6 sm:px-10 transition-colors duration-300">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-14 items-center">
+      <section className="border-t border-border bg-background py-8 px-6 sm:px-10 transition-colors duration-300">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-10 items-center">
           <div className="md:col-span-7">
             <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
               MEDICAL DIRECTOR
@@ -279,7 +279,7 @@ const Index = () => {
               <img
                 src={drFobiImg}
                 alt="Dr. Aloysius N. Fobi, MD — Medical Director"
-                className="absolute inset-0 w-full h-full object-cover object-top"
+                className="absolute inset-0 w-full h-full object-cover object-top scale-[1.08] origin-top-left"
                 loading="lazy"
               />
             </div>
