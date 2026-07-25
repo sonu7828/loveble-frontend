@@ -221,77 +221,47 @@ export default function StaffLayout() {
     const canClinical = isNP || isStaff;
     return [
       {
-        key: "staff_dashboard",
-        label: "Dashboard",
+        key: "today",
+        label: "TODAY",
         icon: LayoutDashboard,
         show: true,
         children: [
-          { to: "/staff/today", label: "Dashboard", icon: LayoutDashboard },
-        ],
-      },
-      {
-        key: "staff_patients",
-        label: "Patients",
-        icon: UserCircle2,
-        show: true,
-        children: [
-          { to: "/staff/clients", label: "Patients", icon: UserCircle2 },
-        ],
-      },
-      {
-        key: "staff_appts",
-        label: "Appointments",
-        icon: CalIcon,
-        show: true,
-        children: [
-          { to: "/staff/calendar", label: "Appointments", icon: CalIcon },
-        ],
-      },
-      {
-        key: "staff_notes",
-        label: "Clinical Notes",
-        icon: FileText,
-        show: true,
-        children: [
-          { to: "/staff/clinical", label: "Clinical Notes", icon: FileText },
-        ],
-      },
-      {
-        key: "staff_rx",
-        label: "Prescriptions",
-        icon: Pill,
-        show: true,
-        children: [
-          { to: "/staff/orders?tab=rx", label: "Prescriptions", icon: Pill },
-        ],
-      },
-      {
-        key: "staff_tasks",
-        label: "Tasks",
-        icon: Inbox,
-        show: true,
-        badge: pendingCount,
-        children: [
-          { to: "/staff/inbox", label: "Tasks", icon: Inbox, badge: pendingCount },
-        ],
-      },
-      {
-        key: "staff_messages",
-        label: "Messages",
-        icon: MessageSquare,
-        show: true,
-        badge: unreadSms,
-        children: [
+          { to: "/staff/today", label: "Today", icon: LayoutDashboard },
+          { to: "/staff/inbox", label: "Booking Requests", icon: Inbox, badge: pendingCount },
           { to: "/staff/messages", label: "Messages", icon: MessageSquare, badge: unreadSms },
         ],
       },
       {
-        key: "staff_settings",
-        label: "Settings",
-        icon: Settings,
+        key: "schedule",
+        label: "SCHEDULE",
+        icon: CalIcon,
         show: true,
         children: [
-          { to: "/staff/me", label: "Settings", icon: Settings },
+          { to: "/staff/calendar", label: "Calendar", icon: CalIcon },
+          { to: "/staff/my-schedule", label: "My Schedule", icon: UserCircle2 },
+          { to: "/staff/time-clock", label: "Time Clock", icon: Clock },
+        ],
+      },
+      {
+        key: "clients",
+        label: "CLIENTS",
+        icon: Users,
+        show: true,
+        children: [
+          { to: "/staff/clients", label: "All Clients", icon: Users },
+        ],
+      },
+      {
+        key: "clinical",
+        label: "CLINICAL",
+        icon: Stethoscope,
+        show: true,
+        children: [
+          { to: "/staff/clinical", label: "Charts", icon: FileText },
+          { to: "/staff/clinical/cosign", label: "Cosign Queue", icon: FileCheck },
+          { to: "/staff/clinical/safety", label: "Safety & Protocols", icon: ShieldCheck },
+          { to: "/staff/compliance", label: "My Compliance", icon: BookOpen },
+          { to: "/staff/inventory", label: "Inventory & Supplies", icon: Boxes },
         ],
       },
     ];
@@ -383,71 +353,61 @@ export default function StaffLayout() {
 
           return (
             <div key={g.key} className="space-y-0.5">
-              {/* Dropdown Button Header */}
-              <button
-                type="button"
-                onClick={() => toggleGroup(g.key)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer select-none ${hasActiveChild
-                    ? "text-primary font-semibold bg-primary/5"
-                    : "text-foreground hover:bg-secondary/60"
+              {/* Static Group Header */}
+              <div
+                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold select-none ${hasActiveChild
+                    ? "text-primary"
+                    : "text-muted-foreground"
                   }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <GIcon className="h-4 w-4 shrink-0 text-primary" />
+                  <GIcon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{g.label}</span>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {g.badge ? (
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-primary/15 text-primary font-bold">
-                      {g.badge}
-                    </span>
-                  ) : null}
-                  {isOpen ? (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                </div>
-              </button>
+                {g.badge ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-primary/15 text-primary font-bold">
+                    {g.badge}
+                  </span>
+                ) : null}
+              </div>
 
-              {/* Collapsible Dropdown Children Items */}
-              {isOpen && (
-                <div className="pl-4 pr-1 py-1 space-y-1">
-                  {visibleChildren.map((c) => {
-                    const CIcon = c.icon;
-                    const active = isSubActive(c.to);
-                    return (
-                      <NavLink
-                        key={c.to}
-                        to={c.to}
-                        onClick={() => setOpen(false)}
-                        className={() =>
-                          `flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${active
-                            ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                          }`
-                        }
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <CIcon className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{c.label}</span>
-                        </div>
-                        {c.badge ? (
-                          <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-primary/15 text-primary font-bold shrink-0">
-                            {c.badge}
-                          </span>
-                        ) : null}
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              )}
+              {/* Always visible Children Items */}
+              <div className="pl-4 pr-1 py-1 space-y-1">
+                {visibleChildren.map((c) => {
+                  const CIcon = c.icon;
+                  const active = isSubActive(c.to);
+                  return (
+                    <NavLink
+                      key={c.to}
+                      to={c.to}
+                      onClick={() => setOpen(false)}
+                      className={() =>
+                        `flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${active
+                          ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        }`
+                      }
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <CIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{c.label}</span>
+                      </div>
+                      {c.badge ? (
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-primary/15 text-primary font-bold shrink-0">
+                          {c.badge}
+                        </span>
+                      ) : null}
+                    </NavLink>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
       </div>
 
       <div className="pt-3 mt-4 border-t border-border space-y-1">
+        <NavLink to="/staff/me" className={footerLinkCls} onClick={() => setOpen(false)}><UserCircle2 className="h-4 w-4" />My Profile</NavLink>
         <NavLink to="/staff/help" className={footerLinkCls} onClick={() => setOpen(false)}><BookOpen className="h-4 w-4" />Help / Handbook</NavLink>
         <div className="flex items-center justify-between px-3 py-1.5 text-xs font-medium text-muted-foreground rounded-lg">
           <span>Appearance</span>

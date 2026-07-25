@@ -91,7 +91,7 @@ const Index = () => {
 
       {/* Hero Section — 3-Panel Side-by-Side Composition */}
       <section className="relative w-full bg-secondary/40 dark:bg-background border-b border-border overflow-hidden transition-colors duration-300">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 min-h-[580px] lg:min-h-[680px]">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 min-h-[440px] lg:min-h-[520px]">
 
           {/* Left Image Panel — Archway & Olive Tree */}
           <div className="hidden lg:block lg:col-span-4 relative overflow-hidden">
@@ -104,7 +104,7 @@ const Index = () => {
 
           {/* Center Card Panel — A quiet ritual of refinement */}
           <div className="col-span-1 lg:col-span-4 flex items-stretch justify-center bg-background lg:bg-[#f5f0eb] dark:lg:bg-background">
-            <div className="w-full max-w-[520px] bg-card/95 dark:bg-card/90 text-card-foreground flex flex-col justify-between min-h-[580px] lg:min-h-[680px] px-10 sm:px-14 pt-10 pb-0 border-x border-border">
+            <div className="w-full max-w-[520px] bg-card/95 dark:bg-card/90 text-card-foreground flex flex-col justify-between min-h-[440px] lg:min-h-[520px] px-10 sm:px-14 pt-8 pb-0 border-x border-border">
 
               {/* Top: Brand label + divider line */}
               <div className="flex flex-col items-center">
@@ -115,8 +115,8 @@ const Index = () => {
               </div>
 
               {/* Middle: Headline + location tag */}
-              <div className="flex flex-col gap-8 mt-6 mb-auto">
-                <h1 className="font-serif text-5xl sm:text-6xl lg:text-[4.25rem] text-card-foreground font-medium leading-[1.05] tracking-tight">
+              <div className="flex flex-col gap-6 mt-6 mb-auto">
+                <h1 className="font-serif text-4xl sm:text-5xl lg:text-[3.5rem] text-card-foreground font-medium leading-[1.05] tracking-tight">
                   A quiet<br />
                   <span className="italic font-serif text-primary font-normal">ritual</span><br />
                   of refinement.
@@ -165,16 +165,16 @@ const Index = () => {
       </section>
 
       {/* What We Do Section */}
-      <section className="border-t border-border bg-background py-20 px-6 sm:px-10 transition-colors duration-300">
+      <section className="border-t border-border bg-background py-10 px-6 sm:px-10 transition-colors duration-300">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-6">
             <div>
               <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
                 WHAT WE DO
               </p>
-              <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium">
+              <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium">
                 Treatments, simply.
-              </h2>
+              </h3>
             </div>
             <Link
               to="/services"
@@ -189,14 +189,14 @@ const Index = () => {
               <Link
                 key={title}
                 to={href}
-                className="group rounded-xl border border-border bg-card text-card-foreground p-6 hover:border-primary/60 hover:shadow-md transition text-center flex flex-col items-center justify-between"
+                className="group rounded-xl border border-border bg-card text-card-foreground p-4 hover:border-primary/60 hover:shadow-md transition text-center flex flex-col items-center justify-between h-full"
               >
                 <div className="w-full flex flex-col items-center">
-                  <div className="p-3 rounded-full bg-primary/10 text-primary mb-4 group-hover:scale-105 transition">
+                  <div className="p-3 rounded-full bg-primary/10 text-primary mb-3 group-hover:scale-105 transition">
                     <Icon className="h-5 w-5" strokeWidth={1.5} />
                   </div>
-                  <h3 className="font-serif text-xl font-medium text-card-foreground mb-2">{title}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed font-light">{desc}</p>
+                  <h3 className="font-serif text-lg font-medium text-card-foreground mb-1">{title}</h3>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed font-light">{desc}</p>
                 </div>
               </Link>
             ))}
@@ -205,15 +205,15 @@ const Index = () => {
       </section>
 
       {/* Our Philosophy Section */}
-      <section className="border-t border-border bg-secondary/30 dark:bg-card/30 py-20 px-6 sm:px-10 transition-colors duration-300">
+      <section className="border-t border-border bg-secondary/30 dark:bg-card/30 py-10 px-6 sm:px-10 transition-colors duration-300">
         <div className="max-w-6xl mx-auto">
-          <div className="max-w-xl mb-12">
+          <div className="max-w-xl mb-8">
             <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
               OUR PHILOSOPHY
             </p>
-            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium">
+            <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium">
               Beauty, considered.
-            </h2>
+            </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -234,11 +234,11 @@ const Index = () => {
                 desc: "Modern, seamless experience so you can focus on what matters most—you."
               }
             ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="bg-card text-card-foreground border border-border rounded-xl p-8 flex flex-col items-start shadow-xs">
-                <div className="p-3 rounded-full bg-primary/10 text-primary mb-5">
+              <div key={title} className="bg-card text-card-foreground border border-border rounded-xl p-5 md:p-6 flex flex-col items-start shadow-xs h-full">
+                <div className="p-3 rounded-full bg-primary/10 text-primary mb-3">
                   <Icon className="h-5 w-5" strokeWidth={1.5} />
                 </div>
-                <h3 className="font-serif text-2xl text-card-foreground font-medium mb-3">{title}</h3>
+                <h3 className="font-serif text-xl text-card-foreground font-medium mb-2">{title}</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-light">{desc}</p>
               </div>
             ))}
@@ -293,9 +293,9 @@ const Index = () => {
           <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
             FROM OUR CLIENTS
           </p>
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium mb-3">
+          <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium mb-3">
             In their words.
-          </h2>
+          </h3>
 
           {/* Rating Badge */}
           <div className="flex items-center justify-center gap-2 mb-6">
@@ -348,9 +348,9 @@ const Index = () => {
         <div className="relative max-w-5xl mx-auto rounded-2xl bg-secondary/40 dark:bg-card border border-border py-6 sm:py-8 px-8 sm:px-16 text-center overflow-hidden shadow-sm">
           {/* Subtle Leaf Branch Vector Accent */}
           <div className="pointer-events-none absolute right-4 md:right-12 top-1/2 -translate-y-1/2 opacity-50">
-            <img 
-              src={rkaLogo} 
-              alt="" 
+            <img
+              src={rkaLogo}
+              alt=""
               className="w-32 h-32 md:w-48 md:h-48 rounded-full object-cover shadow-sm mix-blend-multiply dark:mix-blend-lighten"
             />
           </div>
