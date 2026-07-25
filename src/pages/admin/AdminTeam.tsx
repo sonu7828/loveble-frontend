@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Loader2, Mail, CheckCircle2, Plus, MoreHorizontal, UserX, UserCheck, Trash2, DollarSign, ShieldCheck, Lock, KeyRound, AlertCircle, XCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import ChartNotesIndex from "../staff/clinical/ChartNotesIndex";
 
 interface Member {
   id: string; full_name: string; title: string; email: string | null;
@@ -50,7 +51,7 @@ export default function AdminTeam() {
   const { isAdmin, isMedicalDirector, isPrivacyOfficer, isStaff, isNP, isPrivileged } = useAuth();
   const canAccessTeam = isAdmin || isMedicalDirector || isPrivacyOfficer || isStaff || isNP || isPrivileged;
   const [sp, setSp] = useSearchParams();
-  const roleFilter = sp.get("role") || "all";
+  const roleFilter = sp.get("role") || (sp.get("tab") === "providers" ? "provider" : "all");
   const currentTab = sp.get("tab");
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -98,6 +99,7 @@ export default function AdminTeam() {
   const load = async () => {
     setLoading(true);
     const { data: m } = await apiQuery("staff_profiles").select("id, user_id, full_name, title, email, bio, color, is_owner, is_active, created_at, updated_at, calendar_email, phone, license_number" as any).order("is_owner", { ascending: false }).order("created_at");
+    const fetchedMembers = (m ?? []) as Member[];
     const { data: pay } = await (apiQuery as any).from("staff_pay_config").select("staff_id, hourly_rate_cents, commission_percent");
 
     const payMap: Record<string, { hourly_rate_cents: number | null; commission_percent: number | null }> = {};
@@ -162,7 +164,7 @@ export default function AdminTeam() {
     setLoading(false);
   };
 
-  useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+  useEffect(() => { if (canAccessTeam) load(); }, [canAccessTeam]);
 
   const sendInvite = async (m: Member, role?: Role) => {
     if (!m.email) { toast.error("No email on file"); return; }
@@ -553,6 +555,25 @@ export default function AdminTeam() {
     if (roleFilter === "staff") return primaryRole === "staff" || primaryRole === "receptionist" || primaryRole === "scheduler";
     return true;
   });
+
+  if (currentTab === "notes") {
+    return (
+      <div className="p-4 sm:p-8 max-w-6xl space-y-6">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="font-serif text-3xl">Staff & Provider Notes</h1>
+            <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/20 font-semibold px-2.5 py-0.5">
+              Medical Director & Admin Governance
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Review and oversee all clinical chart notes, Good Faith Exams, and procedure notes submitted by providers and staff members.
+          </p>
+        </div>
+        <ChartNotesIndex />
+      </div>
+    );
+  }
 
   if (currentTab === "roles") {
     return (

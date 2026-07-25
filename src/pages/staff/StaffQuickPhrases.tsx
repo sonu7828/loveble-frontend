@@ -22,7 +22,8 @@ const CATS: { key: Category; label: string }[] = [
 type Phrase = { id: string; category: string; phrase: string; sort_order: number; is_active: boolean };
 
 export default function StaffQuickPhrases() {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, isMedicalDirector, loading } = useAuth();
+  const canAccessPhrases = isAdmin || isMedicalDirector;
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [busy, setBusy] = useState(true);
   const [draft, setDraft] = useState<Record<Category, string>>({ neurotoxin: "", filler: "", energy: "", wellness: "", compliance: "" });
@@ -41,12 +42,12 @@ export default function StaffQuickPhrases() {
 
   useEffect(() => {
     if (loading) return;
-    if (!isAdmin) { setBusy(false); return; }
+    if (!canAccessPhrases) { setBusy(false); return; }
     load();
-  }, [loading, isAdmin]);
+  }, [loading, canAccessPhrases]);
 
   if (loading) return <div className="p-8"><Loader2 className="h-4 w-4 animate-spin" /></div>;
-  if (!isAdmin) return <Navigate to="/staff/today" replace />;
+  if (!canAccessPhrases) return <Navigate to="/staff/today" replace />;
 
   const add = async (cat: Category) => {
     const phrase = draft[cat].trim();

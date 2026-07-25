@@ -188,14 +188,6 @@ const App = () => (
             <Route path="sms-snippets" element={<AdminOnly><AdminSmsSnippets /></AdminOnly>} />
             <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
             <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
-            <Route path="team" element={<AdminTeam />} />
-            <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
-            <Route path="security-officer" element={<AdminSecurityOfficer />} />
-            <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
-            <Route path="compliance/admin" element={<ComplianceAdmin />} />
-            <Route path="breach-report" element={<AdminBreachReport />} />
-            <Route path="me" element={<StaffMyProfile />} />
-            <Route path="help" element={<StaffHelp />} />
           </Route>
 
           <Route element={<StaffLayout />}>

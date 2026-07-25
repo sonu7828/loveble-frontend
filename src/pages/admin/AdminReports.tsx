@@ -31,7 +31,8 @@ const RANGES = [
 const COLORS = ["hsl(var(--primary))", "#c97c5d", "#7d9b76", "#4a6741", "#c44569", "#3b6fa0", "#e8b84a", "#a78bfa"];
 
 export default function AdminReports() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isMedicalDirector, loading: authLoading } = useAuth();
+  const canAccessReports = isAdmin || isMedicalDirector;
   // Keep router hooks before any conditional returns so React hook order is stable.
   const [searchParams, setSearchParams] = useSearchParams();
   const [days, setDays] = useState(30);
@@ -47,7 +48,7 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canAccessReports) return;
     (async () => {
       setLoading(true);
       const start = startOfDay(subDays(new Date(), days - 1)).toISOString();
@@ -201,7 +202,7 @@ export default function AdminReports() {
   }, [appts, apptSvcMap, apptSaleTotals, unlinkedSalesCents, svcPaidRevenue, services, staff, locations, days]);
 
   if (authLoading) return <div className="flex justify-center py-32"><Loader2 className="h-5 w-5 animate-spin" /></div>;
-  if (!isAdmin) return <Navigate to="/staff/today" replace />;
+  if (!canAccessReports) return <Navigate to="/staff/today" replace />;
 
   const fmtMoney = (cents: number) => `$${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 

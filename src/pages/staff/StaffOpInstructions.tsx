@@ -36,7 +36,7 @@ const COPY = {
 } as const;
 
 export default function StaffOpInstructions({ kind, embedded = false }: { kind: Kind; embedded?: boolean }) {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, isMedicalDirector, user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,7 +71,7 @@ export default function StaffOpInstructions({ kind, embedded = false }: { kind: 
   };
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [kind]);
 
-  if (!isAdmin) return <div className="p-8 text-sm text-muted-foreground">Admin only.</div>;
+  if (!isAdmin && !isMedicalDirector) return <div className="p-8 text-sm text-muted-foreground">Admin & Medical Director access required.</div>;
 
   const active = rows.find((r) => r.service_id === activeId);
 

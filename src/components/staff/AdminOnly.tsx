@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 /** Wrap an admin-only route element. Non-admins are bounced to /staff/today. */
 export function AdminOnly({ children }: { children: React.ReactNode }) {
-  const { loading, isAdmin } = useAuth();
+  const { loading, isAdmin, isMedicalDirector } = useAuth();
   if (loading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
@@ -12,6 +12,6 @@ export function AdminOnly({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!isAdmin) return <Navigate to="/staff/today" replace />;
+  if (!isAdmin && !isMedicalDirector) return <Navigate to="/staff/today" replace />;
   return <>{children}</>;
 }

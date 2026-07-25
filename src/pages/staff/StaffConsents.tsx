@@ -20,7 +20,7 @@ interface Service { id: string; name: string; }
 interface Mapping { id: string; service_id: string; consent_form_id: string; }
 
 export default function StaffConsents() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isMedicalDirector, loading: authLoading } = useAuth();
   const [forms, setForms] = useState<Form[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
@@ -66,7 +66,7 @@ export default function StaffConsents() {
   useEffect(() => { setDraft(active ? { ...active } : null); }, [active]);
 
   if (authLoading) return <div className="p-8"><Loader2 className="h-5 w-5 animate-spin" /></div>;
-  if (!isAdmin) return <Navigate to="/staff/today" replace />;
+  if (!isAdmin && !isMedicalDirector) return <Navigate to="/staff/today" replace />;
 
   const save = async () => {
     if (!draft) return;
