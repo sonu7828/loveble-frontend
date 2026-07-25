@@ -56,6 +56,7 @@ import PrivacyPractices from "./pages/public/PrivacyPractices.tsx";
 import Terms from "./pages/public/Terms.tsx";
 import LocationPage from "./pages/public/LocationPage.tsx";
 import Waitlist from "./pages/patient/Waitlist.tsx";
+import Reviews from "./pages/public/Reviews.tsx";
 // StaffWaitlist removed — waitlist is a tab inside StaffInbox; /staff/waitlist redirects.
 import AdminReports from "./pages/admin/AdminReports.tsx";
 import AdminProductivity from "./pages/admin/AdminProductivity.tsx";
@@ -143,6 +144,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/services" element={<Services />} />
           <Route path="/services/:slug" element={<ServiceDetail />} />
+          <Route path="/reviews" element={<Reviews />} />
           <Route path="/specials" element={<Navigate to="/services" replace />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/model" element={<Model />} />
@@ -186,7 +188,6 @@ const App = () => (
             <Route path="sms-snippets" element={<AdminOnly><AdminSmsSnippets /></AdminOnly>} />
             <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
             <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
-<<<<<<< HEAD
             <Route path="team" element={<AdminTeam />} />
             <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
             <Route path="security-officer" element={<AdminSecurityOfficer />} />
@@ -195,8 +196,6 @@ const App = () => (
             <Route path="breach-report" element={<AdminBreachReport />} />
             <Route path="me" element={<StaffMyProfile />} />
             <Route path="help" element={<StaffHelp />} />
-=======
->>>>>>> 9272d63101eaf864f6072e457ffbe626869b1f10
           </Route>
 
           <Route element={<StaffLayout />}>
@@ -262,7 +261,7 @@ const App = () => (
             <Route path="audit-report" element={<AdminAuditReport />} />
             <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
             <Route path="compliance/admin" element={<ComplianceAdmin />} />
-            <Route path="breach-report" element={<StaffBreachReport />} />
+            <Route path="breach-report" element={<AdminBreachReport />} />
           </Route>
           </Route>
           <Route path="/waitlist" element={<Waitlist />} />

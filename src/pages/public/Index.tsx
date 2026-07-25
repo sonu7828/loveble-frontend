@@ -10,6 +10,7 @@ import { apiQuery, authService, ApiClient } from "@/services/api";
 import drFobiImg from "@/assets/dr-fobi.jpg";
 import heroLeftImg from "@/assets/hero-left.png";
 import heroRightImg from "@/assets/hero-right.png";
+import rkaLogo from "@/assets/rka-logo.webp";
 
 const WHAT_WE_DO = [
   { icon: Syringe, title: "Injectables", desc: "Botox, filler, lip enhancement", href: "/services#injectables" },
@@ -287,7 +288,7 @@ const Index = () => {
       </section>
 
       {/* From Our Clients Section */}
-      <section className="border-t border-border bg-secondary/30 dark:bg-card/30 py-20 px-6 sm:px-10 transition-colors duration-300">
+      <section className="border-t border-border bg-secondary/30 dark:bg-card/30 py-10 px-6 sm:px-10 transition-colors duration-300">
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
             FROM OUR CLIENTS
@@ -297,7 +298,7 @@ const Index = () => {
           </h2>
 
           {/* Rating Badge */}
-          <div className="flex items-center justify-center gap-2 mb-10">
+          <div className="flex items-center justify-center gap-2 mb-6">
             <div className="flex text-amber-500">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className="h-4 w-4 fill-amber-500 text-amber-500" />
@@ -311,14 +312,14 @@ const Index = () => {
           {/* Testimonial Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
             {reviewsToShow.map((r) => (
-              <div key={r.id} className="rounded-xl border border-border bg-card text-card-foreground p-6 flex flex-col justify-between shadow-xs">
+              <div key={r.id} className="rounded-xl border border-border bg-card text-card-foreground p-4 md:p-5 flex flex-col justify-between shadow-xs">
                 <div>
-                  <div className="flex text-amber-500 mb-3">
+                  <div className="flex text-amber-500 mb-2">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
                     ))}
                   </div>
-                  <p className="font-serif text-sm sm:text-base text-card-foreground leading-relaxed italic mb-6">
+                  <p className="font-serif text-sm sm:text-base text-card-foreground leading-relaxed italic mb-4">
                     "{r.quote}"
                   </p>
                 </div>
@@ -331,39 +332,39 @@ const Index = () => {
             ))}
           </div>
 
-          <div className="mt-10">
-            <a
-              href={placeIds.sjUrl ?? "https://g.page/r/CSd3Q5ZmyEyKEBM/review"}
-              target="_blank"
-              rel="noopener noreferrer"
+          <div className="mt-8">
+            <Link
+              to="/reviews"
               className="text-xs font-semibold text-primary hover:text-primary/80 inline-flex items-center gap-1.5 transition"
             >
               Read San Jose reviews <ArrowRight className="h-3.5 w-3.5" />
-            </a>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Reserve CTA Banner */}
-      <section className="px-6 py-16 sm:py-24 bg-background transition-colors duration-300">
-        <div className="relative max-w-5xl mx-auto rounded-2xl bg-secondary/70 dark:bg-card border border-border py-16 px-8 sm:px-16 text-center overflow-hidden shadow-sm">
+      <section className="px-6 pt-4 pb-8 sm:pt-8 sm:pb-12 bg-background transition-colors duration-300">
+        <div className="relative max-w-5xl mx-auto rounded-2xl bg-secondary/40 dark:bg-card border border-border py-6 sm:py-8 px-8 sm:px-16 text-center overflow-hidden shadow-sm">
           {/* Subtle Leaf Branch Vector Accent */}
-          <div className="pointer-events-none absolute right-4 bottom-0 opacity-20 text-primary">
-            <svg width="240" height="240" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17,8C15.34,8 14,9.34 14,11C14,12.66 15.34,14 17,14C18.66,14 20,12.66 20,11C20,9.34 18.66,8 17,8M7,8C5.34,8 4,9.34 4,11C4,12.66 5.34,14 7,14C8.66,14 10,12.66 10,11C10,9.34 8.66,8 7,8M12,2C6.48,2 2,6.48 2,12C2,17.52 6.48,22 12,22C17.52,22 22,17.52 22,12C22,6.48 17.52,2 12,2Z" />
-            </svg>
+          <div className="pointer-events-none absolute right-4 md:right-12 top-1/2 -translate-y-1/2 opacity-50">
+            <img 
+              src={rkaLogo} 
+              alt="" 
+              className="w-32 h-32 md:w-48 md:h-48 rounded-full object-cover shadow-sm mix-blend-multiply dark:mix-blend-lighten"
+            />
           </div>
 
           <div className="relative z-10">
             <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] font-semibold text-primary mb-2">
               RESERVE
             </p>
-            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium mb-8">
+            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium mb-6">
               Begin the ritual.
             </h2>
             <Button
               asChild
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 h-auto text-xs font-medium tracking-[0.2em] uppercase rounded-lg shadow-md transition active:scale-[0.98]"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-4 h-auto text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase rounded-lg shadow-md transition active:scale-[0.98]"
             >
               <Link to={bookHref}>BOOK YOUR APPOINTMENT</Link>
             </Button>

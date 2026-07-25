@@ -291,11 +291,7 @@ export default function StaffLayout() {
         icon: Settings,
         show: true,
         children: [
-<<<<<<< HEAD
           { to: "/staff/me", label: "Settings", icon: Settings },
-=======
-          { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
->>>>>>> 9272d63101eaf864f6072e457ffbe626869b1f10
         ],
       },
     ];
@@ -364,10 +360,9 @@ export default function StaffLayout() {
                 to={single.to}
                 onClick={() => setOpen(false)}
                 className={() =>
-                  `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
-                    active
-                      ? "bg-primary text-primary-foreground shadow-xs font-bold"
-                      : "text-foreground hover:bg-secondary/60"
+                  `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition ${active
+                    ? "bg-primary text-primary-foreground shadow-xs font-bold"
+                    : "text-foreground hover:bg-secondary/60"
                   }`
                 }
               >
@@ -392,11 +387,10 @@ export default function StaffLayout() {
               <button
                 type="button"
                 onClick={() => toggleGroup(g.key)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer select-none ${
-                  hasActiveChild
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer select-none ${hasActiveChild
                     ? "text-primary font-semibold bg-primary/5"
                     : "text-foreground hover:bg-secondary/60"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <GIcon className="h-4 w-4 shrink-0 text-primary" />
@@ -428,10 +422,9 @@ export default function StaffLayout() {
                         to={c.to}
                         onClick={() => setOpen(false)}
                         className={() =>
-                          `flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${
-                            active
-                              ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                              : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                          `flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${active
+                            ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                           }`
                         }
                       >
@@ -511,20 +504,19 @@ export default function StaffLayout() {
 
         {/* Right Corner: Active Portal Name Badge */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shadow-xs ${
-            roles.includes("medical_director")
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shadow-xs ${roles.includes("medical_director")
               ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30"
               : roles.includes("privacy_officer")
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-              : "bg-primary/10 text-primary border border-primary/20"
-          }`}>
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                : "bg-primary/10 text-primary border border-primary/20"
+            }`}>
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
             <span>
               {roles.includes("medical_director")
                 ? "Medical Director Portal"
                 : roles.includes("privacy_officer")
-                ? "Security Officer Portal"
-                : "Staff Portal"}
+                  ? "Security Officer Portal"
+                  : "Staff Portal"}
             </span>
           </div>
         </div>
@@ -534,56 +526,56 @@ export default function StaffLayout() {
       <div className="flex-1 flex overflow-hidden min-h-0">
 
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden xl:flex flex-col w-64 border-r border-border bg-card p-4 shrink-0 justify-between">
-        <div className="space-y-4 overflow-y-auto pr-1">
-          <nav className="space-y-1">{NavInner}</nav>
-        </div>
+        {/* Desktop Sidebar */}
+        <aside className="hidden xl:flex flex-col w-64 border-r border-border bg-card p-4 shrink-0 justify-between">
+          <div className="space-y-4 overflow-y-auto pr-1">
+            <nav className="space-y-1">{NavInner}</nav>
+          </div>
 
-        <div className="pt-3 border-t border-border">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
-            onClick={async () => {
-              clearDemoAuthSession();
-              await authService.logout();
-              navigate("/staff/login");
-            }}
-          >
-            <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
-          </Button>
-        </div>
-      </aside>
+          <div className="pt-3 border-t border-border">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
+              onClick={async () => {
+                clearDemoAuthSession();
+                await authService.logout();
+                navigate("/staff/login");
+              }}
+            >
+              <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
+            </Button>
+          </div>
+        </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-background min-w-0">
-        <Outlet />
-      </main>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto bg-background min-w-0">
+          <Outlet />
+        </main>
+      </div>
+
+      <StaffBottomNav
+        canCheckout={isAdmin || isScheduler || isReceptionist || isStaff}
+        canClinical={isAdmin || isNP || isStaff}
+        pendingBadge={pendingCount + unreadSms}
+      />
+
+      <CommandPalette isAdmin={isAdmin} />
+      <KeyboardShortcutsHelp />
+
+      <AlertDialog open={showWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you still there?</AlertDialogTitle>
+            <AlertDialogDescription>
+              For patient privacy, you will be automatically signed out in {countdown} seconds due to inactivity.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={staySignedIn}>Stay Signed In</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-
-    <StaffBottomNav
-      canCheckout={isAdmin || isScheduler || isReceptionist || isStaff}
-      canClinical={isAdmin || isNP || isStaff}
-      pendingBadge={pendingCount + unreadSms}
-    />
-
-    <CommandPalette isAdmin={isAdmin} />
-    <KeyboardShortcutsHelp />
-
-    <AlertDialog open={showWarning}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Are you still there?</AlertDialogTitle>
-          <AlertDialogDescription>
-            For patient privacy, you will be automatically signed out in {countdown} seconds due to inactivity.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogAction onClick={staySignedIn}>Stay Signed In</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  </div>
-);
+  );
 }
