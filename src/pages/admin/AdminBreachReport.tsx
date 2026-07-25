@@ -31,7 +31,7 @@ const STATUS_STYLE: Record<string, string> = {
   reported_to_hhs: "bg-purple-100 text-purple-900 dark:bg-purple-900/40 dark:text-purple-200",
 };
 
-export default function StaffBreachReport() {
+export default function AdminBreachReport() {
   usePageMeta({ title: "Report a possible breach" });
   const { user, isAdmin } = useAuth();
   const [rows, setRows] = useState<Report[]>([]);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { authService, AppRole, UserProfile } from "@/services/api/authService";
+import { authService, AppRole, UserProfile, getUserProfileByEmail } from "@/services/api/authService";
 
 export interface AuthState {
   session: any;
@@ -19,11 +19,16 @@ export interface AuthState {
   canSeeAll: boolean;
   canOverride: boolean;
 }
-
 export function setDemoAuthSession(email: string, roles: AppRole[], staffId?: string) {
-  authService.login(email).then(() => {
-    window.dispatchEvent(new Event("rka_demo_auth_change"));
-  });
+  const user = getUserProfileByEmail(email);
+  if (roles && roles.length > 0) {
+    user.roles = roles;
+  }
+  sessionStorage.setItem("auth_token", "demo-token");
+  sessionStorage.setItem("user_profile", JSON.stringify(user));
+  localStorage.setItem("auth_token", "demo-token");
+  localStorage.setItem("user_profile", JSON.stringify(user));
+  window.dispatchEvent(new Event("rka_demo_auth_change"));
 }
 
 export function clearDemoAuthSession() {
@@ -63,13 +68,13 @@ export function useAuth(): AuthState {
     };
   }, []);
 
-  const isAdmin = roles.includes("admin") || true;
+  const isAdmin = roles.includes("admin");
   const isScheduler = roles.includes("scheduler") || isAdmin;
   const isReceptionist = roles.includes("receptionist") || isAdmin;
   const isStaff = roles.includes("staff") || isAdmin;
   const isNP = roles.includes("nurse_practitioner") || isAdmin;
-  const isMedicalDirector = roles.includes("medical_director") || isAdmin;
-  const isPrivacyOfficer = roles.includes("privacy_officer") || isAdmin;
+  const isMedicalDirector = roles.includes("medical_director");
+  const isPrivacyOfficer = roles.includes("privacy_officer");
   const isClinicalStaff = isAdmin || isStaff || isScheduler || isNP || isMedicalDirector;
   const isPrivileged = isAdmin || isStaff || isNP || isMedicalDirector || isPrivacyOfficer;
   const canOverride = isAdmin || isScheduler || isReceptionist || isNP || isMedicalDirector;

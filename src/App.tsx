@@ -56,6 +56,7 @@ import PrivacyPractices from "./pages/public/PrivacyPractices.tsx";
 import Terms from "./pages/public/Terms.tsx";
 import LocationPage from "./pages/public/LocationPage.tsx";
 import Waitlist from "./pages/patient/Waitlist.tsx";
+import Reviews from "./pages/public/Reviews.tsx";
 // StaffWaitlist removed — waitlist is a tab inside StaffInbox; /staff/waitlist redirects.
 import AdminReports from "./pages/admin/AdminReports.tsx";
 import AdminProductivity from "./pages/admin/AdminProductivity.tsx";
@@ -65,7 +66,7 @@ import { OwnerOnly } from "./components/staff/OwnerOnly.tsx";
 import AdminFinances from "./pages/admin/AdminFinances.tsx";
 import AdminAudit from "./pages/admin/AdminAudit.tsx";
 import AdminAuditReport from "./pages/admin/AdminAuditReport.tsx";
-import StaffMarketing from "./pages/staff/StaffMarketing.tsx";
+
 import Feedback from "./pages/patient/Feedback.tsx";
 import StaffFeedback from "./pages/staff/StaffFeedback.tsx";
 import PhotoUpload from "./pages/patient/PhotoUpload.tsx";
@@ -94,8 +95,7 @@ import SafetyHub from "./pages/staff/clinical/SafetyHub.tsx";
 import StaffMessages from "./pages/staff/StaffMessages.tsx";
 import StaffCosignQueue from "./pages/staff/StaffCosignQueue.tsx";
 import AdminNoShowCharges from "./pages/admin/AdminNoShowCharges.tsx";
-import StaffPerks from "./pages/staff/StaffPerks.tsx";
-import StaffQuickPhrases from "./pages/staff/StaffQuickPhrases.tsx";
+
 // StaffOutcomes is rendered inside StaffReports as a tab — direct route redirects there.
 import StaffMySchedule from "./pages/staff/StaffMySchedule.tsx";
 import AdminClinicalTemplates from "./pages/admin/AdminClinicalTemplates.tsx";
@@ -111,11 +111,14 @@ import AdminToxFollowup from "./pages/admin/AdminToxFollowup.tsx";
 import ChartNotesIndex from "./pages/staff/clinical/ChartNotesIndex.tsx";
 import GFEIndex from "./pages/staff/clinical/GFEIndex.tsx";
 import AdminVendors from "./pages/admin/AdminVendors.tsx";
-import StaffBreachReport from "./pages/staff/StaffBreachReport.tsx";
+import AdminBreachReport from "./pages/admin/AdminBreachReport.tsx";
 import AdminHipaaPolicies from "./pages/admin/AdminHipaaPolicies.tsx";
 import AdminSecurityOfficer from "./pages/admin/AdminSecurityOfficer.tsx";
 import AdminModelApplications from "./pages/admin/AdminModelApplications.tsx";
 import AdminModelApplicationDetail from "./pages/admin/AdminModelApplicationDetail.tsx";
+
+import StaffClinicalReviews from "./pages/staff/StaffClinicalReviews.tsx";
+import StaffOrders from "./pages/staff/StaffOrders.tsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -141,6 +144,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/services" element={<Services />} />
           <Route path="/services/:slug" element={<ServiceDetail />} />
+          <Route path="/reviews" element={<Reviews />} />
           <Route path="/specials" element={<Navigate to="/services" replace />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/model" element={<Model />} />
@@ -172,27 +176,36 @@ const App = () => (
             <Route path="services" element={<AdminOnly><AdminServices /></AdminOnly>} />
             <Route path="model-applications" element={<AdminOnly><AdminModelApplications /></AdminOnly>} />
             <Route path="model-applications/:id" element={<AdminOnly><AdminModelApplicationDetail /></AdminOnly>} />
-            <Route path="reports" element={<AdminOnly><AdminReports /></AdminOnly>} />
             <Route path="productivity" element={<AdminOnly><AdminProductivity /></AdminOnly>} />
             <Route path="finances" element={<AdminOnly><AdminFinances /></AdminOnly>} />
             <Route path="audit" element={<AdminOnly><AdminAudit /></AdminOnly>} />
-            <Route path="audit-report" element={<AdminOnly><AdminAuditReport /></AdminOnly>} />
             <Route path="terminal" element={<AdminOnly><AdminTerminalSettings /></AdminOnly>} />
             <Route path="pos-config" element={<AdminOnly><AdminPosConfig /></AdminOnly>} />
             <Route path="admin" element={<AdminOnly><AdminHub /></AdminOnly>} />
-            <Route path="vendors" element={<AdminOnly><AdminVendors /></AdminOnly>} />
             <Route path="no-show-charges" element={<AdminOnly><AdminNoShowCharges /></AdminOnly>} />
             <Route path="rewards" element={<AdminOnly><AdminRewards /></AdminOnly>} />
             <Route path="intake-status" element={<AdminOnly><AdminIntakeDashboard /></AdminOnly>} />
             <Route path="sms-snippets" element={<AdminOnly><AdminSmsSnippets /></AdminOnly>} />
             <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
             <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
+            <Route path="team" element={<AdminTeam />} />
+            <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
+            <Route path="security-officer" element={<AdminSecurityOfficer />} />
+            <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
+            <Route path="compliance/admin" element={<ComplianceAdmin />} />
+            <Route path="breach-report" element={<AdminBreachReport />} />
+            <Route path="me" element={<StaffMyProfile />} />
+            <Route path="help" element={<StaffHelp />} />
           </Route>
 
           <Route element={<StaffLayout />}>
             <Route index element={<StaffToday />} />
             <Route path="dashboard" element={<Navigate to="/staff/today" replace />} />
             <Route path="today" element={<StaffToday />} />
+            <Route path="clinical-reviews" element={<StaffClinicalReviews />} />
+            <Route path="orders" element={<StaffOrders />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="vendors" element={<AdminVendors />} />
             <Route path="inbox" element={<StaffInbox />} />
             <Route path="calendar" element={<StaffCalendar />} />
             <Route path="messages" element={<StaffMessages />} />
@@ -220,7 +233,6 @@ const App = () => (
             <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="profile" element={<Navigate to="/staff/me" replace />} />
             <Route path="schedule" element={<Navigate to="/staff/my-schedule" replace />} />
-            {/* breach-report moved to AdminLayout above */}
             <Route path="clinical" element={<StaffClinical />} />
             <Route path="clinical/notes" element={<ChartNotesIndex />} />
             <Route path="clinical/gfe" element={<GFEIndex />} />
@@ -249,7 +261,7 @@ const App = () => (
             <Route path="audit-report" element={<AdminAuditReport />} />
             <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
             <Route path="compliance/admin" element={<ComplianceAdmin />} />
-            <Route path="breach-report" element={<StaffBreachReport />} />
+            <Route path="breach-report" element={<AdminBreachReport />} />
           </Route>
           </Route>
           <Route path="/waitlist" element={<Waitlist />} />

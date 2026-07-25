@@ -5,10 +5,23 @@ import { MapPin, Phone, Menu, X, Mail, UserCheck, Instagram, Facebook, Globe, Na
 import rkaLogo from "@/assets/rka-logo.webp";
 import ThemeToggle from "@/components/ThemeToggle";
 import NewsletterSignup from "@/components/NewsletterSignup";
+import { useAuth } from "@/hooks/useAuth";
 
 export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { user, isAdmin, isPrivacyOfficer, isStaff } = useAuth();
+
+  const accountPath = !user
+    ? "/staff/login"
+    : isAdmin
+    ? "/staff/admin"
+    : isPrivacyOfficer
+    ? "/staff/security-officer"
+    : isStaff
+    ? "/staff/today"
+    : "/account";
+
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   const skipToMain: React.MouseEventHandler<HTMLAnchorElement> = (e) => {
@@ -29,19 +42,24 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
       >
         Skip to main content
       </a>
-      <header className="border-b border-border bg-background/80 backdrop-blur sticky top-0 z-40">
-        <div className="container mx-auto px-4 sm:px-6 flex items-center justify-between py-3 gap-3">
-          <Link to="/" className="flex items-center gap-2.5 sm:gap-3 leading-tight min-w-0 md:mr-auto group">
-            <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-cover shadow-soft shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span className="font-serif text-base sm:text-xl font-medium tracking-tight truncate">
+      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border transition-colors">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3 group">
+            <img
+              src={rkaLogo}
+              alt="Radiantilyk Aesthetic"
+              className="h-10 w-10 object-contain rounded-full shadow-soft group-hover:scale-105 transition-transform"
+            />
+            <div className="flex flex-col">
+              <span className="font-serif text-lg tracking-tight font-medium text-foreground group-hover:text-primary transition-colors">
                 Radiantilyk Aesthetic
               </span>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground tracking-wider uppercase">
-                <span className="font-semibold text-primary">MEDSPA</span>
-                <span className="opacity-40">•</span>
-                <span className="hidden sm:flex items-center gap-1 font-normal normal-case text-[11px] text-muted-foreground truncate">
-                  <MapPin className="h-3 w-3 text-primary shrink-0" />
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium">
+                  MEDSPA
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                  <MapPin className="h-2.5 w-2.5 text-primary" />
                   San Jose · 2100 Curtner Ave, Ste 1B
                 </span>
               </div>
@@ -53,7 +71,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
                 <NavLink to="/" end className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Home</NavLink>
                 <NavLink to="/services" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Services & Pricing</NavLink>
                 <NavLink to="/model" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Model Application</NavLink>
-                <NavLink to="/account/auth" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>My Account</NavLink>
+                <NavLink to="/staff/login" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>My Account</NavLink>
               </>
             )}
             <ThemeToggle />
@@ -80,7 +98,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
               {!isPortal && (
                 <>
                   <NavLink to="/services" className="py-3 border-b border-border">Services & Pricing</NavLink>
-                  <NavLink to="/account/auth" className="py-3 border-b border-border">My Account</NavLink>
+                  <NavLink to="/staff/login" className="py-3 border-b border-border">My Account</NavLink>
                   <NavLink to="/model" className="py-3 border-b border-border">Become a Model</NavLink>
                   <NavLink to="/faq" className="py-3 border-b border-border">FAQ</NavLink>
                 </>
@@ -102,21 +120,21 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
 };
 
 export const SiteFooter = () => (
-  <footer className="border-t border-border bg-background text-foreground pt-16 pb-8 transition-colors duration-300">
-    <div className="container mx-auto px-6 md:px-10 grid gap-10 grid-cols-1 sm:grid-cols-3 items-start text-xs">
+  <footer className="border-t border-border bg-background text-foreground pt-4 pb-4 transition-colors duration-300">
+    <div className="container mx-auto px-6 md:px-10 grid gap-6 grid-cols-1 sm:grid-cols-3 items-start text-xs">
       {/* Column 1: Brand Info */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
+      <div className="space-y-2 flex flex-col items-center text-center">
+        <div className="flex flex-col items-center gap-2">
           <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-10 w-10 rounded-full object-cover border border-border" />
-          <div>
-            <div className="font-serif text-lg font-medium text-foreground">Radiantilyk Aesthetic</div>
+          <div className="flex flex-col items-center">
+            <div className="font-serif text-lg font-medium text-foreground leading-tight">Radiantilyk Aesthetic</div>
             <div className="text-[10px] uppercase tracking-widest text-primary font-semibold">MEDSPA</div>
           </div>
         </div>
-        <p className="text-muted-foreground text-[11px] leading-relaxed italic">
+        <p className="text-muted-foreground text-[11px] leading-relaxed italic max-w-xs m-0">
           A quiet ritual of refinement. Luxury medspa in San Jose.
         </p>
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex items-center justify-center gap-3 pt-1">
           <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Instagram" className="p-2 rounded-full border border-border bg-card hover:bg-primary hover:text-primary-foreground transition text-primary">
             <Instagram className="h-3.5 w-3.5" />
           </a>
@@ -130,7 +148,7 @@ export const SiteFooter = () => (
       </div>
 
       {/* Column 2: Studio Location */}
-      <div className="space-y-3">
+      <div className="space-y-1.5 flex flex-col items-center text-center">
         <div className="font-serif text-sm font-semibold text-foreground uppercase tracking-wider">San Jose Studio</div>
         <p className="text-muted-foreground text-[11px] leading-relaxed">
           2100 Curtner Ave, Ste 18<br />
@@ -140,7 +158,7 @@ export const SiteFooter = () => (
           href="https://maps.google.com/?q=2100+Curtner+Ave+Ste+18+San+Jose+CA+95124"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-secondary hover:bg-accent text-secondary-foreground font-medium text-[11px] transition shadow-xs"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-secondary hover:bg-accent text-secondary-foreground font-medium text-[11px] transition shadow-xs mt-1"
         >
           <Navigation className="h-3 w-3 text-primary" />
           Get Directions
@@ -148,21 +166,21 @@ export const SiteFooter = () => (
       </div>
 
       {/* Column 3: Contact */}
-      <div className="space-y-2.5">
-        <div className="font-serif text-sm font-semibold text-foreground uppercase tracking-wider mb-3">Contact</div>
-        <a href="tel:4083511873" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px]">
+      <div className="space-y-1.5 flex flex-col items-center text-center">
+        <div className="font-serif text-sm font-semibold text-foreground uppercase tracking-wider mb-1">Contact</div>
+        <a href="tel:4083511873" className="flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px]">
           <Phone className="h-3.5 w-3.5 text-primary" />
           Call 408 · 351 · 1873
         </a>
-        <a href="sms:+14083511873" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px]">
+        <a href="sms:+14083511873" className="flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px]">
           <Mail className="h-3.5 w-3.5 text-primary" />
           Text us (408 · 351 · 1873)
         </a>
-        <a href="mailto:kv@rkaglow.com" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px]">
+        <a href="mailto:kv@rkaglow.com" className="flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px]">
           <Mail className="h-3.5 w-3.5 text-primary" />
           kv@rkaglow.com
         </a>
-        <Link to="/waitlist" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px] pt-1">
+        <Link to="/waitlist" className="flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition text-[11px] pt-1">
           <UserCheck className="h-3.5 w-3.5 text-primary" />
           Join the waitlist
         </Link>
@@ -170,14 +188,14 @@ export const SiteFooter = () => (
     </div>
 
     {/* Newsletter Container */}
-    <div className="container mx-auto px-6 mt-12 pb-8">
-      <div className="rounded-xl border border-border bg-card/80 backdrop-blur p-6 md:p-8 max-w-3xl mx-auto shadow-sm">
+    <div className="container mx-auto px-6 mt-4 pb-4">
+      <div className="rounded-xl border border-border bg-card/80 backdrop-blur p-3 md:p-4 max-w-3xl mx-auto shadow-sm">
         <NewsletterSignup />
       </div>
     </div>
 
     {/* Footer Bottom Bar */}
-    <div className="border-t border-border pt-6 pb-2 text-center text-[11px] text-muted-foreground flex flex-wrap items-center justify-center gap-2 sm:gap-4 px-4">
+    <div className="border-t border-border pt-4 text-center text-[11px] text-muted-foreground flex flex-wrap items-center justify-center gap-2 sm:gap-4 px-4">
       <span>© {new Date().getFullYear()} Radiantilyk Aesthetic</span>
       <span>·</span>
       <Link to="/faq" className="hover:text-foreground">FAQ</Link>
@@ -192,3 +210,4 @@ export const SiteFooter = () => (
     </div>
   </footer>
 );
+
