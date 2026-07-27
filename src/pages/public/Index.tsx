@@ -46,7 +46,8 @@ const Index = () => {
   useEffect(() => {
     apiQuery("locations").select("slug, google_place_id, google_review_url").eq("slug", "san-jose")
       .then(({ data }) => {
-        const sj = (data ?? []).find((r: any) => r.slug === "san-jose");
+        const list = Array.isArray(data) ? data : [];
+        const sj = list.find((r: any) => r.slug === "san-jose");
         setPlaceIds({
           sj: sj?.google_place_id ?? null,
           sjUrl: sj?.google_review_url ?? null,
@@ -59,9 +60,10 @@ const Index = () => {
       .order("created_at", { ascending: false })
       .limit(30)
       .then(({ data }) => {
-        if (!data || data.length === 0) return;
+        const list = Array.isArray(data) ? data : [];
+        if (list.length === 0) return;
         setLiveReviews(
-          (data as any[]).map((t) => ({
+          list.map((t) => ({
             id: t.id,
             quote: t.comment,
             author: t.first_name || "Verified guest",

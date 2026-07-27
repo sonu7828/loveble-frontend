@@ -135,6 +135,9 @@ export class ApiTableQuery {
     }
 
     let data = res?.data;
+    if (data && typeof data === "object" && !Array.isArray(data) && "data" in data) {
+      data = data.data;
+    }
     if ((!data || (Array.isArray(data) && data.length === 0)) && MOCK_FALLBACKS[this.tableName]) {
       data = MOCK_FALLBACKS[this.tableName];
     }
