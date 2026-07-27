@@ -4,7 +4,7 @@ import { apiQuery, authService } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Sparkles, ShieldCheck, CreditCard, Clock, Calendar as CalIcon, Star } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { type CardOnFileHandle } from "@/components/CardOnFile";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -19,8 +19,8 @@ const StepDetails = lazy(() => import("../book/StepDetails").then(m => ({ defaul
 const StepConsentsAndPay = lazy(() => import("../book/StepConsentsAndPay").then(m => ({ default: m.StepConsentsAndPay })));
 
 const StepFallback = () => (
-  <div className="flex items-center justify-center py-20">
-    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+  <div className="flex items-center justify-center py-12">
+    <Loader2 className="h-5 w-5 animate-spin text-primary" />
   </div>
 );
 
@@ -173,9 +173,9 @@ export const Book = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col justify-between">
         <SiteHeader />
-        <div className="flex-1 flex flex-col items-center justify-center py-24">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-          <p className="text-sm text-muted-foreground font-serif">Loading booking menu...</p>
+        <div className="flex-1 flex flex-col items-center justify-center py-16">
+          <Loader2 className="h-7 w-7 animate-spin text-primary mb-2" />
+          <p className="text-xs text-muted-foreground font-serif">Loading booking menu...</p>
         </div>
         <SiteFooter />
       </div>
@@ -187,22 +187,22 @@ export const Book = () => {
       <SiteHeader />
 
       {/* Main Container — Middle 90% Width */}
-      <main className="flex-1 w-[95%] xl:w-[90%] max-w-[1440px] mx-auto px-3 sm:px-6 md:px-8 pt-6 pb-20">
+      <main className="flex-1 w-[95%] xl:w-[90%] max-w-[1440px] mx-auto px-3 sm:px-5 pt-2 pb-12">
         
-        {/* Announcement Banner */}
-        <div className="flex justify-center mb-6">
+        {/* SEPARATE Nurse Discount Banner — Placed right-aligned on top */}
+        <div className="flex justify-end mb-2">
           <NurseDiscountBanner />
         </div>
 
         {draftBanner && draftRestored && (
-          <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-3.5 flex items-center justify-between gap-4 text-xs shadow-xs">
-            <div className="flex items-center gap-3">
-              <span className="text-base leading-none text-primary" aria-hidden>↻</span>
+          <div className="mb-2.5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 flex items-center justify-between gap-3 text-xs shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <span className="text-sm leading-none text-primary" aria-hidden>↻</span>
               <div>
-                <div className="font-medium text-foreground">Welcome back — we saved your spot.</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  Picked up at step {draftBanner.step} of 6. Your selections are filled in.
-                </div>
+                <span className="font-medium text-foreground">Welcome back — we saved your spot.</span>
+                <span className="text-[11px] text-muted-foreground ml-2">
+                  Picked up at step {draftBanner.step} of 6.
+                </span>
               </div>
             </div>
             <button
@@ -219,15 +219,16 @@ export const Book = () => {
           </div>
         )}
 
-        {/* Systematic 6-Step Funnel Header */}
-        <div className="sticky top-4 z-30 mb-8 rounded-2xl border border-border/80 bg-background/95 backdrop-blur-md shadow-sm p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-3 gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-[0.2em] font-semibold text-primary">
+        {/* Clean 6-Step Header Card */}
+        <div className="sticky top-2 z-30 mb-2.5 rounded-xl border border-border/70 bg-background/95 backdrop-blur-md shadow-xs p-3 sm:p-3.5">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            {/* Step Label */}
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs uppercase tracking-[0.2em] font-semibold text-primary shrink-0">
                 Step {step === 5 && payStep === "pay" ? 6 : step} of 6
               </span>
               <span className="text-muted-foreground/40">•</span>
-              <span className="text-sm font-medium text-foreground">
+              <span className="text-xs sm:text-sm font-medium text-foreground truncate">
                 {step === 1 && "Select Service(s)"}
                 {step === 2 && "Location & Provider"}
                 {step === 3 && "Date & Time"}
@@ -237,20 +238,21 @@ export const Book = () => {
               </span>
             </div>
 
+            {/* Back Button */}
             {step > 1 && (
               <button
                 onClick={() => { if (step === 5 && payStep === "pay") setPayStep("consents"); else goBack(); }}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium px-3 py-1.5 rounded-full bg-secondary/80 hover:bg-secondary transition"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium px-2.5 py-1 rounded-full bg-secondary/80 hover:bg-secondary transition shrink-0"
                 aria-label="Go back"
               >
-                <ArrowLeft className="h-3.5 w-3.5" /> Back
+                <ArrowLeft className="h-3 w-3" /> Back
               </button>
             )}
           </div>
 
           {/* 6-Step Progress Line */}
           <div
-            className="flex gap-2"
+            className="flex gap-1.5"
             role="progressbar"
             aria-valuemin={1}
             aria-valuemax={6}
@@ -265,9 +267,9 @@ export const Book = () => {
                   key={n}
                   type="button"
                   onClick={() => handleJumpToStep(n)}
-                  className={`h-2.5 flex-1 rounded-full transition-all duration-300 cursor-pointer ${
+                  className={`h-2 flex-1 rounded-full transition-all duration-300 cursor-pointer ${
                     isCurrent
-                      ? "bg-primary ring-4 ring-primary/20 scale-[1.02]"
+                      ? "bg-primary ring-3 ring-primary/20 scale-[1.01]"
                       : filled
                       ? "bg-primary/85 hover:bg-primary"
                       : "bg-secondary/90 hover:bg-primary/30"
@@ -279,40 +281,40 @@ export const Book = () => {
           </div>
         </div>
 
-        {/* Reassurance Ribbon — Systematic 3-Card Step Overview */}
+        {/* Compact "What Happens Next" Cards — Positioned Directly Below Progress Header */}
         {step === 1 && (
-          <div className="mb-8 rounded-2xl border border-primary/20 bg-primary/5 p-5 text-xs shadow-xs">
-            <div className="text-[11px] uppercase tracking-[0.2em] font-semibold text-primary mb-3.5">
+          <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs shadow-2xs">
+            <div className="text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
               What happens next
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-background/80 p-3.5">
-                <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center justify-center shrink-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">
                   1
                 </span>
-                <div>
-                  <div className="font-semibold text-foreground text-xs sm:text-sm">Pick your service</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Browse menu, duration & clear pricing</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground text-xs">Pick your service</div>
+                  <div className="text-[10px] text-muted-foreground truncate">Browse menu, duration & clear pricing</div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-background/80 p-3.5">
-                <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">
                   2
                 </span>
-                <div>
-                  <div className="font-semibold text-foreground text-xs sm:text-sm">Pick a time</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Real-time availability & instant reservation</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground text-xs">Pick a time</div>
+                  <div className="text-[10px] text-muted-foreground truncate">Real-time availability & instant reservation</div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-background/80 p-3.5">
-                <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">
                   3
                 </span>
-                <div>
-                  <div className="font-semibold text-foreground text-xs sm:text-sm">Save card (No charge today)</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Card on file only used for visit or 48h cancel</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground text-xs">Save card (No charge today)</div>
+                  <div className="text-[10px] text-muted-foreground truncate">Card on file only used for visit or 48h cancel</div>
                 </div>
               </div>
             </div>

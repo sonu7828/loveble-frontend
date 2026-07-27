@@ -17,16 +17,6 @@ const MOCK_FALLBACKS: Record<string, any[]> = {
       is_active: true,
     },
   ],
-  service_categories: [
-    { id: "cat-01", name: "Injectables", description: "Neurotoxins, Dermal Fillers & Biostimulators", display_order: 1, is_active: true },
-    { id: "cat-02", name: "Skin Resurfacing", description: "RF Microneedling, Chemical Peels & Lasers", display_order: 2, is_active: true },
-    { id: "cat-03", name: "Laser Hair Reduction", description: "Diode & Alexandrite Laser Treatments", display_order: 3, is_active: true },
-  ],
-  services: [
-    { id: "svc-01", category_id: "cat-01", name: "Botox Cosmetic (Per Unit)", description: "FDA-approved neurotoxin for wrinkle reduction", duration_minutes: 30, price_cents: 1400, price_note: "$14 / unit", is_active: true, display_order: 1 },
-    { id: "svc-02", category_id: "cat-01", name: "Juvederm Voluma Lip Filler", description: "Hyaluronic acid lip & cheek enhancement", duration_minutes: 45, price_cents: 75000, price_note: "$750 / syringe", is_active: true, display_order: 2 },
-    { id: "svc-03", category_id: "cat-02", name: "RF Microneedling Face", description: "Collagen induction therapy with radiofrequency", duration_minutes: 60, price_cents: 65000, price_note: "$650 / session", is_active: true, display_order: 3 },
-  ],
   client_profiles: [
     {
       id: "cp-01",
