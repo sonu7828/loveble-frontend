@@ -264,9 +264,29 @@ export class ApiTableQuery {
       data = data.data;
     }
     if ((!data || (Array.isArray(data) && data.length === 0)) && MOCK_FALLBACKS[this.tableName]) {
-      data = MOCK_FALLBACKS[this.tableName];
+      data = [...MOCK_FALLBACKS[this.tableName]];
     }
-    data = data ?? [];
+    data = Array.isArray(data) ? [...data] : (data ? [data] : []);
+
+    if (this.action === "select") {
+      if (this.tableName === "appointments") {
+        const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const existingIds = new Set(data.map((x: any) => x.id));
+        for (const la of localAppts) {
+          if (!existingIds.has(la.id)) {
+            data.unshift(la);
+          }
+        }
+      } else if (this.tableName === "client_profiles") {
+        const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+        const existingIds = new Set(data.map((x: any) => x.id));
+        for (const lc of localClients) {
+          if (!existingIds.has(lc.id)) {
+            data.unshift(lc);
+          }
+        }
+      }
+    }
 
     // For SELECT queries, apply client-side filtering so callers with .eq() get correct subsets
     if (this.action === "select" && Array.isArray(data) && this.filters.length > 0) {

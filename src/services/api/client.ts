@@ -56,9 +56,12 @@ export class ApiClient {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = `${API_BASE_URL.replace(/\/$/, "")}${normalizedEndpoint}`;
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        const response = await fetch(url, {
           ...options,
           headers,
         });

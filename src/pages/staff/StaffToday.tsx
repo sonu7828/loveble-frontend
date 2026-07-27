@@ -375,6 +375,54 @@ function StandardStaffToday() {
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
 
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: appointmentRows } = await apiQuery("appointments").select("*").order("start_at", { ascending: false });
+      const fetchedAppts = (appointmentRows ?? []) as Appt[];
+      setAppts(fetchedAppts);
+
+      const { data: clientRows } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false });
+      
+      const uniquePatientsMap = new Map<string, any>();
+      (clientRows ?? []).forEach((c: any) => {
+        const email = (c.email || "").toLowerCase();
+        if (email) {
+          uniquePatientsMap.set(email, {
+            id: c.id || `client-${Date.now()}`,
+            name: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.name || "Patient",
+            email: c.email || "—",
+            phone: c.phone || "—",
+            lastVisit: "Recent Patient",
+          });
+        }
+      });
+
+      fetchedAppts.forEach((a: any) => {
+        const email = (a.client_email || "").toLowerCase();
+        const clientName = `${a.client_first_name || ""} ${a.client_last_name || ""}`.trim() || "Patient";
+        if (email && !uniquePatientsMap.has(email)) {
+          uniquePatientsMap.set(email, {
+            id: a.id,
+            name: clientName,
+            email: a.client_email || "—",
+            phone: a.client_phone || "—",
+            lastVisit: a.start_at ? new Date(a.start_at).toLocaleDateString() : "Today",
+          });
+        }
+      });
+
+      setRecentPatients(Array.from(uniquePatientsMap.values()).slice(0, 10));
+    } catch (_e) {
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const staffName = user?.user_metadata?.first_name || user?.user_metadata?.last_name
     ? `${user?.user_metadata?.first_name || ""} ${user?.user_metadata?.last_name || ""}`.trim()
     : user?.email || "Clinical Staff";
@@ -517,8 +565,8 @@ function StandardStaffToday() {
                         <tr key={a.id} className="hover:bg-muted/30 transition">
                           <td className="p-3 font-mono text-muted-foreground">{formatClinicTime(a.start_at)}</td>
                           <td className="p-3 font-semibold text-foreground">{a.client_first_name} {a.client_last_name}</td>
-                          <td className="p-3 text-muted-foreground">{a.service_id}</td>
-                          <td className="p-3 text-muted-foreground">{a.staff_id}</td>
+                          <td className="p-3 text-muted-foreground">{a.service_name || a.service_id || "Aesthetic Treatment"}</td>
+                          <td className="p-3 text-muted-foreground">{a.staff_name || a.staff_id || "Provider"}</td>
                           <td className="p-3">
                             <Badge variant="outline" className="text-[10px] uppercase">{a.status}</Badge>
                           </td>
