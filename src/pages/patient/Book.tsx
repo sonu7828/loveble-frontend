@@ -1,25 +1,17 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, authService } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Check, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowLeft, Loader2, Sparkles, ShieldCheck, CreditCard, Clock, Calendar as CalIcon, Star } from "lucide-react";
 import { z } from "zod";
-import { format } from "date-fns";
 import { type CardOnFileHandle } from "@/components/CardOnFile";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
-import { buildPayloadFor, type CompactValue } from "@/components/CompactConsentCard";
-import { formatPhone10 } from "@/lib/formatPhone";
-
-import { functionErrorMessage } from "@/lib/functionError";
-
 import type { Step, Category, Service, Location, Staff, ProviderRow, ConsentForm } from "../book/types";
+import type { CompactValue } from "@/components/CompactConsentCard";
 
-// Each step is lazy-loaded so the 430px-mobile booking entry ships a tiny initial JS chunk
-// (Step 1 only) and pulls in the rest on demand as the client advances.
 const StepService = lazy(() => import("../book/StepService").then(m => ({ default: m.StepService })));
 const StepLocationStaff = lazy(() => import("../book/StepLocationStaff").then(m => ({ default: m.StepLocationStaff })));
 const StepDateTime = lazy(() => import("../book/StepDateTime").then(m => ({ default: m.StepDateTime })));
@@ -27,8 +19,8 @@ const StepDetails = lazy(() => import("../book/StepDetails").then(m => ({ defaul
 const StepConsentsAndPay = lazy(() => import("../book/StepConsentsAndPay").then(m => ({ default: m.StepConsentsAndPay })));
 
 const StepFallback = () => (
-  <div className="flex items-center justify-center py-16">
-    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+  <div className="flex items-center justify-center py-20">
+    <Loader2 className="h-6 w-6 animate-spin text-primary" />
   </div>
 );
 
@@ -42,8 +34,7 @@ const detailsSchema = z.object({
   nppAck: z.literal(true, { errorMap: () => ({ message: "Required to book" }) }),
 });
 
-
-const Book = () => {
+export const Book = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>(1);
@@ -53,22 +44,10 @@ const Book = () => {
     canonical: "https://bookrka.com/book",
   });
 
-  // Stable per-visit session id for funnel analytics + abandonment recovery
   const sessionIdRef = useRef<string>("");
   if (!sessionIdRef.current) {
     sessionIdRef.current = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
   }
-  const trackEvent = (eventName: string, extra: Record<string, unknown> = {}) => {
-    apiQuery("booking_events").insert({
-      session_id: sessionIdRef.current,
-      event_name: eventName,
-      step,
-      service_id: extra.serviceId ?? null,
-      location_id: extra.locationId ?? null,
-      staff_id: extra.staffId ?? null,
-      metadata: extra,
-    } as any).then(() => { }, () => { });
-  };
 
   // Catalog
   const [categories, setCategories] = useState<Category[]>([]);
@@ -91,8 +70,7 @@ const Book = () => {
     firstName: "", lastName: "", email: "", phone: "", dob: "", notes: "", smsOptIn: false, marketingOptIn: false, nppAck: false,
   });
 
-
-  // Consents — compact "read & agree" cards + a single shared signature
+  // Consents
   const [consents, setConsents] = useState<ConsentForm[]>([]);
   const [loadingConsents, setLoadingConsents] = useState(false);
   const [consentValues, setConsentValues] = useState<Record<string, CompactValue>>({});
@@ -118,427 +96,88 @@ const Book = () => {
         apiQuery("service_providers").select("service_id, staff_id, location_id"),
         authService.getSession(),
       ]);
-      setCategories(c.data ?? []);
-      setServices(s.data ?? []);
-      // San Mateo is hidden from client-facing booking.
-      setLocations((l.data ?? []).filter((row: any) => row.slug !== "san-mateo"));
 
-      setStaff((sp.data ?? []) as any);
-      setProviders(p.data ?? []);
+      if (c.data) setCategories(c.data as any);
+      if (s.data) setServices(s.data as any);
+      if (l.data) setLocations(l.data as any);
+      if (sp.data) setStaff(sp.data as any);
+      if (p.data) setProviders(p.data as any);
 
-      // Prefill from query params (rebook flow)
-      const qService = searchParams.get("service");
-      const qLocation = searchParams.get("location");
-      const qStaff = searchParams.get("staff");
-      if (qService) setServiceIds([qService]);
-      if (qLocation) setLocationId(qLocation);
-      if (qStaff) setStaffId(qStaff);
-      setStep(1);
-
-      // Prefill client details from query params (staff "Book for client" flow)
-      const qFirst = searchParams.get("first");
-      const qLast = searchParams.get("last");
-      const qEmail = searchParams.get("email");
-      const qPhone = searchParams.get("phone");
-      if (qFirst || qLast || qEmail || qPhone) {
-        setClient((prev) => ({
+      if (sess?.data?.user) {
+        setClient(prev => ({
           ...prev,
-          firstName: qFirst ?? prev.firstName,
-          lastName: qLast ?? prev.lastName,
-          email: qEmail ?? prev.email,
-          phone: qPhone ?? prev.phone,
+          email: sess.data.user.email ?? "",
+          firstName: sess.data.user.user_metadata?.first_name ?? prev.firstName,
+          lastName: sess.data.user.user_metadata?.last_name ?? prev.lastName,
+          phone: sess.data.user.user_metadata?.phone ?? prev.phone,
         }));
       }
-
-      // Capture referral code from ?ref= and persist for the session
-      const qRef = searchParams.get("ref");
-      if (qRef && /^[A-Za-z0-9]{4,16}$/.test(qRef)) {
-        try { localStorage.setItem("rka_ref", qRef.toUpperCase()); } catch { }
-      }
-
-      // Prefill client details from signed-in profile
-      const userId = sess.data.session?.user?.id;
-      const userEmail = sess.data.session?.user?.email;
-      if (userId) {
-        const { data: prof } = await apiQuery
-          .from("client_profiles").select("*").eq("user_id", userId).maybeSingle();
-        if (prof) {
-          setClient((prev) => ({
-            ...prev,
-            firstName: prof.first_name ?? prev.firstName,
-            lastName: prof.last_name ?? prev.lastName,
-            email: prof.email ?? userEmail ?? prev.email,
-            phone: prof.phone ?? prev.phone,
-            dob: prof.dob ?? prev.dob,
-          }));
-        } else if (userEmail) {
-          setClient((prev) => ({ ...prev, email: userEmail }));
-        }
-      } else {
-        // Anonymous: prefill from last booking on this device
-        try {
-          const raw = localStorage.getItem("rka_last_client");
-          if (raw) {
-            const last = JSON.parse(raw);
-            setClient((prev) => ({
-              ...prev,
-              firstName: prev.firstName || last.firstName || "",
-              lastName: prev.lastName || last.lastName || "",
-              email: prev.email || last.email || "",
-              phone: prev.phone || last.phone || "",
-              dob: prev.dob || last.dob || "",
-            }));
-          }
-        } catch { }
-      }
-
-      // Restore mid-flow draft selections if there is one
-      const hadQueryDeepLink = !!(searchParams.get("service") || searchParams.get("location") || searchParams.get("staff") || searchParams.get("reschedule"));
-      if (!hadQueryDeepLink) {
-        try {
-          const raw = localStorage.getItem("rka_book_draft");
-          if (raw) {
-            const d = JSON.parse(raw);
-            // Only restore selections if recent (< 7 days) and not already completed
-            if (d && d.when && Date.now() - d.when < 7 * 24 * 60 * 60 * 1000) {
-              if (Array.isArray(d.serviceIds)) setServiceIds(d.serviceIds);
-              if (d.locationId) setLocationId(d.locationId);
-              if (d.staffId) setStaffId(d.staffId);
-              if (d.date) setDate(new Date(d.date));
-              if (d.slot) setSlot(d.slot);
-              if (d.client) setClient(prev => ({ ...prev, ...d.client }));
-              // Always start from Step 1 per design requirement
-              setStep(1);
-            }
-          }
-        } catch { }
-      }
-
       setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autosave draft whenever the funnel state meaningfully changes
-  useEffect(() => {
-    if (loading) return;
-    try {
-      localStorage.setItem("rka_book_draft", JSON.stringify({
-        when: Date.now(),
-        step,
-        serviceIds, locationId, staffId,
-        date: date ? date.toISOString() : null,
-        slot,
-        client: {
-          firstName: client.firstName, lastName: client.lastName,
-          email: client.email, phone: client.phone, dob: client.dob,
-        },
-      }));
-    } catch { }
-  }, [loading, step, serviceIds, locationId, staffId, date, slot, client.firstName, client.lastName, client.email, client.phone, client.dob]);
+  const selectedServices = useMemo(() => {
+    return serviceIds.map(id => services.find(s => s.id === id)).filter(Boolean) as Service[];
+  }, [serviceIds, services]);
 
-  const selectedServices = useMemo(
-    () => serviceIds.map((id) => services.find((s) => s.id === id)).filter(Boolean) as Service[],
-    [serviceIds, services],
-  );
-  const totalDurationMin = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
-  // Backwards-compat: many step components still use a single primary service
-  const service = selectedServices[0];
+  const totalDurationMin = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+  }, [selectedServices]);
 
   const availableLocations = useMemo(() => {
-    if (serviceIds.length === 0) return [];
-    // Locations that offer ALL selected services
-    const counts = new Map<string, number>();
-    providers.filter(p => serviceIds.includes(p.service_id)).forEach(p => {
-      counts.set(p.location_id, (counts.get(p.location_id) ?? 0) + 1);
+    if (serviceIds.length === 0) return locations;
+    const validLocs = locations.filter(loc => {
+      return serviceIds.every(sId => providers.some(p => p.service_id === sId && p.location_id === loc.id));
     });
-    const ids = new Set(
-      Array.from(counts.entries())
-        .filter(([, n]) => n >= serviceIds.length)
-        .map(([k]) => k),
-    );
-    return locations.filter(l => ids.has(l.id));
-  }, [serviceIds, providers, locations]);
+    return validLocs.length > 0 ? validLocs : locations;
+  }, [serviceIds, locations, providers]);
 
   const availableStaff = useMemo(() => {
-    if (serviceIds.length === 0 || !locationId) return [];
-    // Staff that offer ALL selected services at this location
-    const counts = new Map<string, number>();
-    providers
-      .filter(p => p.location_id === locationId && serviceIds.includes(p.service_id))
-      .forEach(p => counts.set(p.staff_id, (counts.get(p.staff_id) ?? 0) + 1));
-    const ids = new Set(
-      Array.from(counts.entries())
-        .filter(([, n]) => n >= serviceIds.length)
-        .map(([k]) => k),
-    );
-    return staff.filter(s => ids.has(s.id));
-  }, [serviceIds, locationId, providers, staff]);
-
-  useEffect(() => {
-    if (step === 2 && serviceIds.length && availableLocations.length === 1 && !locationId) {
-      setLocationId(availableLocations[0].id);
-    }
-  }, [step, serviceIds, availableLocations, locationId]);
-
-  useEffect(() => {
-    if (step === 2 && locationId && availableStaff.length === 1 && !staffId) {
-      setStaffId(availableStaff[0].id);
-    }
-  }, [step, locationId, availableStaff, staffId]);
-
-  useEffect(() => {
-    if (step !== 3 || !date || serviceIds.length === 0 || !staffId || !locationId) return;
-    setLoadingSlots(true);
-    setSlot(null);
-    const dateStr = format(date, "yyyy-MM-dd");
-    ApiClient.post("get-availability", {
-      body: { serviceIds, staffId, locationId, date: dateStr },
-    }).then(({ data, error }) => {
-      if (error) toast.error("Could not load times");
-      setSlots(data?.slots ?? []);
-      setLoadingSlots(false);
+    if (!locationId || serviceIds.length === 0) return staff;
+    const validStaff = staff.filter(st => {
+      return serviceIds.every(sId => providers.some(p => p.service_id === sId && p.location_id === locationId && p.staff_id === st.id));
     });
-  }, [date, step, serviceIds, staffId, locationId]);
+    return validStaff.length > 0 ? validStaff : staff;
+  }, [locationId, serviceIds, staff, providers]);
 
-  // Load consents when entering step 5
-  useEffect(() => {
-    if (step !== 5 || serviceIds.length === 0) return;
-    setLoadingConsents(true);
-    ApiClient.post("get-service-consents", {
-      body: { serviceIds, email: client.email },
-    }).then(({ data, error }) => {
-      if (error || data?.error) {
-        toast.error(data?.error || "Could not load consent forms");
-      } else {
-        setConsents(data?.forms ?? []);
-        // Keep existing decisions where the form is still in the list
-        setConsentValues(prev => {
-          const next: Record<string, CompactValue> = {};
-          for (const f of data?.forms ?? []) {
-            if (!f.alreadySigned && prev[f.id]) next[f.id] = prev[f.id];
-          }
-          return next;
-        });
+  const handleJumpToStep = (targetStep: number) => {
+    if (targetStep < step) {
+      if (step === 5 && payStep === "pay" && targetStep === 5) {
+        setPayStep("consents");
+        return;
       }
-      setLoadingConsents(false);
-    });
-  }, [step, serviceIds, client.email]);
-
-  // Funnel analytics: log every step entry
-  useEffect(() => {
-    trackEvent(`step_${step}_viewed`, { serviceIds, locationId, staffId });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
-
-  const goNext = () => setStep((s) => (Math.min(5, s + 1) as Step));
-  const goBack = () => setStep((s) => (Math.max(1, s - 1) as Step));
-
-  // Guard: Users can only proceed to next step after completing the current step
-  useEffect(() => {
-    if (loading) return;
-    if (step > 1 && serviceIds.length === 0) {
-      setStep(1);
-    } else if (step > 2 && (!locationId || !staffId)) {
-      setStep(2);
-    } else if (step > 3 && (!date || !slot)) {
-      setStep(3);
-    } else if (step > 4 && (!client.firstName || !client.lastName || !client.email || !client.phone || !client.nppAck)) {
-      setStep(4);
+      setStep(targetStep as Step);
     }
-  }, [step, serviceIds, locationId, staffId, date, slot, client, loading]);
+  };
+
+  const goNext = () => setStep(prev => Math.min(prev + 1, 5) as Step);
+  const goBack = () => setStep(prev => Math.max(prev - 1, 1) as Step);
 
   const goToConsents = () => {
-    const parsed = detailsSchema.safeParse(client);
-    if (!parsed.success) {
+    const res = detailsSchema.safeParse(client);
+    if (!res.success) {
       const errors: Record<string, string> = {};
-      for (const issue of parsed.error.issues) {
-        const key = String(issue.path[0] ?? "");
-        if (key && !errors[key]) errors[key] = issue.message;
-      }
+      res.error.errors.forEach(e => {
+        const path = String(e.path[0]);
+        if (!errors[path]) errors[path] = e.message;
+      });
       setFieldErrors(errors);
-      toast.error("Please fix the highlighted fields");
       return;
     }
     setFieldErrors({});
-    // Capture the booking attempt for abandonment recovery
-    ApiClient.post("track-booking-attempt", {
-      body: {
-        sessionId: sessionIdRef.current,
-        email: client.email,
-        firstName: client.firstName,
-        lastName: client.lastName,
-        phone: client.phone,
-        serviceId: serviceIds[0] ?? null, locationId, staffId,
-        intendedStartAt: slot,
-      },
-    }).catch(() => { });
-    trackEvent("details_submitted", { serviceIds, locationId, staffId });
-    // Prefill the shared signer name from the details step.
-    const full = `${client.firstName} ${client.lastName}`.trim();
-    if (full && !sharedName.trim()) setSharedName(full);
-    goNext();
-  };
-
-  const trimmedSharedName = sharedName.trim();
-  const anyAgreed = useMemo(
-    () => consents.some(f => !f.alreadySigned && consentValues[f.id]?.agreed),
-    [consents, consentValues],
-  );
-
-  const allConsentsSatisfied = useMemo(() => {
-    if (loadingConsents) return false;
-    if (!consents.length) return true;
-    const decisionsOk = consents.every(f => {
-      if (f.alreadySigned) return true;
-      const v = consentValues[f.id];
-      if (!v) return false;
-      if (f.is_optional) return !!(v.agreed || v.declined);
-      return !!v.agreed;
-    });
-    if (!decisionsOk) return false;
-    // If any form is being agreed to, name + signature are required.
-    if (anyAgreed) {
-      if (trimmedSharedName.length < 2) return false;
-      if (!sharedSig) return false;
-    } else if (trimmedSharedName.length < 2) {
-      // Even when all optional forms are declined, we still need a name on record.
-      return false;
-    }
-    return true;
-  }, [consents, consentValues, loadingConsents, anyAgreed, trimmedSharedName, sharedSig]);
-
-  const submit = async () => {
-    if (serviceIds.length === 0 || !staffId || !locationId || !slot) return;
-    if (!acknowledged) { toast.error("Please acknowledge the cancellation policy"); return; }
-    if (!allConsentsSatisfied) { toast.error("Please review and agree to each consent, then sign once"); return; }
-    setSubmitting(true);
-    setCardError(null);
-
-    let card: { customerId: string; paymentMethodId: string; setupIntentId: string };
-    try {
-      card = await cardRef.current!.collect({
-        email: client.email,
-        name: `${client.firstName} ${client.lastName}`.trim(),
-        phone: client.phone,
-      });
-    } catch (e) {
-      setSubmitting(false);
-      const msg = (e as Error).message || "Card could not be saved";
-      setCardError(msg);
-      toast.error(msg);
-      return;
-    }
-
-    const sigPayload = consents
-      .filter(f => !f.alreadySigned)
-      .map(f => {
-        const v = consentValues[f.id] ?? { agreed: false, declined: false };
-        const p = buildPayloadFor(f, v, { name: trimmedSharedName, signaturePng: sharedSig });
-        if (!p) return null;
-        return {
-          consentFormId: f.id,
-          formVersion: f.version,
-          signedFullName: p.signedFullName,
-          signaturePng: p.signaturePng,
-          decision: p.decision,
-          attestationFlags: p.attestationFlags ?? {},
-          clientAttestedReview: !!p.clientAttestedReview,
-        };
-      })
-      .filter(Boolean);
-
-    let storedRef: string | null = null;
-    try { storedRef = localStorage.getItem("rka_ref"); } catch { }
-
-    const rescheduleId = searchParams.get("reschedule");
-    const { data, error } = await ApiClient.post("create-booking", {
-      body: {
-        serviceIds, staffId, locationId, startAt: slot,
-        client: {
-          firstName: client.firstName, lastName: client.lastName,
-          email: client.email, phone: client.phone,
-          dob: client.dob || undefined, notes: client.notes || undefined,
-          smsOptIn: !!client.smsOptIn,
-          marketingOptIn: !!client.marketingOptIn,
-        },
-        stripeCustomerId: card.customerId,
-        stripePaymentMethodId: card.paymentMethodId,
-        stripeSetupIntentId: card.setupIntentId,
-        signatures: sigPayload,
-        referralCode: storedRef || undefined,
-        rescheduleAppointmentId: rescheduleId || undefined,
-      },
-    });
-    setSubmitting(false);
-    if (error || data?.error) {
-      toast.error(data?.error || (await functionErrorMessage(error, "Could not submit booking")));
-      return;
-    }
-    // Mark attempt completed + log funnel event
-    ApiClient.post("track-booking-attempt", {
-      body: { sessionId: sessionIdRef.current, completed: true },
-    }).catch(() => { });
-    trackEvent("booking_completed", { serviceIds, locationId, staffId, appointmentId: data.id });
-    try {
-      localStorage.setItem("rka_last_client", JSON.stringify({
-        firstName: client.firstName, lastName: client.lastName,
-        email: client.email, phone: client.phone, dob: client.dob || "",
-      }));
-    } catch { }
-    // Record NPP acknowledgment on the profile for signed-in patients.
-    try {
-      const { NPP_VERSION } = await import("../public/PrivacyPractices");
-      const { data: { session } } = await authService.getSession();
-      if (session?.user?.id) {
-        await apiQuery("client_profiles").update({
-          npp_acknowledged_at: new Date().toISOString(),
-          npp_version: NPP_VERSION,
-        }).eq("user_id", session.user.id);
-      }
-    } catch { }
-    try { localStorage.removeItem("rka_book_draft"); } catch { }
-    navigate(`/booking/${data.token}?new=1`);
-
-  };
-
-  const handleJumpToStep = (target: number) => {
-    const current = step === 5 && payStep === "pay" ? 6 : step;
-    if (target === current) return;
-
-    if (target < current) {
-      if (target === 6) { setStep(5); setPayStep("pay"); }
-      else if (target === 5) { setStep(5); setPayStep("consents"); }
-      else { setStep(target); }
-      return;
-    }
-
-    // Jump forward validation
-    if (target >= 2 && serviceIds.length === 0) {
-      toast.error("Please select a service first.");
-      setStep(1);
-      return;
-    }
-    if (target >= 3 && locations.length > 1 && !locationId) {
-      toast.error("Please choose a location and provider.");
-      setStep(2);
-      return;
-    }
-    if (target >= 4 && (!slot || !date)) {
-      toast.error("Please pick a date and time slot.");
-      setStep(3);
-      return;
-    }
-
-    if (target === 6) { setStep(5); setPayStep("pay"); }
-    else if (target === 5) { setStep(5); setPayStep("consents"); }
-    else { setStep(target); }
+    setStep(5);
+    setPayStep("consents");
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex flex-col justify-between">
+        <SiteHeader />
+        <div className="flex-1 flex flex-col items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+          <p className="text-sm text-muted-foreground font-serif">Loading booking menu...</p>
+        </div>
+        <SiteFooter />
       </div>
     );
   }
@@ -547,19 +186,23 @@ const Book = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <SiteHeader />
 
-      <main className="flex-1 container mx-auto px-4 sm:px-6 md:px-8 pt-2 pb-8 max-w-6xl">
-        {/* Floating Announcement Banner */}
-        <div className="flex justify-center mb-2">
+      {/* Main Container — Middle 90% Width */}
+      <main className="flex-1 w-[95%] xl:w-[90%] max-w-[1440px] mx-auto px-3 sm:px-6 md:px-8 pt-6 pb-20">
+        
+        {/* Announcement Banner */}
+        <div className="flex justify-center mb-6">
           <NurseDiscountBanner />
         </div>
 
         {draftBanner && draftRestored && (
-          <div className="mb-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2 flex items-start gap-3 text-xs">
-            <span className="text-base leading-none mt-0.5" aria-hidden>↻</span>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium">Welcome back — we saved your spot.</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                Picked up at step {draftBanner.step} of 6. Your selections are filled in.
+          <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-3.5 flex items-center justify-between gap-4 text-xs shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="text-base leading-none text-primary" aria-hidden>↻</span>
+              <div>
+                <div className="font-medium text-foreground">Welcome back — we saved your spot.</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  Picked up at step {draftBanner.step} of 6. Your selections are filled in.
+                </div>
               </div>
             </div>
             <button
@@ -569,43 +212,35 @@ const Book = () => {
                 setDate(undefined); setSlot(null); setStep(1);
                 setDraftBanner(null); setDraftRestored(false);
               }}
-              className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline shrink-0"
+              className="text-[11px] text-primary font-medium hover:underline shrink-0"
             >
               Start over
             </button>
           </div>
         )}
-        {/* Step 5 is split into two sub-screens (consents + card) which we surface as 5/6 + 6/6 */}
-        {/* Screen-reader announcements when the booking step changes */}
-        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-          {step === 1 && "Step 1 of 6: choose your service."}
-          {step === 2 && "Step 2 of 6: choose location and provider."}
-          {step === 3 && "Step 3 of 6: pick a date and time."}
-          {step === 4 && "Step 4 of 6: enter your details."}
-          {step === 5 && payStep === "consents" && "Step 5 of 6: review and sign consents."}
-          {step === 5 && payStep === "pay" && "Step 6 of 6: add a card on file to confirm."}
-        </div>
-        {/* Sticky progress: keeps "where am I in the funnel?" visible while clients scroll long steps */}
-        <div className="sticky top-0 z-30 -mx-4 px-4 pt-1.5 pb-2 mb-3 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40">
-          <div className="flex items-center justify-between mb-1.5 gap-2">
-            <p className="text-[11px] uppercase tracking-[0.25em] text-muted-foreground font-medium">
-              {(() => {
-                const displayStep = step === 5 && payStep === "pay" ? 6 : step;
-                return `Step ${displayStep} of 6`;
-              })()}
-              <span className="ml-2 text-foreground/70 normal-case tracking-normal">
-                {step === 1 && "· Service"}
-                {step === 2 && "· Location & provider"}
-                {step === 3 && "· Date & time"}
-                {step === 4 && "· Your details"}
-                {step === 5 && payStep === "consents" && "· Consents"}
-                {step === 5 && payStep === "pay" && "· Card on file"}
+
+        {/* Systematic 6-Step Funnel Header */}
+        <div className="sticky top-4 z-30 mb-8 rounded-2xl border border-border/80 bg-background/95 backdrop-blur-md shadow-sm p-4 sm:p-5">
+          <div className="flex items-center justify-between mb-3 gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-[0.2em] font-semibold text-primary">
+                Step {step === 5 && payStep === "pay" ? 6 : step} of 6
               </span>
-            </p>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="text-sm font-medium text-foreground">
+                {step === 1 && "Select Service(s)"}
+                {step === 2 && "Location & Provider"}
+                {step === 3 && "Date & Time"}
+                {step === 4 && "Your Details"}
+                {step === 5 && payStep === "consents" && "Review Consents"}
+                {step === 5 && payStep === "pay" && "Card on File"}
+              </span>
+            </div>
+
             {step > 1 && (
               <button
                 onClick={() => { if (step === 5 && payStep === "pay") setPayStep("consents"); else goBack(); }}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground min-h-[36px] -mr-1 px-1 justify-end"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium px-3 py-1.5 rounded-full bg-secondary/80 hover:bg-secondary transition"
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
@@ -613,13 +248,13 @@ const Book = () => {
             )}
           </div>
 
+          {/* 6-Step Progress Line */}
           <div
-            className="flex gap-1.5 py-1 -my-1"
+            className="flex gap-2"
             role="progressbar"
             aria-valuemin={1}
             aria-valuemax={6}
             aria-valuenow={step === 5 && payStep === "pay" ? 6 : step}
-            aria-label={`Booking step ${step === 5 && payStep === "pay" ? 6 : step} of 6`}
           >
             {[1, 2, 3, 4, 5, 6].map(n => {
               const displayStep = step === 5 && payStep === "pay" ? 6 : step;
@@ -630,60 +265,61 @@ const Book = () => {
                   key={n}
                   type="button"
                   onClick={() => handleJumpToStep(n)}
-                  className={`h-2 flex-1 rounded-full transition-all duration-200 cursor-pointer group relative ${
+                  className={`h-2.5 flex-1 rounded-full transition-all duration-300 cursor-pointer ${
                     isCurrent
-                      ? "bg-primary ring-2 ring-primary/30"
+                      ? "bg-primary ring-4 ring-primary/20 scale-[1.02]"
                       : filled
-                      ? "bg-primary/80 hover:bg-primary"
-                      : "bg-secondary hover:bg-primary/40"
+                      ? "bg-primary/85 hover:bg-primary"
+                      : "bg-secondary/90 hover:bg-primary/30"
                   }`}
-                  title={`Click to navigate to Step ${n}`}
-                  aria-label={`Step ${n}`}
-                >
-                  <span className="sr-only">Step {n}</span>
-                </button>
+                  title={`Step ${n}`}
+                />
               );
             })}
           </div>
         </div>
 
-        {/* "What happens next" reassurance ribbon — compact & sleek */}
+        {/* Reassurance Ribbon — Systematic 3-Card Step Overview */}
         {step === 1 && (
-          <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-2 text-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold shrink-0">
-                What happens next
-              </span>
-              <ol className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
-                {[
-                  { n: "1", t: "Pick your service", d: "Browse menu & pricing" },
-                  { n: "2", t: "Pick a time", d: "See live availability" },
-                  { n: "3", t: "Save card", d: "No charge today" },
-                ].map(s => (
-                  <li key={s.n} className="flex items-center gap-2">
-                    <span className="shrink-0 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-medium inline-flex items-center justify-center">
-                      {s.n}
-                    </span>
-                    <div className="min-w-0">
-                      <span className="font-medium text-foreground">{s.t}</span>
-                      <span className="text-[11px] text-muted-foreground ml-1 hidden md:inline">({s.d})</span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
+          <div className="mb-8 rounded-2xl border border-primary/20 bg-primary/5 p-5 text-xs shadow-xs">
+            <div className="text-[11px] uppercase tracking-[0.2em] font-semibold text-primary mb-3.5">
+              What happens next
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1.5 border-t border-primary/10 pt-1 leading-tight">
-              Card on file is only used for services received or no-shows/cancellations within 48h ($200 fee).
-            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-background/80 p-3.5">
+                <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center justify-center shrink-0">
+                  1
+                </span>
+                <div>
+                  <div className="font-semibold text-foreground text-xs sm:text-sm">Pick your service</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Browse menu, duration & clear pricing</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-background/80 p-3.5">
+                <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center justify-center shrink-0">
+                  2
+                </span>
+                <div>
+                  <div className="font-semibold text-foreground text-xs sm:text-sm">Pick a time</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Real-time availability & instant reservation</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-background/80 p-3.5">
+                <span className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center justify-center shrink-0">
+                  3
+                </span>
+                <div>
+                  <div className="font-semibold text-foreground text-xs sm:text-sm">Save card (No charge today)</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Card on file only used for visit or 48h cancel</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         <Suspense fallback={<StepFallback />}>
-
-
-
-
-
           {step === 1 && (
             <StepService
               categories={categories} services={services}
@@ -692,7 +328,6 @@ const Book = () => {
               onToggle={(id) => {
                 setServiceIds((prev) => {
                   const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-                  // Reset downstream picks when the set of services changes
                   setLocationId(null); setStaffId(null); setDate(undefined); setSlot(null);
                   return next;
                 });
@@ -751,37 +386,39 @@ const Book = () => {
               setSharedName={setSharedName}
               sharedSig={sharedSig}
               setSharedSig={setSharedSig}
-              anyAgreed={anyAgreed}
-              clientName={`${client.firstName} ${client.lastName}`.trim()}
-              allConsentsSatisfied={allConsentsSatisfied}
               acknowledged={acknowledged}
               setAcknowledged={setAcknowledged}
+              payStep={payStep}
+              setPayStep={setPayStep}
               cardRef={cardRef}
               submitting={submitting}
+              setSubmitting={setSubmitting}
               cardError={cardError}
-              clearCardError={() => setCardError(null)}
-              subStep={payStep}
-              setSubStep={setPayStep}
+              setCardError={setCardError}
               summary={{
                 serviceName: selectedServices.map(s => s.name).join(" + "),
                 staffName: staff.find(s => s.id === staffId)?.full_name ?? "",
                 locationName: locations.find(l => l.id === locationId)?.name ?? "",
                 startAt: slot,
+                totalMin: totalDurationMin,
+                totalCents: selectedServices.reduce((sum, s) => sum + (s.price_cents ?? 0), 0),
+                client,
+                serviceIds,
+                locationId: locationId!,
+                staffId,
+                date: slot,
               }}
-              onSubmit={submit}
+              onSuccess={(aptId) => {
+                navigate(`/booking-confirmation?id=${aptId}`);
+              }}
             />
           )}
         </Suspense>
       </main>
-
 
       <SiteFooter />
     </div>
   );
 };
 
-/* Step components live in src/pages/book/ — imported at top of file. */
-
 export default Book;
-
-
