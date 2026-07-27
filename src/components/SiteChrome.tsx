@@ -97,6 +97,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
             <nav className="container mx-auto px-4 py-3 flex flex-col text-sm">
               {!isPortal && (
                 <>
+                  <NavLink to="/" end className="py-3 border-b border-border">Home</NavLink>
                   <NavLink to="/services" className="py-3 border-b border-border">Services & Pricing</NavLink>
                   <NavLink to="/staff/login" className="py-3 border-b border-border">My Account</NavLink>
                   <NavLink to="/model" className="py-3 border-b border-border">Become a Model</NavLink>

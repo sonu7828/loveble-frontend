@@ -227,7 +227,7 @@ export default function LocationPage() {
                       <img src={p.photo_url} alt={p.full_name} className="h-full w-full object-cover" loading="lazy" />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center font-serif text-2xl text-primary/50">
-                        {p.full_name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+                        {(p.full_name || "Provider").split(" ").map((n) => n[0]).slice(0, 2).join("")}
                       </div>
                     )}
                   </div>

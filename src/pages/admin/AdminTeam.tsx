@@ -47,6 +47,19 @@ interface PendingRequest {
 
 const PALETTE = ["#c97c5d", "#7c9dd1", "#a8c084", "#d4a3c4", "#e8b94b", "#8b7ec4", "#d97c7c", "#5db8a8"];
 
+const getInitials = (name?: string | null): string => {
+  if (!name) return "??";
+  const trimmed = name.trim();
+  if (!trimmed) return "??";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const resolveName = (m: any): string => {
+  return m?.full_name || m?.fullName || m?.name || [m?.first_name, m?.last_name].filter(Boolean).join(" ") || "Unnamed Member";
+};
+
 export default function AdminTeam() {
   const { isAdmin, isMedicalDirector, isPrivacyOfficer, isStaff, isNP, isPrivileged } = useAuth();
   const canAccessTeam = isAdmin || isMedicalDirector || isPrivacyOfficer || isStaff || isNP || isPrivileged;
@@ -98,21 +111,41 @@ export default function AdminTeam() {
 
   const load = async () => {
     setLoading(true);
-    const { data: m } = await apiQuery("staff_profiles").select("id, user_id, full_name, title, email, bio, color, is_owner, is_active, created_at, updated_at, calendar_email, phone, license_number" as any).order("is_owner", { ascending: false }).order("created_at");
-    const fetchedMembers = (m ?? []) as Member[];
-    const { data: pay } = await (apiQuery as any).from("staff_pay_config").select("staff_id, hourly_rate_cents, commission_percent");
+
+    const [{ data: m }, { data: pay }, { data: inv }] = await Promise.all([
+      apiQuery("staff_profiles").select("id, user_id, full_name, title, email, bio, color, is_owner, is_active, created_at, updated_at, calendar_email, phone, license_number" as any).order("is_owner", { ascending: false }).order("created_at"),
+      (apiQuery as any).from("staff_pay_config").select("staff_id, hourly_rate_cents, commission_percent"),
+      apiQuery("staff_invitations").select("staff_id, created_at, accepted_at, role").order("created_at", { ascending: false }),
+    ]);
+
+    const fetchedMembers = ((m ?? []) as any[]).map(x => ({
+      ...x,
+      full_name: resolveName(x),
+      title: x.title || "Team Member",
+      color: x.color || PALETTE[0],
+    })) as Member[];
 
     const payMap: Record<string, { hourly_rate_cents: number | null; commission_percent: number | null }> = {};
     (pay ?? []).forEach((p: any) => { payMap[p.staff_id] = p; });
 
     // Include local demo staff members
-    const localDemoMembers: Member[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
+    const rawLocalDemo: any[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
+    const localDemoMembers: Member[] = rawLocalDemo.map(x => ({
+      ...x,
+      full_name: resolveName(x),
+      title: x.title || "Team Member",
+      color: x.color || PALETTE[0],
+    }));
 
     const existingIds = new Set(fetchedMembers.map(x => x.id));
     const uniqueLocal = localDemoMembers.filter(x => !existingIds.has(x.id));
 
     // Load pending member creation requests and map them as pending members in Staff Management
-    const storedRequests: PendingRequest[] = JSON.parse(localStorage.getItem("rka_pending_member_requests") || "[]");
+    const rawStoredRequests: any[] = JSON.parse(localStorage.getItem("rka_pending_member_requests") || "[]");
+    const storedRequests: PendingRequest[] = rawStoredRequests.map(req => ({
+      ...req,
+      full_name: resolveName(req),
+    }));
     setPendingRequests(storedRequests);
 
     const activeIds = new Set([...fetchedMembers.map(x => x.id), ...uniqueLocal.map(x => x.id)]);
@@ -122,13 +155,13 @@ export default function AdminTeam() {
       .filter(req => !activeIds.has(req.id) && !activeEmails.has(req.email))
       .map(req => ({
         id: req.id,
-        full_name: req.full_name,
-        title: req.title,
-        email: req.email,
+        full_name: resolveName(req),
+        title: req.title || "Team Member",
+        email: req.email || "",
         user_id: null,
         is_active: false,
         is_owner: false,
-        color: req.color,
+        color: req.color || PALETTE[0],
         hourly_rate_cents: null,
         commission_percent: null,
         is_pending: true,
@@ -148,7 +181,7 @@ export default function AdminTeam() {
     } else {
       setRoles({});
     }
-    const { data: inv } = await apiQuery("staff_invitations").select("staff_id, created_at, accepted_at, role").order("created_at", { ascending: false });
+
     const im: typeof invites = {};
     (inv ?? []).forEach((row: any) => {
       if (!im[row.staff_id]) im[row.staff_id] = { sent: row.created_at, accepted: row.accepted_at, role: row.role };
@@ -438,11 +471,13 @@ export default function AdminTeam() {
   const deleteMember = async (m: Member) => {
     setBusy(m.id);
     try {
-      if (m.user_id) await apiQuery("user_roles").delete().eq("user_id", m.user_id);
-      await apiQuery("staff_invitations").delete().eq("staff_id", m.id);
-      await apiQuery("service_providers").delete().eq("staff_id", m.id);
-      await apiQuery("schedule_overrides").delete().eq("staff_id", m.id);
-      await apiQuery("staff_profiles").delete().eq("id", m.id);
+      await Promise.allSettled([
+        m.user_id ? apiQuery("user_roles").delete().eq("user_id", m.user_id) : Promise.resolve(),
+        apiQuery("staff_invitations").delete().eq("staff_id", m.id),
+        apiQuery("service_providers").delete().eq("staff_id", m.id),
+        apiQuery("schedule_overrides").delete().eq("staff_id", m.id),
+        apiQuery("staff_profiles").delete().eq("id", m.id),
+      ]);
     } catch (e) {
       console.warn("Remote delete notice:", e);
     }
@@ -611,11 +646,11 @@ export default function AdminTeam() {
                 <div key={req.id} className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white shadow-xs" style={{ background: req.color }}>
-                      {req.full_name.slice(0, 2).toUpperCase()}
+                      {getInitials(req.full_name)}
                     </div>
                     <div>
                       <div className="font-semibold text-sm text-foreground flex items-center gap-2">
-                        {req.full_name}
+                        {req.full_name || "Pending Member"}
                         <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[10px]">
                           {req.role.replace("_", " ")}
                         </Badge>
@@ -783,10 +818,10 @@ export default function AdminTeam() {
               <div key={m.id} className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="h-10 w-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white shadow-xs" style={{ background: m.color }}>
-                    {m.full_name.slice(0, 2).toUpperCase()}
+                    {getInitials(m.full_name)}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-medium truncate">{m.full_name}</div>
+                    <div className="font-medium truncate">{m.full_name || "Unnamed Member"}</div>
                     <div className="text-xs text-muted-foreground truncate">{m.title} · {m.email || "no email"}</div>
                     <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-1.5 items-center">
                       {m.is_owner && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">Owner</span>}
