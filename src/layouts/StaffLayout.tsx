@@ -138,15 +138,6 @@ export default function StaffLayout() {
             { to: "/staff/reports", label: "Reports", icon: BarChart3 },
           ],
         },
-        {
-          key: "settings_overview",
-          label: "Settings",
-          icon: Settings,
-          show: true,
-          children: [
-            { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
-          ],
-        },
       ];
     }
 
@@ -204,15 +195,6 @@ export default function StaffLayout() {
           show: true,
           children: [
             { to: "/staff/reports", label: "Reports", icon: BarChart3 },
-          ],
-        },
-        {
-          key: "sec_settings",
-          label: "Settings",
-          icon: Settings,
-          show: true,
-          children: [
-            { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
           ],
         },
       ];

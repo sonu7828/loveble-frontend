@@ -12,6 +12,7 @@ import {
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsHelp } from "@/components/staff/KeyboardShortcutsHelp";
 import ThemeToggle from "@/components/ThemeToggle";
+import StaffLayout from "./StaffLayout";
 import {
   Menu, ShieldCheck, ShieldAlert, Star, Users,
   BookOpen, History as HistoryIcon, Laptop, Building2, LogOut, Loader2, UserCircle2
@@ -27,8 +28,8 @@ interface NavItem {
 }
 
 export default function AdminLayout() {
-  const { user, loading, isAdmin, isMedicalDirector, isPrivileged } = useAuth();
-  const canAccessAdminLayout = isAdmin || isMedicalDirector;
+  const { user, loading, isAdmin, isMedicalDirector, isPrivacyOfficer, isPrivileged } = useAuth();
+  const canAccessAdminLayout = isAdmin;
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -72,14 +73,7 @@ export default function AdminLayout() {
   if (isPrivileged && !mfaOk) return <Navigate to="/staff/mfa" replace />;
 
   if (!canAccessAdminLayout) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-center px-4">
-        <div>
-          <p className="text-sm font-medium mb-4">Access Denied. Admin or Medical Director privileges required.</p>
-          <Button variant="outline" onClick={async () => { clearDemoAuthSession(); await authService.logout(); navigate("/staff/login"); }}>Sign out</Button>
-        </div>
-      </div>
-    );
+    return <StaffLayout />;
   }
 
   const footerLinkCls = ({ isActive }: { isActive: boolean }) =>

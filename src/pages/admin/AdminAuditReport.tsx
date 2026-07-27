@@ -57,7 +57,7 @@ const downloadBlob = (content: string, filename: string, mime = "text/csv;charse
 };
 
 export default function AdminAuditReport() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isMedicalDirector, isPrivacyOfficer, loading: authLoading } = useAuth();
 
   const [from, setFrom] = useState<string>(format(subDays(new Date(), 30), "yyyy-MM-dd"));
   const [to, setTo] = useState<string>(format(new Date(), "yyyy-MM-dd"));
@@ -280,7 +280,7 @@ export default function AdminAuditReport() {
   const totalPages = Math.max(1, Math.ceil(events.length / PAGE_SIZE));
 
   if (authLoading) return <div className="flex justify-center py-32"><Loader2 className="h-5 w-5 animate-spin" /></div>;
-  if (!isAdmin) return <Navigate to="/staff/today" replace />;
+  if (!isAdmin && !isMedicalDirector && !isPrivacyOfficer) return <Navigate to="/staff/today" replace />;
 
   const maxDay = Math.max(1, ...summary.perDay.map((d) => d.count));
 
