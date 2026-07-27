@@ -93,7 +93,7 @@ const Index = () => {
 
       {/* Hero Section — 3-Panel Side-by-Side Composition */}
       <section className="relative w-full bg-secondary/40 dark:bg-background border-b border-border overflow-hidden transition-colors duration-300">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 min-h-[440px] lg:min-h-[520px]">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 min-h-[500px] lg:min-h-[640px]">
 
           {/* Left Image Panel — Archway & Olive Tree */}
           <div className="hidden lg:block lg:col-span-4 relative overflow-hidden">
@@ -106,7 +106,7 @@ const Index = () => {
 
           {/* Center Card Panel — A quiet ritual of refinement */}
           <div className="col-span-1 lg:col-span-4 flex items-stretch justify-center bg-background lg:bg-[#f5f0eb] dark:lg:bg-background">
-            <div className="w-full max-w-[520px] bg-card/95 dark:bg-card/90 text-card-foreground flex flex-col justify-between min-h-[440px] lg:min-h-[520px] px-10 sm:px-14 pt-8 pb-0 border-x border-border">
+            <div className="w-full max-w-[520px] bg-card/95 dark:bg-card/90 text-card-foreground flex flex-col justify-between min-h-[500px] lg:min-h-[640px] px-10 sm:px-14 pt-10 pb-8 sm:pb-10 border-x border-border">
 
               {/* Top: Brand label + divider line */}
               <div className="flex flex-col items-center">
@@ -117,8 +117,8 @@ const Index = () => {
               </div>
 
               {/* Middle: Headline + location tag */}
-              <div className="flex flex-col gap-6 mt-6 mb-auto">
-                <h1 className="font-serif text-4xl sm:text-5xl lg:text-[3.5rem] text-card-foreground font-medium leading-[1.05] tracking-tight">
+              <div className="flex flex-col gap-6 my-auto">
+                <h1 className="font-serif text-4xl sm:text-5xl lg:text-[4rem] text-card-foreground font-medium leading-[1.05] tracking-tight">
                   A quiet<br />
                   <span className="italic font-serif text-primary font-normal">ritual</span><br />
                   of refinement.
@@ -145,7 +145,7 @@ const Index = () => {
                 {/* Full-width button */}
                 <Button
                   asChild
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-5 h-auto text-xs font-medium tracking-[0.22em] uppercase rounded-none shadow-none transition-all active:scale-[0.98]"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-5 h-auto text-xs font-medium tracking-[0.22em] uppercase rounded-md shadow-none transition-all active:scale-[0.98]"
                 >
                   <Link to={bookHref}>BOOK AN APPOINTMENT</Link>
                 </Button>
@@ -346,27 +346,27 @@ const Index = () => {
       </section>
 
       {/* Reserve CTA Banner */}
-      <section className="px-6 pt-4 pb-8 sm:pt-8 sm:pb-12 bg-background transition-colors duration-300">
-        <div className="relative max-w-5xl mx-auto rounded-2xl bg-secondary/40 dark:bg-card border border-border py-6 sm:py-8 px-8 sm:px-16 text-center overflow-hidden shadow-sm">
+      <section className="px-4 sm:px-6 pt-4 pb-8 sm:pt-8 sm:pb-12 bg-background transition-colors duration-300">
+        <div className="relative max-w-5xl mx-auto rounded-2xl bg-secondary/40 dark:bg-card border border-border py-8 sm:py-10 px-5 sm:px-8 md:px-16 text-center overflow-hidden shadow-sm">
           {/* Subtle Leaf Branch Vector Accent */}
-          <div className="pointer-events-none absolute right-4 md:right-12 top-1/2 -translate-y-1/2 opacity-50">
+          <div className="pointer-events-none absolute -right-6 sm:right-2 md:right-12 top-1/2 -translate-y-1/2 opacity-20 sm:opacity-30 md:opacity-50">
             <img
               src={rkaLogo}
               alt=""
-              className="w-32 h-32 md:w-48 md:h-48 rounded-full object-cover shadow-sm mix-blend-multiply dark:mix-blend-lighten"
+              className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full object-cover shadow-sm mix-blend-multiply dark:mix-blend-lighten"
             />
           </div>
 
-          <div className="relative z-10">
+          <div className="relative z-10 flex flex-col items-center">
             <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] font-semibold text-primary mb-2">
               RESERVE
             </p>
-            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium mb-6">
+            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-foreground font-medium mb-6 sm:mb-8">
               Begin the ritual.
             </h2>
             <Button
               asChild
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-4 h-auto text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase rounded-lg shadow-md transition active:scale-[0.98]"
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-4 h-auto text-[10px] sm:text-xs font-medium tracking-[0.15em] sm:tracking-[0.2em] uppercase rounded-lg shadow-md transition active:scale-[0.98]"
             >
               <Link to={bookHref}>BOOK YOUR APPOINTMENT</Link>
             </Button>
