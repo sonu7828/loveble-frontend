@@ -116,6 +116,9 @@ export class ApiTableQuery {
   private tableName: string;
   private action: "select" | "insert" | "update" | "upsert" | "delete" = "select";
   private payload: any = null;
+  private filters: Array<{ col: string; op: string; val: any }> = [];
+  private limitCount: number | null = null;
+  private selectedColumns = "*";
 
   constructor(tableName: string) {
     this.tableName = tableName;
@@ -123,46 +126,60 @@ export class ApiTableQuery {
 
   public select(columns = "*"): this {
     this.action = "select";
+    this.selectedColumns = columns;
     return this;
   }
 
   public eq(column: string, value: any): this {
+    this.filters.push({ col: column, op: "eq", val: value });
     return this;
   }
 
   public neq(column: string, value: any): this {
+    this.filters.push({ col: column, op: "neq", val: value });
     return this;
   }
 
   public gte(column: string, value: any): this {
+    this.filters.push({ col: column, op: "gte", val: value });
     return this;
   }
 
   public lte(column: string, value: any): this {
+    this.filters.push({ col: column, op: "lte", val: value });
     return this;
   }
 
   public is(column: string, value: any): this {
+    this.filters.push({ col: column, op: "is", val: value });
     return this;
   }
 
   public in(column: string, values: any[]): this {
+    this.filters.push({ col: column, op: "in", val: values });
     return this;
   }
 
   public not(column: string, operator: string, value: any): this {
+    this.filters.push({ col: column, op: `not.${operator}`, val: value });
     return this;
   }
 
   public ilike(column: string, pattern: string): this {
+    this.filters.push({ col: column, op: "ilike", val: pattern });
     return this;
   }
 
-  public order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): this {
+  public order(column: string, _options?: { ascending?: boolean; nullsFirst?: boolean }): this {
     return this;
   }
 
   public limit(count: number): this {
+    this.limitCount = count;
+    return this;
+  }
+
+  public range(_from: number, _to: number): this {
     return this;
   }
 
@@ -178,7 +195,7 @@ export class ApiTableQuery {
     return this;
   }
 
-  public upsert(data: any, options?: any): this {
+  public upsert(data: any, _options?: any): this {
     this.action = "upsert";
     this.payload = data;
     return this;
@@ -187,6 +204,30 @@ export class ApiTableQuery {
   public delete(): this {
     this.action = "delete";
     return this;
+  }
+
+  /** Build a query-string from stored filters for DELETE/UPDATE requests */
+  private buildQueryString(): string {
+    if (!this.filters.length) return "";
+    const params = new URLSearchParams();
+    for (const f of this.filters) {
+      params.append(f.col, String(f.val));
+    }
+    return `?${params.toString()}`;
+  }
+
+  /** Apply eq/in filters on a data array returned by SELECT (client-side fallback) */
+  private applyFilters(data: any[]): any[] {
+    return data.filter((row) =>
+      this.filters.every((f) => {
+        const v = row[f.col];
+        if (f.op === "eq") return String(v) === String(f.val);
+        if (f.op === "neq") return String(v) !== String(f.val);
+        if (f.op === "in") return Array.isArray(f.val) && f.val.map(String).includes(String(v));
+        if (f.op === "is") return f.val === null ? v == null : v === f.val;
+        return true; // pass through for ops we can't handle client-side
+      })
+    );
   }
 
   public async single(): Promise<{ data: any; error: any }> {
@@ -203,13 +244,14 @@ export class ApiTableQuery {
 
   private async execute(): Promise<{ data: any; error: any; count: number }> {
     let res: any;
+    const qs = this.buildQueryString();
     try {
       if (this.action === "insert") {
         res = await ApiClient.post(`/${this.tableName}`, this.payload);
       } else if (this.action === "update" || this.action === "upsert") {
-        res = await ApiClient.patch(`/${this.tableName}`, this.payload);
+        res = await ApiClient.patch(`/${this.tableName}${qs}`, this.payload);
       } else if (this.action === "delete") {
-        res = await ApiClient.delete(`/${this.tableName}`);
+        res = await ApiClient.delete(`/${this.tableName}${qs}`);
       } else {
         res = await ApiClient.get(`/${this.tableName}`);
       }
@@ -225,6 +267,14 @@ export class ApiTableQuery {
       data = MOCK_FALLBACKS[this.tableName];
     }
     data = data ?? [];
+
+    // For SELECT queries, apply client-side filtering so callers with .eq() get correct subsets
+    if (this.action === "select" && Array.isArray(data) && this.filters.length > 0) {
+      data = this.applyFilters(data);
+    }
+    if (this.limitCount !== null && Array.isArray(data)) {
+      data = data.slice(0, this.limitCount);
+    }
 
     return {
       data,

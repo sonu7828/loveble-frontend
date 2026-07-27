@@ -280,7 +280,7 @@ function VendorTab() {
     try {
       const { data, error } = await apiQuery("vendors" as any).select("*").order("name");
       if (!error && data) remoteVendors = (data as any) as Vendor[];
-    } catch (e) {}
+    } catch (e) { }
 
     const defaultHipaaVendors: Vendor[] = [
       { id: "v-lovable", name: "Lovable Cloud (Database Host)", category: "Database & Cloud Infrastructure", touches_phi: true, baa_required: true, baa_status: "signed", baa_signed_at: "2025-01-15", baa_renewal_at: "2027-01-15", contact_name: "Compliance Dept", contact_email: "hipaa@lovable.dev", notes: "PostgreSQL & Asset Storage BAA" },
@@ -291,20 +291,26 @@ function VendorTab() {
     ];
 
     const localDemoVendors: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
+    const deletedVendorIds: string[] = JSON.parse(localStorage.getItem("rka_deleted_vendor_ids") || "[]");
     const mergedList = [...remoteVendors];
 
     for (const def of defaultHipaaVendors) {
+      if (deletedVendorIds.includes(def.id)) continue;
       if (!mergedList.some((x) => x.name.toLowerCase().includes(def.name.split(" ")[0].toLowerCase()))) {
         mergedList.push(def);
       }
     }
     for (const loc of localDemoVendors) {
+      if (deletedVendorIds.includes(loc.id)) continue;
       if (!mergedList.some((x) => x.id === loc.id)) {
         mergedList.push(loc);
       }
     }
 
-    setRows(mergedList);
+    // Also filter out any remote vendors that were deleted locally
+    const finalList = mergedList.filter(v => !deletedVendorIds.includes(v.id));
+
+    setRows(finalList);
     setLoading(false);
   }
 
@@ -333,11 +339,11 @@ function VendorTab() {
     };
 
     if (form.id) {
-      try { await apiQuery("vendors" as any).update(payload).eq("id", form.id); } catch (e) {}
+      try { await apiQuery("vendors" as any).update(payload).eq("id", form.id); } catch (e) { }
       const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
       localStorage.setItem("rka_demo_vendors", JSON.stringify(local.map(v => v.id === form.id ? { ...v, ...payload } : v)));
     } else {
-      try { await apiQuery("vendors" as any).insert(payload); } catch (e) {}
+      try { await apiQuery("vendors" as any).insert(payload); } catch (e) { }
       const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
       local.push({ id: `vendor-${Date.now()}`, ...payload });
       localStorage.setItem("rka_demo_vendors", JSON.stringify(local));
@@ -351,9 +357,15 @@ function VendorTab() {
 
   async function remove(id: string) {
     if (!(await confirmDialog({ title: "Delete vendor?", description: "This will remove the vendor from your inventory records. This action cannot be undone.", destructive: true, confirmLabel: "Delete Vendor" }))) return;
-    try { await apiQuery("vendors" as any).delete().eq("id", id); } catch (e) {}
+    try { await apiQuery("vendors" as any).delete().eq("id", id); } catch (e) { }
     const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
     localStorage.setItem("rka_demo_vendors", JSON.stringify(local.filter(v => v.id !== id)));
+
+    // Persist deletion so hardcoded defaults and remote vendors don't reappear
+    const deletedIds: string[] = JSON.parse(localStorage.getItem("rka_deleted_vendor_ids") || "[]");
+    if (!deletedIds.includes(id)) deletedIds.push(id);
+    localStorage.setItem("rka_deleted_vendor_ids", JSON.stringify(deletedIds));
+
     toast({ title: "Vendor deleted" });
     load();
   }
@@ -620,7 +632,7 @@ function DeviceTab() {
           }
         });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const demoMembers: any[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
     demoMembers.forEach((m: any) => {

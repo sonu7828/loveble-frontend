@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,14 +22,13 @@ interface Member {
   pending_role?: Role;
 }
 
-type Role = "admin" | "provider" | "nurse_practitioner" | "medical_director" | "scheduler" | "receptionist" | "staff" | "privacy_officer";
+type Role = "admin" | "provider" | "nurse_practitioner" | "medical_director" | "receptionist" | "staff" | "privacy_officer";
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin (full access)",
   privacy_officer: "Privacy & Security Officer (HIPAA Policy Approval & Security)",
   medical_director: "Medical Director (supervising physician — sign & co-sign notes)",
   provider: "Provider (clinical provider)",
   nurse_practitioner: "Nurse Practitioner (GFE + clinical co-sign)",
-  scheduler: "Scheduler (manage all bookings)",
   receptionist: "Front Desk Receptionist (book, check in, schedule)",
   staff: "Staff (own bookings only)",
 };
@@ -72,6 +71,7 @@ export default function AdminTeam() {
   const [invites, setInvites] = useState<Record<string, { sent: string; accepted: string | null; role: Role }>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const loadInProgress = useRef(false);
 
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
 
@@ -110,6 +110,8 @@ export default function AdminTeam() {
   };
 
   const load = async () => {
+    if (loadInProgress.current) return; // prevent overlapping calls → 429
+    loadInProgress.current = true;
     setLoading(true);
 
     const [{ data: m }, { data: pay }, { data: inv }] = await Promise.all([
@@ -125,6 +127,14 @@ export default function AdminTeam() {
       color: x.color || PALETTE[0],
     })) as Member[];
 
+    // Filter out any members that were previously deleted by the user
+    const deletedIds: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_ids") || "[]");
+    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+    const filteredFetched = fetchedMembers.filter(x =>
+      !deletedIds.includes(x.id) &&
+      !(x.email && deletedEmails.includes((x.email || "").toLowerCase()))
+    );
+
     const payMap: Record<string, { hourly_rate_cents: number | null; commission_percent: number | null }> = {};
     (pay ?? []).forEach((p: any) => { payMap[p.staff_id] = p; });
 
@@ -137,8 +147,8 @@ export default function AdminTeam() {
       color: x.color || PALETTE[0],
     }));
 
-    const existingIds = new Set(fetchedMembers.map(x => x.id));
-    const uniqueLocal = localDemoMembers.filter(x => !existingIds.has(x.id));
+    const existingIds = new Set(filteredFetched.map(x => x.id));
+    const uniqueLocal = localDemoMembers.filter(x => !existingIds.has(x.id) && !deletedIds.includes(x.id));
 
     // Load pending member creation requests and map them as pending members in Staff Management
     const rawStoredRequests: any[] = JSON.parse(localStorage.getItem("rka_pending_member_requests") || "[]");
@@ -148,11 +158,11 @@ export default function AdminTeam() {
     }));
     setPendingRequests(storedRequests);
 
-    const activeIds = new Set([...fetchedMembers.map(x => x.id), ...uniqueLocal.map(x => x.id)]);
-    const activeEmails = new Set([...fetchedMembers.map(x => x.email), ...uniqueLocal.map(x => x.email)].filter(Boolean));
+    const activeIds = new Set([...filteredFetched.map(x => x.id), ...uniqueLocal.map(x => x.id)]);
+    const activeEmails = new Set([...filteredFetched.map(x => x.email), ...uniqueLocal.map(x => x.email)].filter(Boolean));
 
     const pendingMembers: Member[] = storedRequests
-      .filter(req => !activeIds.has(req.id) && !activeEmails.has(req.email))
+      .filter(req => !activeIds.has(req.id) && !activeEmails.has(req.email) && !deletedIds.includes(req.id))
       .map(req => ({
         id: req.id,
         full_name: resolveName(req),
@@ -168,9 +178,9 @@ export default function AdminTeam() {
         pending_role: req.role,
       }));
 
-    setMembers([...fetchedMembers, ...uniqueLocal, ...pendingMembers]);
+    setMembers([...filteredFetched, ...uniqueLocal, ...pendingMembers]);
 
-    const userIds = (m ?? []).map((x: any) => x.user_id).filter(Boolean);
+    const userIds = (filteredFetched).map((x: any) => x.user_id).filter(Boolean);
     if (userIds.length) {
       const { data: r } = await apiQuery("user_roles").select("user_id, role").in("user_id", userIds);
       const map: Record<string, Role[]> = {};
@@ -195,6 +205,7 @@ export default function AdminTeam() {
 
     setInvites(im);
     setLoading(false);
+    loadInProgress.current = false;
   };
 
   useEffect(() => { if (canAccessTeam) load(); }, [canAccessTeam]);
@@ -261,11 +272,12 @@ export default function AdminTeam() {
       }
       localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(updatedAccounts));
 
-      // Update active team list
+      // Update active team list — only match by ID or by original email (not draft email)
+      const originalEmail = (originalMember?.email || "").toLowerCase();
       const existingTeam: Member[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
       let teamFound = false;
       const updatedTeam = existingTeam.map(m => {
-        if (m.id === draft.id || (m.email && email && m.email.toLowerCase() === m.email.toLowerCase())) {
+        if (m.id === draft.id || (m.email && originalEmail && m.email.toLowerCase() === originalEmail)) {
           teamFound = true;
           return {
             ...m,
@@ -290,17 +302,26 @@ export default function AdminTeam() {
       }
       localStorage.setItem("rka_demo_team_members", JSON.stringify(updatedTeam));
 
-      // Update in database if it exists there
-      if (originalMember?.user_id) {
-        try {
-          await apiQuery("staff_profiles").update({
-            full_name: draft.full_name.trim(),
-            title: draft.title.trim(),
-            email,
-            color: draft.color,
-          }).eq("id", draft.id);
-        } catch (e) {}
-      }
+      // Update in-memory members state immediately for instant UI feedback
+      setMembers(prev => prev.map(x =>
+        x.id === draft.id
+          ? { ...x, full_name: draft.full_name.trim(), title: draft.title.trim(), email, color: draft.color }
+          : x
+      ));
+
+      // Attempt a best-effort DB update (safe to fail — localStorage is source of truth)
+      // We use the backend's PUT /staff_profiles/:id pattern if supported
+      try {
+        await ApiClient.put(`/staff_profiles/${draft.id}`, {
+          full_name: draft.full_name.trim(),
+          title: draft.title.trim(),
+          email,
+          color: draft.color,
+        });
+      } catch (_e) {}
+
+      // Invalidate GET cache so next load() fetches fresh data
+      ApiClient.clearCache("/staff_profiles");
 
       toast.success(`Member ${draft.full_name} updated successfully!`);
     } else {
@@ -493,6 +514,18 @@ export default function AdminTeam() {
     const pendingReqs: PendingRequest[] = JSON.parse(localStorage.getItem("rka_pending_member_requests") || "[]");
     const updatedReqs = pendingReqs.filter(r => r.id !== m.id && r.email !== m.email);
     localStorage.setItem("rka_pending_member_requests", JSON.stringify(updatedReqs));
+
+    // Persist this deletion so DB-sourced members don't re-appear on next load
+    const deletedIds: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_ids") || "[]");
+    if (!deletedIds.includes(m.id)) deletedIds.push(m.id);
+    localStorage.setItem("rka_deleted_staff_ids", JSON.stringify(deletedIds));
+
+    if (m.email) {
+      const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+      const emailKey = m.email.toLowerCase();
+      if (!deletedEmails.includes(emailKey)) deletedEmails.push(emailKey);
+      localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(deletedEmails));
+    }
 
     setBusy(null);
     setConfirmDelete(null);

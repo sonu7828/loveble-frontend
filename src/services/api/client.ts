@@ -1,6 +1,7 @@
 /**
  * Base API Client for Node.js + Express REST API Backend.
  * Handles HTTP requests, headers, authorization tokens, and API error formatting.
+ * Includes: in-flight deduplication, short-lived GET cache, and 429 exponential-backoff retry.
  */
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:5000/api";
@@ -13,7 +14,10 @@ export interface ApiResponse<T = any> {
 
 const inFlightRequests = new Map<string, Promise<ApiResponse<any>>>();
 const responseCache = new Map<string, { data: ApiResponse<any>; timestamp: number }>();
-const CACHE_TTL_MS = 2000;
+const CACHE_TTL_MS = 10_000; // 10 s — avoids duplicate requests after mutations
+
+/** Sleep helper for backoff delays */
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export class ApiClient {
   private static getToken(): string | null {
@@ -33,9 +37,14 @@ export class ApiClient {
     }
   }
 
+  /**
+   * Core HTTP request with automatic 429 retry using exponential backoff.
+   * Retries up to `maxRetries` times on 429 or network errors.
+   */
   public static async request<T = any>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    maxRetries = 4
   ): Promise<ApiResponse<T>> {
     const token = this.getToken();
     const headers: Record<string, string> = {
@@ -47,38 +56,56 @@ export class ApiClient {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-      });
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          ...options,
+          headers,
+        });
 
-      const contentType = response.headers.get("content-type");
-      let data: any = null;
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
+        const contentType = response.headers.get("content-type");
+        let data: any = null;
+        if (contentType && contentType.includes("application/json")) {
+          data = await response.json();
+        }
 
-      if (!response.ok) {
+        // 429 – rate limited: back off and retry
+        if (response.status === 429 && attempt < maxRetries) {
+          const retryAfterHeader = response.headers.get("retry-after");
+          const waitMs = retryAfterHeader
+            ? parseInt(retryAfterHeader, 10) * 1000
+            : Math.min(600 * Math.pow(2, attempt), 10_000); // 600ms → 1.2s → 2.4s → 4.8s…
+          await sleep(waitMs);
+          continue;
+        }
+
+        if (!response.ok) {
+          return {
+            data: null,
+            error: data?.message || data?.error || `HTTP ${response.status}: ${response.statusText}`,
+            status: response.status,
+          };
+        }
+
         return {
-          data: null,
-          error: data?.message || data?.error || `HTTP ${response.status}: ${response.statusText}`,
+          data: data !== null ? data : ({} as T),
+          error: null,
           status: response.status,
         };
+      } catch (err: any) {
+        if (attempt < maxRetries) {
+          await sleep(Math.min(600 * Math.pow(2, attempt), 10_000));
+          continue;
+        }
+        return {
+          data: null,
+          error: err.message || "Network error. Please check backend connection.",
+          status: 0,
+        };
       }
-
-      return {
-        data: data !== null ? data : ({} as T),
-        error: null,
-        status: response.status,
-      };
-    } catch (err: any) {
-      return {
-        data: null,
-        error: err.message || "Network error. Please check backend connection.",
-        status: 0,
-      };
     }
+
+    return { data: null, error: "Max retries exceeded (rate limit)", status: 429 };
   }
 
   public static get<T = any>(endpoint: string, options: RequestInit = {}) {
