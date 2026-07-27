@@ -11,9 +11,26 @@ export interface ApiResponse<T = any> {
   status: number;
 }
 
+const inFlightRequests = new Map<string, Promise<ApiResponse<any>>>();
+const responseCache = new Map<string, { data: ApiResponse<any>; timestamp: number }>();
+const CACHE_TTL_MS = 2000;
+
 export class ApiClient {
   private static getToken(): string | null {
     return localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token");
+  }
+
+  public static clearCache(endpointPattern?: string) {
+    if (!endpointPattern) {
+      responseCache.clear();
+      return;
+    }
+    const cleanPattern = endpointPattern.replace(/^\//, "").split("/")[0];
+    for (const key of responseCache.keys()) {
+      if (!cleanPattern || key.includes(cleanPattern)) {
+        responseCache.delete(key);
+      }
+    }
   }
 
   public static async request<T = any>(
@@ -65,10 +82,37 @@ export class ApiClient {
   }
 
   public static get<T = any>(endpoint: string, options: RequestInit = {}) {
-    return this.request<T>(endpoint, { ...options, method: "GET" });
+    const cacheKey = endpoint;
+    const now = Date.now();
+
+    const cached = responseCache.get(cacheKey);
+    if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+      return Promise.resolve(cached.data as ApiResponse<T>);
+    }
+
+    if (inFlightRequests.has(cacheKey)) {
+      return inFlightRequests.get(cacheKey) as Promise<ApiResponse<T>>;
+    }
+
+    const reqPromise = this.request<T>(endpoint, { ...options, method: "GET" })
+      .then((res) => {
+        inFlightRequests.delete(cacheKey);
+        if (res.status === 200 || res.status === 304) {
+          responseCache.set(cacheKey, { data: res, timestamp: Date.now() });
+        }
+        return res;
+      })
+      .catch((err) => {
+        inFlightRequests.delete(cacheKey);
+        throw err;
+      });
+
+    inFlightRequests.set(cacheKey, reqPromise);
+    return reqPromise;
   }
 
   public static post<T = any>(endpoint: string, body?: any, options: RequestInit = {}) {
+    this.clearCache(endpoint);
     return this.request<T>(endpoint, {
       ...options,
       method: "POST",
@@ -77,6 +121,7 @@ export class ApiClient {
   }
 
   public static put<T = any>(endpoint: string, body?: any, options: RequestInit = {}) {
+    this.clearCache(endpoint);
     return this.request<T>(endpoint, {
       ...options,
       method: "PUT",
@@ -85,6 +130,7 @@ export class ApiClient {
   }
 
   public static patch<T = any>(endpoint: string, body?: any, options: RequestInit = {}) {
+    this.clearCache(endpoint);
     return this.request<T>(endpoint, {
       ...options,
       method: "PATCH",
@@ -93,6 +139,7 @@ export class ApiClient {
   }
 
   public static delete<T = any>(endpoint: string, options: RequestInit = {}) {
+    this.clearCache(endpoint);
     return this.request<T>(endpoint, { ...options, method: "DELETE" });
   }
 }
