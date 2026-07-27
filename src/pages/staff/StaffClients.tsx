@@ -48,10 +48,25 @@ export default function StaffClients() {
   const [leads, setLeads] = useState<Array<{ email: string; first_name: string | null; last_name: string | null; phone: string | null; lead_captured_at: string | null; lead_source: string | null }>>([]);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
 
+  const [clientProfiles, setClientProfiles] = useState<any[]>([]);
+  const [addClientOpen, setAddClientOpen] = useState(false);
+  const [addClientDraft, setAddClientDraft] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    dob: "",
+  });
+  const [addClientBusy, setAddClientBusy] = useState(false);
+
   const reloadAccounts = async () => {
-    const { data } = await apiQuery("client_profiles").select("email, is_lead, first_name, last_name, phone, lead_captured_at, lead_source").limit(5000);
-    setAccountEmails(new Set((data ?? []).map((r: any) => (r.email || "").toLowerCase())));
-    const leadRows = (data ?? []).filter((r: any) => r.is_lead);
+    const { data } = await apiQuery("client_profiles").select("email, is_lead, first_name, last_name, phone, dob, lead_captured_at, lead_source, created_at").limit(5000);
+    const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+    const cpList = [...(data ?? []), ...localClients];
+
+    setClientProfiles(cpList);
+    setAccountEmails(new Set(cpList.map((r: any) => (r.email || "").toLowerCase())));
+    const leadRows = cpList.filter((r: any) => r.is_lead);
     setLeadEmails(new Set(leadRows.map((r: any) => (r.email || "").toLowerCase())));
     setLeads(leadRows.map((r: any) => ({
       email: (r.email || "").toLowerCase(),
@@ -499,6 +514,25 @@ export default function StaffClients() {
         existing.appt_count += 1;
       }
     }
+    for (const cp of clientProfiles) {
+      const email = (cp.email || "").trim().toLowerCase();
+      if (!email) continue;
+      if (!map.has(email)) {
+        map.set(email, {
+          key: email,
+          first_name: cp.first_name || "Client",
+          last_name: cp.last_name || "",
+          email: cp.email,
+          phone: cp.phone ?? null,
+          dob: cp.dob ?? null,
+          appt_count: 0,
+          last_appt: null,
+          imported_id: null,
+          invited_at: null,
+          sort_at: cp.created_at ? new Date(cp.created_at).getTime() : 0,
+        });
+      }
+    }
     for (const i of imported) {
       const key = i.email.trim().toLowerCase();
       if (map.has(key)) continue;
@@ -529,8 +563,39 @@ export default function StaffClients() {
         sort_at: l.lead_captured_at ? new Date(l.lead_captured_at).getTime() : 0,
       });
     }
-    return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || a.last_name.localeCompare(b.last_name));
-  }, [items, imported, leads]);
+    return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || (a.last_name || "").localeCompare(b.last_name || ""));
+  }, [items, imported, leads, clientProfiles]);
+
+  const handleAddClient = async () => {
+    if (!addClientDraft.first_name.trim() || !addClientDraft.email.trim()) {
+      toast.error("First name and email are required");
+      return;
+    }
+    setAddClientBusy(true);
+    const newClient = {
+      id: `client-${Date.now()}`,
+      first_name: addClientDraft.first_name.trim(),
+      last_name: addClientDraft.last_name.trim(),
+      email: addClientDraft.email.trim().toLowerCase(),
+      phone: addClientDraft.phone.trim() || null,
+      dob: addClientDraft.dob.trim() || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+    localClients.push(newClient);
+    localStorage.setItem("rka_demo_clients", JSON.stringify(localClients));
+
+    try {
+      await apiQuery("client_profiles").insert(newClient);
+    } catch (e) {}
+
+    toast.success(`Client ${newClient.first_name} ${newClient.last_name} created successfully!`);
+    setAddClientBusy(false);
+    setAddClientOpen(false);
+    setAddClientDraft({ first_name: "", last_name: "", email: "", phone: "", dob: "" });
+    reloadAccounts();
+  };
 
   const matchesQuery = (s: string) => !q || s.toLowerCase().includes(q.toLowerCase());
   const filtered = allClients.filter((c) => {
@@ -565,6 +630,9 @@ export default function StaffClients() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setAddClientOpen(true)} size="sm" className="rounded-full">
+            <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Add client
+          </Button>
           <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search clients…" className="pl-9 w-full sm:w-64" />
@@ -794,6 +862,78 @@ export default function StaffClients() {
                 Import {importPreview.rows.length}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addClientOpen} onOpenChange={setAddClientOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Client</DialogTitle>
+            <DialogDescription>
+              Create a new client profile in your aesthetic EMR records.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">First Name *</label>
+                <Input
+                  value={addClientDraft.first_name}
+                  onChange={(e) => setAddClientDraft((d) => ({ ...d, first_name: e.target.value }))}
+                  placeholder="Jane"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Last Name</label>
+                <Input
+                  value={addClientDraft.last_name}
+                  onChange={(e) => setAddClientDraft((d) => ({ ...d, last_name: e.target.value }))}
+                  placeholder="Doe"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Email Address *</label>
+              <Input
+                type="email"
+                value={addClientDraft.email}
+                onChange={(e) => setAddClientDraft((d) => ({ ...d, email: e.target.value }))}
+                placeholder="jane@example.com"
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
+                <Input
+                  value={addClientDraft.phone}
+                  onChange={(e) => setAddClientDraft((d) => ({ ...d, phone: e.target.value }))}
+                  placeholder="(555) 000-0000"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Date of Birth</label>
+                <Input
+                  type="date"
+                  value={addClientDraft.dob}
+                  onChange={(e) => setAddClientDraft((d) => ({ ...d, dob: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAddClientOpen(false)} disabled={addClientBusy}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddClient} disabled={addClientBusy}>
+              {addClientBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+              Create Client
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
