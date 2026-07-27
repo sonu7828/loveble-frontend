@@ -28,20 +28,33 @@ const BookingStatus = () => {
   const [showCancel, setShowCancel] = useState(false);
 
   const refetch = async () => {
-    if (!token) return;
+    const idParam = params.get("id") || params.get("token") || token;
+    if (!idParam) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await ApiClient.get(`/booking?token=${encodeURIComponent(token)}`);
-      if (res.error) throw new Error(res.error);
-      setData(res.data);
+      const { data: dbData } = await apiQuery("appointments").select("*").eq("id", idParam).maybeSingle();
+      if (dbData) {
+        setData(dbData);
+        setLoading(false);
+        return;
+      }
+      const res = await ApiClient.get(`/booking?token=${encodeURIComponent(idParam)}`);
+      if (res.data) {
+        setData(res.data);
+      } else {
+        throw new Error(res.error || "Appointment not found");
+      }
     } catch (e) {
       setLoadError((e as Error).message || "Could not load appointment");
     } finally {
       setLoading(false);
     }
   };
-  useEffect(() => { refetch(); /* eslint-disable-next-line */ }, [token]);
+  useEffect(() => { refetch(); /* eslint-disable-next-line */ }, [token, params.get("id")]);
 
   // Live status updates: while the appointment is pending, refetch every 15s and
   // also subscribe to realtime changes so the page flips the moment staff approves/denies.
