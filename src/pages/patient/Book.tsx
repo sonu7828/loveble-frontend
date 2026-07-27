@@ -630,13 +630,12 @@ const Book = () => {
                   key={n}
                   type="button"
                   onClick={() => handleJumpToStep(n)}
-                  className={`h-2 flex-1 rounded-full transition-all duration-200 cursor-pointer group relative ${
-                    isCurrent
-                      ? "bg-primary ring-2 ring-primary/30"
-                      : filled
+                  className={`h-2 flex-1 rounded-full transition-all duration-200 cursor-pointer group relative ${isCurrent
+                    ? "bg-primary ring-2 ring-primary/30"
+                    : filled
                       ? "bg-primary/80 hover:bg-primary"
                       : "bg-secondary hover:bg-primary/40"
-                  }`}
+                    }`}
                   title={`Click to navigate to Step ${n}`}
                   aria-label={`Step ${n}`}
                 >
