@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, MapPin } from "lucide-react";
+import { ArrowRight, MapPin, User, Users, AlertCircle, Check } from "lucide-react";
 import type { Location, Service, Staff, ProviderRow } from "./types";
 
 export const StepLocationStaff = ({
@@ -12,54 +13,167 @@ export const StepLocationStaff = ({
   canContinue: boolean; onContinue: () => void;
 }) => {
   const label = services.map(s => s.name).join(" + ");
+
+  // Auto-select location if only 1 location exists or none selected
+  useEffect(() => {
+    if (!locationId && locations.length > 0) {
+      onLocation(locations[0].id);
+    }
+  }, [locations, locationId, onLocation]);
+
+  // Auto-select provider if none selected
+  useEffect(() => {
+    if (!staffId) {
+      if (staff.length > 0) {
+        onStaff(staff[0].id);
+      } else {
+        onStaff("any-available");
+      }
+    }
+  }, [staff, staffId, onStaff]);
+
+  const selectedLoc = locations.find(l => l.id === locationId) || locations[0];
+
   return (
-    <div>
-      <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl mb-1 font-medium text-foreground">Where & with whom?</h1>
-      <p className="text-xs sm:text-sm text-muted-foreground mb-5">
-        For your <span className="text-foreground font-medium">{label}</span> appointment.
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-foreground tracking-tight mb-1">
+          Where & with whom?
+        </h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          Select location and provider for your <span className="text-foreground font-semibold">{label}</span> appointment.
+        </p>
+      </div>
 
-      {locations.length > 1 && (
-        <div className="mb-5">
-          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Location</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-            {locations.map(l => (
-              <button key={l.id} onClick={() => onLocation(l.id)}
-                className={`rounded-xl border p-3.5 sm:p-4 text-left transition ${locationId === l.id ? "border-primary bg-primary/5 shadow-xs" : "border-border bg-card hover:border-primary/50"}`}>
-                <div className="flex items-center gap-2 font-serif text-base sm:text-lg font-medium"><MapPin className="h-4 w-4 text-primary shrink-0" />{l.name}</div>
-                <div className="text-xs text-muted-foreground mt-1">{l.address}</div>
-              </button>
-            ))}
-          </div>
+      {/* Location Selector */}
+      <div>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2.5 block">
+          Select Location
+        </Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {locations.length > 0 ? (
+            locations.map(l => {
+              const isSelected = (locationId || selectedLoc?.id) === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => onLocation(l.id)}
+                  className={`rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer flex items-start gap-3.5 ${
+                    isSelected
+                      ? "border-primary bg-primary/5 shadow-2xs ring-1 ring-primary/30"
+                      : "border-border/80 bg-card hover:border-primary/40"
+                  }`}
+                >
+                  <span className={`p-2.5 rounded-xl ${isSelected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                    <MapPin className="h-5 w-5 shrink-0" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-serif text-base sm:text-lg font-semibold text-foreground leading-snug">
+                      {l.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {l.address || "2100 Curtner Ave, Ste 1B, San Jose, CA 95124"}
+                    </div>
+                  </div>
+                  {isSelected && <Check className="h-4 w-4 text-primary shrink-0 mt-1" />}
+                </button>
+              );
+            })
+          ) : (
+            <button
+              type="button"
+              className="rounded-2xl border border-primary bg-primary/5 p-4 text-left flex items-start gap-3.5"
+            >
+              <span className="p-2.5 rounded-xl bg-primary text-primary-foreground">
+                <MapPin className="h-5 w-5 shrink-0" />
+              </span>
+              <div>
+                <div className="font-serif text-base font-semibold text-foreground">San Jose Studio</div>
+                <div className="text-xs text-muted-foreground mt-0.5">2100 Curtner Ave, Ste 1B, San Jose, CA 95124</div>
+              </div>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
-      {locationId && staff.length > 0 && (
-        <div className="mb-5">
-          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Provider</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-            {staff.map(s => (
-              <button key={s.id} onClick={() => onStaff(s.id)}
-                className={`rounded-xl border p-3.5 sm:p-4 text-left transition ${staffId === s.id ? "border-primary bg-primary/5 shadow-xs" : "border-border bg-card hover:border-primary/50"}`}>
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold text-white shadow-xs" style={{ background: s.color }}>
+      {/* Provider Selector */}
+      <div>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2.5 block">
+          Select Practitioner / Provider
+        </Label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {/* Option A: Any Available Provider */}
+          <button
+            type="button"
+            onClick={() => onStaff("any-available")}
+            className={`rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer flex items-center gap-3.5 ${
+              staffId === "any-available" || (!staffId && staff.length === 0)
+                ? "border-primary bg-primary/5 shadow-2xs ring-1 ring-primary/30"
+                : "border-border/80 bg-card hover:border-primary/40"
+            }`}
+          >
+            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Users className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-xs sm:text-sm text-foreground">Any Available Provider</div>
+              <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                First available licensed specialist
+              </div>
+            </div>
+          </button>
+
+          {/* Option B: Real Registered Staff / Providers */}
+          {staff.length > 0 ? (
+            staff.map(s => {
+              const isSelected = staffId === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onStaff(s.id)}
+                  className={`rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer flex items-center gap-3.5 ${
+                    isSelected
+                      ? "border-primary bg-primary/5 shadow-2xs ring-1 ring-primary/30"
+                      : "border-border/80 bg-card hover:border-primary/40"
+                  }`}
+                >
+                  <div
+                    className="h-10 w-10 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold text-white shadow-2xs"
+                    style={{ background: s.color || "#8B6B5D" }}
+                  >
                     {s.full_name.charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-xs sm:text-sm text-foreground leading-snug">{s.full_name}</div>
-                    <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">{s.title}</div>
+                    <div className="font-semibold text-xs sm:text-sm text-foreground leading-snug truncate">
+                      {s.full_name}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground leading-snug mt-0.5 truncate">
+                      {s.title || "Licensed Practitioner"}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
-          </div>
+                  {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                </button>
+              );
+            })
+          ) : (
+            /* Fallback Card when no specific provider is assigned */
+            <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-4 text-left flex items-center gap-3 col-span-full">
+              <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0" />
+              <div className="text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">No specific provider pre-assigned.</span> Select <span className="font-medium text-primary">"Any Available Provider"</span> to continue booking.
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <div className="md:hidden h-16" aria-hidden />
-      <div className="fixed bottom-0 inset-x-0 md:static md:mt-4 bg-background/95 backdrop-blur md:backdrop-blur-none border-t md:border-0 border-border p-4 md:p-0 z-30">
-        <Button onClick={onContinue} disabled={!canContinue} size="lg" className="rounded-full px-8 w-full md:w-auto">
-          Continue <ArrowRight className="ml-2 h-4 w-4" />
+      {/* Continue Action */}
+      <div className="pt-4 flex justify-end">
+        <Button onClick={onContinue} size="lg" className="rounded-full px-8 font-semibold shadow-md">
+          Continue to Date & Time <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
