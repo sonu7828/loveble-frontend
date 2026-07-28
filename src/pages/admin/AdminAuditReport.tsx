@@ -268,11 +268,15 @@ export default function AdminAuditReport() {
       e.when, CATEGORY_LABEL[e.category], e.action, e.actor,
       e.resource_type, e.resource_id ?? "", e.client_email ?? "", e.detail,
     ].map(csvCell).join(","));
+    // Always export — if no data, generates header-only CSV so the download always succeeds
     const csv = [header.join(","), ...rows].join("\n");
-    downloadBlob(csv, `audit-report_${from}_to_${to}.csv`);
+    const filename = `audit-report_${from}_to_${to}.csv`;
+    downloadBlob(csv, filename);
   };
 
   const printSummary = () => {
+    // Bring window to front first so the print dialog reliably appears in all browsers
+    window.focus();
     window.print();
   };
 
@@ -334,10 +338,10 @@ export default function AdminAuditReport() {
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> : <Activity className="h-3.5 w-3.5 mr-2" />}
             Run report
           </Button>
-          <Button onClick={exportCsv} variant="outline" size="sm" disabled={events.length === 0}>
+          <Button onClick={exportCsv} variant="outline" size="sm">
             <Download className="h-3.5 w-3.5 mr-2" /> Export CSV ({events.length})
           </Button>
-          <Button onClick={printSummary} variant="outline" size="sm" disabled={events.length === 0}>
+          <Button onClick={printSummary} variant="outline" size="sm">
             <Printer className="h-3.5 w-3.5 mr-2" /> Print / Save PDF
           </Button>
 
