@@ -310,15 +310,17 @@ export default function AdminTeam() {
       ));
 
       // Attempt a best-effort DB update (safe to fail — localStorage is source of truth)
-      // We use the backend's PUT /staff_profiles/:id pattern if supported
-      try {
-        await ApiClient.put(`/staff_profiles/${draft.id}`, {
-          full_name: draft.full_name.trim(),
-          title: draft.title.trim(),
-          email,
-          color: draft.color,
-        });
-      } catch (_e) {}
+      // Skip for local-only members whose IDs start with "approved-" (no DB record exists)
+      if (!draft.id.startsWith('approved-')) {
+        try {
+          await ApiClient.put(`/staff_profiles/${draft.id}`, {
+            full_name: draft.full_name.trim(),
+            title: draft.title.trim(),
+            email,
+            color: draft.color,
+          });
+        } catch (_e) {}
+      }
 
       // Invalidate GET cache so next load() fetches fresh data
       ApiClient.clearCache("/staff_profiles");
