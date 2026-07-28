@@ -2,7 +2,7 @@
 // Shows: AE rate by injector, AE rate by product, recovery curves (avg swelling/
 // bruising/pain by day_offset per product), and photo-share rate.
 import { useEffect, useMemo, useState } from "react";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, TrendingUp, AlertTriangle, Image as ImgIcon, Users } from "lucide-react";
 import { subDays } from "date-fns";
@@ -34,18 +34,27 @@ export function ClinicalOutcomesPanel() {
     (async () => {
       setBusy(true);
       const from = subDays(new Date(), days).toISOString();
-      const { data: res, error } = await apiQuery("get_outcomes_summary", {
-        _from: from,
-        _to: new Date().toISOString(),
-        _location_id: null,
-        _staff_user_id: null,
-      });
+      const to = new Date().toISOString();
+      const res = await ApiClient.get(
+        `/clinical/outcomes-summary?_from=${encodeURIComponent(from)}&_to=${encodeURIComponent(to)}`
+      );
       if (cancel) return;
-      if (error) {
-        console.error(error);
+      if (res.error) {
+        console.error(res.error);
         setData(null);
       } else {
-        setData(res as unknown as Summary);
+        // Normalize: if the API returns an array or non-Summary object,
+        // treat it as no data to prevent .map() crashes
+        const summary = res.data as unknown as Summary;
+        const isValidSummary =
+          summary &&
+          !Array.isArray(summary) &&
+          typeof summary === "object" &&
+          "totals" in summary &&
+          "ae_by_injector" in summary &&
+          "ae_by_product" in summary &&
+          "recovery_by_product" in summary;
+        setData(isValidSummary ? summary : null);
       }
       setBusy(false);
     })();
@@ -53,14 +62,14 @@ export function ClinicalOutcomesPanel() {
   }, [authLoading, isClinicalStaff, days]);
 
   const recoveryProducts = useMemo(() => {
-    if (!data) return [] as string[];
+    if (!data || !Array.isArray(data.recovery_by_product)) return [] as string[];
     return Array.from(new Set(data.recovery_by_product.map((r) => r.product)));
   }, [data]);
 
   const [productFilter, setProductFilter] = useState<string>("all");
 
   const recoverySeries = useMemo(() => {
-    if (!data) return [];
+    if (!data || !Array.isArray(data.recovery_by_product)) return [];
     const rows = data.recovery_by_product.filter(
       (r) => productFilter === "all" || r.product === productFilter,
     );
@@ -110,9 +119,8 @@ export function ClinicalOutcomesPanel() {
             <button
               key={d}
               onClick={() => setDays(d)}
-              className={`text-xs px-3 py-1.5 rounded-md border transition ${
-                d === days ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"
-              }`}
+              className={`text-xs px-3 py-1.5 rounded-md border transition ${d === days ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"
+                }`}
             >{d}d</button>
           ))}
         </div>
