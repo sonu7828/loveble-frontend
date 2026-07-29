@@ -315,17 +315,9 @@ export default function AdminTeam() {
   };
 
   const deleteMember = async (m: Member) => {
-    const BUILTIN_EMAILS = [
-      "admin@gmail.com",
-      "staff@gmail.com",
-      "securityofficer@gmail.com",
-      "officer@gmail.com",
-      "medicaldirector@gmail.com",
-      "md@gmail.com",
-      "user@gmail.com",
-    ];
-    if (m.email && BUILTIN_EMAILS.includes(m.email.toLowerCase())) {
-      toast.error("Built-in system accounts cannot be deleted.");
+    const isAdminAccount = m.email?.toLowerCase() === "admin@gmail.com" || resolveMemberRole(m) === "admin";
+    if (isAdminAccount) {
+      toast.error("System Admin account cannot be deleted.");
       setConfirmDelete(null);
       return;
     }
