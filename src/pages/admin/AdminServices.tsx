@@ -185,7 +185,7 @@ const AdminServices = () => {
             placeholder="Search service name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8.5 h-9 text-xs rounded-xl bg-card border-border/80"
+            className="pl-9 h-9 text-xs rounded-xl bg-card border-border/80"
           />
         </div>
       </div>

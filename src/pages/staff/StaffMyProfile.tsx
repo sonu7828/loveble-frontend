@@ -11,7 +11,7 @@ import { z } from "zod";
 import GoogleCalendarConnect from "@/components/staff/GoogleCalendarConnect";
 import { useAuth } from "@/hooks/useAuth";
 import SharedOwnerCalendarCard from "@/components/staff/SharedOwnerCalendarCard";
-import { loadStaffMessageTemplates, upsertStaffMessageTemplate, type StaffMessageType } from "@/lib/staffMessageTemplates";
+
 import { SavedSignatureCard } from "@/components/staff/SavedSignatureCard";
 
 const schema = z.object({
@@ -22,14 +22,6 @@ const schema = z.object({
   license_number: z.string().trim().max(60).optional().or(z.literal("")),
 });
 
-const DEFAULT_CHECKIN_TEMPLATE =
-  "Hi {{clientFirstName}}, it's {{providerFirstName}}. Just checking in on you! Hope you're healing and resting well. Let me know if you have any questions or concerns!";
-const DEFAULT_REVIEW_TEMPLATE =
-  "Hi {{clientFirstName}}, it's {{providerFirstName}} at Radiantilyk. It was so lovely seeing you! Mind sharing a quick rating? {{feedbackUrl}}";
-const DEFAULT_PHOTO_TEMPLATE =
-  "Hi {{clientFirstName}}, it's {{providerFirstName}} at Radiantilyk. We'd love to see how you're healing — tap to upload a quick photo for your chart: {{uploadUrl}}";
-const DEFAULT_REBOOK_TEMPLATE =
-  "Hi {{clientFirstName}}, it's {{providerFirstName}}. You're due for your next visit! Whenever you're ready, you can book here: https://bookrka.com";
 
 export default function StaffMyProfile() {
   const { isAdmin } = useAuth();
@@ -38,29 +30,6 @@ export default function StaffMyProfile() {
   const [userEmail, setUserEmail] = useState<string>("");
   const [staffId, setStaffId] = useState<string | null>(null);
   const [form, setForm] = useState({ full_name: "", title: "", email: "", phone: "", license_number: "" });
-
-  // Post-visit check-in SMS settings
-  const [checkinEnabled, setCheckinEnabled] = useState(true);
-  const [checkinTemplate, setCheckinTemplate] = useState<string>(DEFAULT_CHECKIN_TEMPLATE);
-  const [savingCheckin, setSavingCheckin] = useState(false);
-
-  // Review request settings
-  const [reviewEnabled, setReviewEnabled] = useState(true);
-  const [reviewTemplate, setReviewTemplate] = useState<string>(DEFAULT_REVIEW_TEMPLATE);
-  const [reviewDelayHours, setReviewDelayHours] = useState<number>(72);
-  const [savingReview, setSavingReview] = useState(false);
-
-  // Rebook reminder settings
-  const [rebookEnabled, setRebookEnabled] = useState(false);
-  const [rebookTemplate, setRebookTemplate] = useState<string>(DEFAULT_REBOOK_TEMPLATE);
-  const [rebookWeeks, setRebookWeeks] = useState<number>(4);
-  const [savingRebook, setSavingRebook] = useState(false);
-
-  // Photo upload request settings
-  const [photoEnabled, setPhotoEnabled] = useState(false);
-  const [photoTemplate, setPhotoTemplate] = useState<string>(DEFAULT_PHOTO_TEMPLATE);
-  const [photoDays, setPhotoDays] = useState<number>(14);
-  const [savingPhoto, setSavingPhoto] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -152,29 +121,6 @@ export default function StaffMyProfile() {
 
         try {
           const tpls = await loadStaffMessageTemplates(s.id);
-          const ci = tpls.get("checkin");
-          if (ci) {
-            setCheckinEnabled(ci.enabled);
-            setCheckinTemplate(ci.template || DEFAULT_CHECKIN_TEMPLATE);
-          }
-          const rv = tpls.get("review");
-          if (rv) {
-            setReviewEnabled(rv.enabled);
-            setReviewTemplate(rv.template || DEFAULT_REVIEW_TEMPLATE);
-            setReviewDelayHours(rv.delay_minutes != null ? Math.round(rv.delay_minutes / 60) : 72);
-          }
-          const rb = tpls.get("rebook");
-          if (rb) {
-            setRebookEnabled(rb.enabled);
-            setRebookTemplate(rb.template || DEFAULT_REBOOK_TEMPLATE);
-            setRebookWeeks(rb.delay_minutes != null ? Math.max(1, Math.round(rb.delay_minutes / (60 * 24 * 7))) : 4);
-          }
-          const ph = tpls.get("photo");
-          if (ph) {
-            setPhotoEnabled(ph.enabled);
-            setPhotoTemplate(ph.template || DEFAULT_PHOTO_TEMPLATE);
-            setPhotoDays(ph.delay_minutes != null ? Math.max(1, Math.round(ph.delay_minutes / (60 * 24))) : 14);
-          }
         } catch {}
       } else {
         // Fallback default values for logged in staff without DB row
@@ -237,68 +183,7 @@ export default function StaffMyProfile() {
     }
   };
 
-  const saveTemplate = async (
-    type: StaffMessageType,
-    enabled: boolean,
-    template: string,
-    delayMinutes: number | null,
-    label: string,
-    setBusy: (b: boolean) => void,
-  ) => {
-    if (!staffId) return;
-    const tpl = template.trim();
-    if (tpl.length === 0 || tpl.length > 320) {
-      toast.error("Message must be 1–320 characters");
-      return;
-    }
-    setBusy(true);
-    try {
-      await upsertStaffMessageTemplate({
-        staff_id: staffId,
-        message_type: type,
-        enabled,
-        template: tpl,
-        delay_minutes: delayMinutes,
-        config: {},
-      });
-      toast.success(`${label} saved`);
-    } catch (e: any) {
-      toast.error(e.message ?? "Could not save");
-    } finally {
-      setBusy(false);
-    }
-  };
 
-  const saveCheckin = () =>
-    saveTemplate("checkin", checkinEnabled, checkinTemplate, null, "Check-in text settings", setSavingCheckin);
-
-  const saveReview = () => {
-    const hrs = Math.max(1, Math.min(336, Math.floor(reviewDelayHours || 72)));
-    return saveTemplate("review", reviewEnabled, reviewTemplate, hrs * 60, "Review request settings", setSavingReview);
-  };
-
-  const saveRebook = () => {
-    const wks = Math.max(1, Math.min(52, Math.floor(rebookWeeks || 4)));
-    return saveTemplate("rebook", rebookEnabled, rebookTemplate, wks * 7 * 24 * 60, "Rebook reminder settings", setSavingRebook);
-  };
-
-  const savePhoto = () => {
-    const days = Math.max(1, Math.min(60, Math.floor(photoDays || 14)));
-    return saveTemplate("photo", photoEnabled, photoTemplate, days * 24 * 60, "Photo request settings", setSavingPhoto);
-  };
-
-
-  const previewFirstName = (form.full_name || "Kiem").trim().split(/\s+/)[0];
-  const fillPreview = (tpl: string) => tpl
-    .replace(/\{\{clientFirstName\}\}/g, "Sarah")
-    .replace(/\{\{providerFirstName\}\}/g, previewFirstName)
-    .replace(/\{\{reviewUrl\}\}/g, "https://g.page/r/...")
-    .replace(/\{\{feedbackUrl\}\}/g, "https://bookrka.com/feedback/abc123")
-    .replace(/\{\{uploadUrl\}\}/g, "https://bookrka.com/photos/abc123");
-  const preview = fillPreview(checkinTemplate);
-  const reviewPreview = fillPreview(reviewTemplate);
-  const rebookPreview = fillPreview(rebookTemplate);
-  const photoPreview = fillPreview(photoTemplate);
 
   if (loading) {
     return <div className="p-8 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -361,168 +246,6 @@ export default function StaffMyProfile() {
       {staffId && <SavedSignatureCard staffId={staffId} defaultName={form.full_name} />}
 
 
-
-      {staffId && (
-        <div className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-6">
-          <div>
-            <h2 className="font-serif text-lg">Automatic post-visit check-in text</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Send a personable text from you to every client after their appointment. Only sent to clients who opted in to SMS.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-border p-3">
-            <div>
-              <div className="text-sm font-medium">Enable auto check-in</div>
-              <div className="text-xs text-muted-foreground">Turn off to stop sending check-ins from your account.</div>
-            </div>
-            <Switch checked={checkinEnabled} onCheckedChange={setCheckinEnabled} />
-          </div>
-
-          <div>
-            <Label>Message</Label>
-            <Textarea
-              className="mt-1.5"
-              rows={4}
-              maxLength={320}
-              value={checkinTemplate}
-              onChange={(e) => setCheckinTemplate(e.target.value)}
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Use <code>{"{{clientFirstName}}"}</code> and <code>{"{{providerFirstName}}"}</code>. STOP footer is added automatically.
-            </p>
-          </div>
-
-          <div className="rounded-lg bg-muted/50 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview</div>
-            <div className="text-sm whitespace-pre-wrap">{preview}</div>
-          </div>
-
-          <Button onClick={saveCheckin} disabled={savingCheckin} className="rounded-full">
-            {savingCheckin && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Save check-in settings
-          </Button>
-        </div>
-      )}
-
-      {staffId && (
-        <div className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-6">
-          <div>
-            <h2 className="font-serif text-lg">Google review request</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              A few days after a visit, ask opted-in clients to rate. 5-star ratings auto-redirect to Google; lower ratings stay private so you can reach out.
-            </p>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-border p-3">
-            <div>
-              <div className="text-sm font-medium">Enable review request</div>
-              <div className="text-xs text-muted-foreground">One time per appointment.</div>
-            </div>
-            <Switch checked={reviewEnabled} onCheckedChange={setReviewEnabled} />
-          </div>
-          <div>
-            <Label>Send after (hours)</Label>
-            <Input className="mt-1.5" type="number" min={1} max={336}
-              value={reviewDelayHours}
-              onChange={(e) => setReviewDelayHours(Number(e.target.value))} />
-          </div>
-          <div>
-            <Label>Message</Label>
-            <Textarea className="mt-1.5" rows={4} maxLength={320}
-              value={reviewTemplate}
-              onChange={(e) => setReviewTemplate(e.target.value)} />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Use <code>{"{{clientFirstName}}"}</code>, <code>{"{{providerFirstName}}"}</code>, <code>{"{{feedbackUrl}}"}</code> (recommended — routes 5★ to Google, lower ratings stay private) or <code>{"{{reviewUrl}}"}</code> for the direct Google link.
-            </p>
-          </div>
-          <div className="rounded-lg bg-muted/50 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview</div>
-            <div className="text-sm whitespace-pre-wrap">{reviewPreview}</div>
-          </div>
-          <Button onClick={saveReview} disabled={savingReview} className="rounded-full">
-            {savingReview && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Save review settings
-          </Button>
-        </div>
-      )}
-
-      {staffId && (
-        <div className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-6">
-          <div>
-            <h2 className="font-serif text-lg">Rebook reminder</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              When a client is due for their next visit, send a friendly nudge. Skipped automatically if they've already rebooked.
-            </p>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-border p-3">
-            <div>
-              <div className="text-sm font-medium">Enable rebook reminder</div>
-              <div className="text-xs text-muted-foreground">One time per completed appointment.</div>
-            </div>
-            <Switch checked={rebookEnabled} onCheckedChange={setRebookEnabled} />
-          </div>
-          <div>
-            <Label>Send after (weeks)</Label>
-            <Input className="mt-1.5" type="number" min={1} max={52}
-              value={rebookWeeks}
-              onChange={(e) => setRebookWeeks(Number(e.target.value))} />
-          </div>
-          <div>
-            <Label>Message</Label>
-            <Textarea className="mt-1.5" rows={4} maxLength={320}
-              value={rebookTemplate}
-              onChange={(e) => setRebookTemplate(e.target.value)} />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Use <code>{"{{clientFirstName}}"}</code> and <code>{"{{providerFirstName}}"}</code>.
-            </p>
-          </div>
-          <div className="rounded-lg bg-muted/50 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview</div>
-            <div className="text-sm whitespace-pre-wrap">{rebookPreview}</div>
-          </div>
-          <Button onClick={saveRebook} disabled={savingRebook} className="rounded-full">
-            {savingRebook && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Save rebook settings
-          </Button>
-        </div>
-      )}
-
-      {staffId && (
-        <div className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-6">
-          <div>
-            <h2 className="font-serif text-lg">Photo upload request</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              A couple weeks after a visit, invite opted-in clients to upload a healing/result photo straight to their chart.
-            </p>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-border p-3">
-            <div>
-              <div className="text-sm font-medium">Enable photo request</div>
-              <div className="text-xs text-muted-foreground">One time per appointment.</div>
-            </div>
-            <Switch checked={photoEnabled} onCheckedChange={setPhotoEnabled} />
-          </div>
-          <div>
-            <Label>Send after (days)</Label>
-            <Input className="mt-1.5" type="number" min={1} max={60}
-              value={photoDays}
-              onChange={(e) => setPhotoDays(Number(e.target.value))} />
-          </div>
-          <div>
-            <Label>Message</Label>
-            <Textarea className="mt-1.5" rows={4} maxLength={320}
-              value={photoTemplate}
-              onChange={(e) => setPhotoTemplate(e.target.value)} />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Use <code>{"{{clientFirstName}}"}</code>, <code>{"{{providerFirstName}}"}</code>, <code>{"{{uploadUrl}}"}</code>.
-            </p>
-          </div>
-          <div className="rounded-lg bg-muted/50 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview</div>
-            <div className="text-sm whitespace-pre-wrap">{photoPreview}</div>
-          </div>
-          <Button onClick={savePhoto} disabled={savingPhoto} className="rounded-full">
-            {savingPhoto && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Save photo settings
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
