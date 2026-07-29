@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ArrowLeft, FileCheck2, ShieldAlert, Download, Trash2, Plus, Mic, MicOff, Sparkles } from "lucide-react";
+import { Loader2, ArrowLeft, FileCheck2, ShieldAlert, Download, Trash2, Plus, Mic, MicOff, Sparkles, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { useDictation } from "@/hooks/useDictation";
 import { computeInteractionAlerts } from "@/lib/interactionAlerts";
@@ -36,7 +36,6 @@ import { buildVisitSummary } from "@/lib/visitSummary";
 import { PhotoCaptureFlow } from "@/components/clinical/PhotoCaptureFlow";
 import { WatermarkedExportButton } from "@/components/clinical/WatermarkedExportButton";
 import { BeforeAfterSlider } from "@/components/clinical/BeforeAfterSlider";
-import { Camera } from "lucide-react";
 import { AIScribeDialog } from "@/components/clinical/AIScribeDialog";
 
 type Category = "neurotoxin" | "filler" | "energy" | "wellness" | "consult";
