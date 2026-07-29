@@ -19,7 +19,7 @@ import {
   Stethoscope, ShieldCheck, ShieldAlert, Boxes, UserCircle2,
   BookOpen, History as HistoryIcon, Laptop, Building2, LogOut, Loader2,
   LayoutDashboard, FileCheck, FileText, Pill, Activity, Users, BarChart3, Settings,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, Tag
 } from "lucide-react";
 import rkaLogo from "@/assets/rka-logo.webp";
 
@@ -246,8 +246,19 @@ export default function StaffLayout() {
           { to: "/staff/inventory", label: "Inventory & Supplies", icon: Boxes },
         ],
       },
+      {
+        key: "admin_services",
+        label: "SERVICES & ADMIN",
+        icon: Tag,
+        show: isAdmin,
+        children: [
+          { to: "/staff/services", label: "Services & Pricing", icon: Tag },
+          { to: "/staff/admin", label: "Admin Overview", icon: LayoutDashboard },
+          { to: "/staff/team", label: "Staff Management", icon: Users },
+        ],
+      },
     ];
-  }, [isMedicalDirector, isScheduler, isReceptionist, isStaff, isNP, isPrivacyOfficer, pendingCount, unreadSms]);
+  }, [isMedicalDirector, isScheduler, isReceptionist, isStaff, isNP, isPrivacyOfficer, isAdmin, pendingCount, unreadSms]);
 
   if (loading || (user && !mfaChecked)) {
     return (

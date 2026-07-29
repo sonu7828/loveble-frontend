@@ -237,7 +237,16 @@ export default function StaffLogin() {
       return;
     }
 
-    // 2. Check built-in staff/admin demo accounts
+    // 2. Try live database authentication via REST API
+    const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password });
+    if (data?.user) {
+      setLoading(false);
+      setPassword("");
+      await beginMfa();
+      return;
+    }
+
+    // 3. Fallback for initial demo seed accounts (if not yet present in DB)
     if (
       cleanEmail === "admin@gmail.com" ||
       cleanEmail === "staff@gmail.com" ||
@@ -265,39 +274,10 @@ export default function StaffLogin() {
       return;
     }
 
-    // 2. Check admin-approved team member accounts
-    const approvedAccounts: Array<{ email: string; password?: string; role: AppRole; full_name: string }> =
-      JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-
-    const matchedApproved = approvedAccounts.find(
-      (a) => a.email.toLowerCase() === cleanEmail && (a.password ? password === a.password : password === "12345678")
-    );
-
-    if (matchedApproved) {
-      const isAd = matchedApproved.role === "admin";
-      const roles: AppRole[] = [matchedApproved.role];
-      if (matchedApproved.role === "provider" || matchedApproved.role === "nurse_practitioner" || matchedApproved.role === "medical_director" || matchedApproved.role === "receptionist" || matchedApproved.role === "scheduler") {
-        roles.push("staff");
-      }
-      setPendingDemoLogin({ cleanEmail, roles, isAd });
-      setLoading(false);
-      setPassword("");
-      setStep("mfa-verify");
-      setMode("ready");
-      toast.info("Credentials verified. Complete mandatory 2-Factor authentication (Code: 123456).");
-      return;
-    }
-
-    const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password });
     setLoading(false);
-    if (error || !data?.user) {
-      const err = error?.message || "Invalid email or password. Access denied.";
-      setErrMsg(err);
-      toast.error(err);
-      return;
-    }
-    setPassword("");
-    await beginMfa();
+    const err = error?.message || "Invalid email or password. Access denied.";
+    setErrMsg(err);
+    toast.error(err);
   };
 
   const verifyEnroll = async (e: React.FormEvent) => {

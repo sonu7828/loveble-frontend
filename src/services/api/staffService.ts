@@ -10,6 +10,10 @@ export interface StaffProfile {
   role: string;
   is_active: boolean;
   phone?: string;
+  title?: string;
+  color?: string;
+  hourly_rate_cents?: number | null;
+  commission_percent?: number | null;
 }
 
 export interface Location {
@@ -74,9 +78,31 @@ export const staffService = {
     return res.data || MOCK_LOCATIONS;
   },
 
-  async getStaffProfiles(activeOnly = true): Promise<StaffProfile[]> {
-    const res = await ApiClient.get<StaffProfile[]>(`/staff?active=${activeOnly}`);
-    return res.data || MOCK_STAFF;
+  async getStaffProfiles(activeOnly = false): Promise<StaffProfile[]> {
+    const res = await ApiClient.get<StaffProfile[]>(`/staff?activeOnly=${activeOnly}&limit=100`);
+    return res.data || [];
+  },
+
+  async createStaffWithUser(data: {
+    fullName: string;
+    title: string;
+    email: string;
+    password?: string;
+    roleName: string;
+    color?: string;
+  }): Promise<any> {
+    const res = await ApiClient.post<any>("/staff/create-with-user", data);
+    return res.data;
+  },
+
+  async updateStaff(id: string, data: Partial<StaffProfile>): Promise<any> {
+    const res = await ApiClient.patch<any>(`/staff/${id}`, data);
+    return res.data;
+  },
+
+  async deleteStaff(id: string): Promise<any> {
+    const res = await ApiClient.delete<any>(`/staff/${id}`);
+    return res.data;
   },
 
   async getServiceCategories(): Promise<ServiceCategory[]> {
