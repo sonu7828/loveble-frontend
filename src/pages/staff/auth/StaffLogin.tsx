@@ -92,14 +92,12 @@ export default function StaffLogin() {
         setStep("redirecting");
         setMode("ready");
         // Resolve target from DB roles — no email hardcoding.
-        let aal2Target = "/staff/today";
-        try {
+        let aal2Target = nextPath || "/staff/today";
+        if (!nextPath) {
           const { data: { session: s } } = await authService.getSession();
-          if (s?.user?.id) {
-            const { data: rd } = await apiQuery("user_roles").select("role").eq("user_id", s.user.id);
-            aal2Target = resolveRedirectTarget((rd ?? []).map((x: any) => x.role));
-          }
-        } catch { /* keep fallback /staff/today */ }
+          const userRoles = s?.user?.roles || [];
+          aal2Target = resolveRedirectTarget(userRoles);
+        }
         setTimeout(() => navigate(aal2Target, { replace: true }), 350);
         return;
       }
@@ -120,28 +118,19 @@ export default function StaffLogin() {
       } else {
         // Evaluate if user is in a privileged role (admin, provider/staff, nurse_practitioner)
         const { data: { session: currentSession } } = await authService.getSession();
-        const uid = currentSession?.user?.id;
-        let isPrivileged = false;
-        if (uid) {
-          const { data: rData } = await apiQuery("user_roles").select("role").eq("user_id", uid);
-          const userRoles = (rData ?? []).map((x: any) => x.role);
-          isPrivileged = userRoles.includes("admin") || userRoles.includes("staff") ||
-            userRoles.includes("nurse_practitioner") || userRoles.includes("privacy_officer");
-        }
+        const userRoles = currentSession?.user?.roles || [];
+        const isPrivileged = userRoles.includes("admin") || userRoles.includes("staff") ||
+          userRoles.includes("nurse_practitioner") || userRoles.includes("privacy_officer");
 
         if (!isPrivileged) {
           // Non-privileged users (receptionists, schedulers, etc.) bypass mandatory MFA enrollment
           setStep("redirecting");
           setMode("ready");
-          let fallbackTarget = "/staff/today";
-          try {
-            const { data: { session: fs } } = await authService.getSession();
-            if (fs?.user?.id) {
-              const { data: frd } = await apiQuery("user_roles").select("role").eq("user_id", fs.user.id);
-              fallbackTarget = resolveRedirectTarget((frd ?? []).map((x: any) => x.role));
-            }
-          } catch { /* keep fallback */ }
-          setTimeout(() => navigate(nextPath ?? fallbackTarget, { replace: true }), 350);
+          let fallbackTarget = nextPath || "/staff/today";
+          if (!nextPath) {
+            fallbackTarget = resolveRedirectTarget(userRoles);
+          }
+          setTimeout(() => navigate(fallbackTarget, { replace: true }), 350);
           return;
         }
 
@@ -297,14 +286,12 @@ export default function StaffLogin() {
       toast.success("Two-factor authentication enabled");
       setStep("redirecting");
       // Resolve target from DB roles after successful MFA enrollment.
-      let enrollTarget = "/staff/today";
-      try {
+      let enrollTarget = nextPath || "/staff/today";
+      if (!nextPath) {
         const { data: { session: es } } = await authService.getSession();
-        if (es?.user?.id) {
-          const { data: rd } = await apiQuery("user_roles").select("role").eq("user_id", es.user.id);
-          enrollTarget = resolveRedirectTarget((rd ?? []).map((x: any) => x.role));
-        }
-      } catch { /* keep fallback /staff/today */ }
+        const userRoles = es?.user?.roles || [];
+        enrollTarget = resolveRedirectTarget(userRoles);
+      }
       setTimeout(() => navigate(enrollTarget, { replace: true }), 400);
     } catch (e) {
       toast.error(errorMessage(e, "Could not verify two-factor code."));
@@ -325,7 +312,6 @@ export default function StaffLogin() {
       setDemoAuthSession(pendingDemoLogin.cleanEmail, pendingDemoLogin.roles);
       toast.success("MFA Verification Successful — Security Operations Center Access Granted");
       setStep("redirecting");
-      // Use the roles already attached to the demo session — no email matching.
       const demoTarget = resolveRedirectTarget(pendingDemoLogin.roles);
       setTimeout(() => navigate(demoTarget, { replace: true }), 400);
       return;
@@ -346,15 +332,12 @@ export default function StaffLogin() {
       }
       toast.dismiss();
       setStep("redirecting");
-      // Resolve target from DB roles — no email hardcoding.
-      let verifyTarget = "/staff/today";
-      try {
+      let verifyTarget = nextPath || "/staff/today";
+      if (!nextPath) {
         const { data: { session: vs } } = await authService.getSession();
-        if (vs?.user?.id) {
-          const { data: rd } = await apiQuery("user_roles").select("role").eq("user_id", vs.user.id);
-          verifyTarget = resolveRedirectTarget((rd ?? []).map((x: any) => x.role));
-        }
-      } catch { /* keep fallback /staff/today */ }
+        const userRoles = vs?.user?.roles || [];
+        verifyTarget = resolveRedirectTarget(userRoles);
+      }
       setTimeout(() => navigate(verifyTarget, { replace: true }), 400);
     } catch (e) {
       toast.error(errorMessage(e, "Could not verify two-factor code."));
