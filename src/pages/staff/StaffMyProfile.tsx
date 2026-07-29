@@ -60,7 +60,7 @@ export default function StaffMyProfile() {
       }
 
       if (!myEmail) {
-        myEmail = "admin@gmail.com";
+        myEmail = isAdmin ? "admin@gmail.com" : "staff@gmail.com";
       }
 
       setUserEmail(myEmail);
