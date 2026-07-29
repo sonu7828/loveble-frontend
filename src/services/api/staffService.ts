@@ -79,8 +79,12 @@ export const staffService = {
   },
 
   async getStaffProfiles(activeOnly = false): Promise<StaffProfile[]> {
-    const res = await ApiClient.get<StaffProfile[]>(`/staff?activeOnly=${activeOnly}&limit=100`);
-    return res.data || [];
+    const res = await ApiClient.get<any>(`/staff?activeOnly=${activeOnly}&limit=100`);
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.data)) return raw.data;
+    if (Array.isArray(raw?.data?.staff)) return raw.data.staff;
+    return [];
   },
 
   async createStaffWithUser(data: {

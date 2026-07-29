@@ -116,8 +116,9 @@ export default function AdminTeam() {
     setLoading(true);
 
     try {
-      const data = await staffService.getStaffProfiles(false);
-      const fetchedMembers: Member[] = (data || []).map((x: any) => {
+      const rawData = await staffService.getStaffProfiles(false);
+      const dataList: any[] = Array.isArray(rawData) ? rawData : (rawData as any)?.data || (rawData as any)?.staff || [];
+      const fetchedMembers: Member[] = dataList.map((x: any) => {
         const rolesList = x.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
         const primaryRole = rolesList.find((r: string) => r !== "staff") || rolesList[0] || x.role || "staff";
         return {
@@ -138,7 +139,7 @@ export default function AdminTeam() {
       setMembers(fetchedMembers);
 
       const map: Record<string, Role[]> = {};
-      (data || []).forEach((x: any) => {
+      dataList.forEach((x: any) => {
         const uid = x.userId || x.user_id || x.user?.id;
         if (uid) {
           const rolesList = x.user?.userRoles?.map((ur: any) => ur.role?.name as Role) || [];
