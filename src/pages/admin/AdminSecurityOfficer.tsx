@@ -10,8 +10,8 @@ import {
 export default function AdminSecurityOfficer() {
   const { user } = useAuth();
 
-  const officerName = user?.user_metadata?.first_name || user?.user_metadata?.last_name
-    ? `${user?.user_metadata?.first_name || ""} ${user?.user_metadata?.last_name || ""}`.trim() + " (Privacy & Security Officer)"
+  const officerName = (user?.first_name || user?.last_name)
+    ? `${user?.first_name || ""} ${user?.last_name || ""}`.trim() + " (Privacy & Security Officer)"
     : "Kiem Vukadinovic, NP (Privacy & Security Officer)";
 
   const COMPLIANCE_MODULES = [
