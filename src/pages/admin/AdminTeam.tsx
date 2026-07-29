@@ -216,7 +216,7 @@ export default function AdminTeam() {
           roleName: draft.role,
           color: draft.color,
         });
-        toast.success(`Member ${draft.full_name} created successfully! Login credentials: Email: ${email} | Password: ${password}`);
+        toast.success(`Team member ${draft.full_name.trim()} created successfully!`);
       } catch (e: any) {
         const rawErr = e?.message || e?.error?.message || (typeof e === "string" ? e : "");
         if (
