@@ -229,6 +229,10 @@ export const authService = {
     window.dispatchEvent(new Event("rka_demo_auth_change"));
   },
 
+  async getAuthenticatorAssuranceLevel() {
+    return { data: { currentLevel: "aal2", nextLevel: "aal2" }, error: null };
+  },
+
   mfa: {
     async getAuthenticatorAssuranceLevel() {
       return { data: { currentLevel: "aal2", nextLevel: "aal2" }, error: null };
