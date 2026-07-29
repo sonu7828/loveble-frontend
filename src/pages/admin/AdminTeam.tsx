@@ -23,7 +23,7 @@ interface Member {
   pending_role?: Role;
 }
 
-type Role = "admin" | "provider" | "nurse_practitioner" | "medical_director" | "receptionist" | "staff" | "privacy_officer";
+type Role = "admin" | "provider" | "nurse_practitioner" | "medical_director" | "receptionist" | "staff" | "privacy_officer" | "scheduler";
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin (full access)",
   privacy_officer: "Privacy & Security Officer (HIPAA Policy Approval & Security)",
@@ -32,6 +32,7 @@ const ROLE_LABELS: Record<Role, string> = {
   nurse_practitioner: "Nurse Practitioner (GFE + clinical co-sign)",
   receptionist: "Front Desk Receptionist (book, check in, schedule)",
   staff: "Staff (own bookings only)",
+  scheduler: "Scheduler (appointment management)",
 };
 
 interface PendingRequest {

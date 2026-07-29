@@ -10,6 +10,10 @@ export interface StaffProfile {
   role: string;
   is_active: boolean;
   phone?: string;
+  title?: string;
+  color?: string;
+  hourly_rate_cents?: number | null;
+  commission_percent?: number | null;
 }
 
 export interface Location {
