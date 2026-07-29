@@ -14,7 +14,7 @@ import { KeyboardShortcutsHelp } from "@/components/staff/KeyboardShortcutsHelp"
 import ThemeToggle from "@/components/ThemeToggle";
 import StaffLayout from "./StaffLayout";
 import {
-  Menu, ShieldCheck, ShieldAlert, Star, Users,
+  Menu, ShieldCheck, ShieldAlert, Star, Users, Tag,
   BookOpen, History as HistoryIcon, Laptop, Building2, LogOut, Loader2, UserCircle2
 } from "lucide-react";
 import rkaLogo from "@/assets/rka-logo.webp";
@@ -29,7 +29,7 @@ interface NavItem {
 
 export default function AdminLayout() {
   const { user, loading, isAdmin, isMedicalDirector, isPrivacyOfficer, isPrivileged } = useAuth();
-  const canAccessAdminLayout = isAdmin;
+  const canAccessAdminLayout = isAdmin || isMedicalDirector || isPrivacyOfficer;
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -53,6 +53,7 @@ export default function AdminLayout() {
     { to: "/staff/admin", label: "Admin Overview", icon: ShieldCheck },
     { to: "/staff/model-applications", label: "Model Applications", icon: Star },
     { to: "/staff/team", label: "Staff Management", icon: Users },
+    { to: "/staff/services", label: "Services & Pricing", icon: Tag },
     { to: "/staff/security-officer", label: "Privacy & Security Officer", icon: ShieldCheck },
     { to: "/staff/audit-report", label: "Audit Logs", icon: HistoryIcon },
     { to: "/staff/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
