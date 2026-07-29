@@ -50,7 +50,7 @@ export default function AdminLayout() {
   }, [user]);
 
   const adminNavItems: NavItem[] = useMemo(() => [
-    { to: "/staff/admin", label: "Compliance Dashboard", icon: ShieldCheck },
+    { to: "/staff/admin", label: "Admin Overview", icon: ShieldCheck },
     { to: "/staff/model-applications", label: "Model Applications", icon: Star },
     { to: "/staff/team", label: "Staff Management", icon: Users },
     { to: "/staff/security-officer", label: "Privacy & Security Officer", icon: ShieldCheck },

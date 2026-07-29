@@ -35,8 +35,8 @@ export const StepDateTime = ({
         value={slot}
         onChange={onSlot}
         onDateChange={onDate}
-        externalSlots={date ? slots : undefined}
-        externalSlotsLoading={loading}
+        externalSlots={date && slots.length > 0 ? slots : undefined}
+        externalSlotsLoading={loading && slots.length > 0}
       />
 
       <div className="md:hidden h-20" aria-hidden />
