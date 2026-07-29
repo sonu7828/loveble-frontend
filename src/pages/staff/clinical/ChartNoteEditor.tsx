@@ -722,7 +722,7 @@ export default function ChartNoteEditor() {
     // Delete photos in storage too
     const paths = [...(resumableDraft.photo_pre_paths ?? []), ...(resumableDraft.photo_post_paths ?? [])];
     if (paths.length) {
-      try { await ApiClient.remove(paths); } catch { /* ignore */ }
+      try { await (ApiClient as any).remove(paths); } catch { /* ignore */ }
     }
     await apiQuery("clinical_notes").delete().eq("id", resumableDraft.id);
     setResumableDraft(null);
@@ -1276,7 +1276,7 @@ export default function ChartNoteEditor() {
             consumptions.push({ lot: wellnessLot, qty: 1, unit: wellnessLot.unit || "dose" });
           }
           for (const c of consumptions) {
-            const { error: cErr } = await apiQuery("consume_lot", {
+            const { error: cErr } = await (apiQuery as any)("consume_lot", {
               _lot_id: c.lot.id, _qty: c.qty,
               _ref_type: "clinical_note", _ref_id: noteId,
               _notes: `Chart ${noteCategory} — ${c.lot.product_name}`,
@@ -2658,7 +2658,7 @@ function ReadonlyClinicalPhotos({ kind, paths }: { kind: string; paths: string[]
     (async () => {
       const next: Record<string, string> = {};
       for (const p of paths) {
-        const { data } = await ApiClient.createSignedUrl(p, 60 * 60);
+        const { data } = await (ApiClient as any).createSignedUrl(p, 60 * 60);
         if (data?.signedUrl) next[p] = data.signedUrl;
       }
       if (!cancelled) setPreviews(next);
@@ -2875,7 +2875,7 @@ function ClinicalPhotos({
     (async () => {
       const next: Record<string, string> = {};
       for (const p of paths) {
-        const { data } = await ApiClient.createSignedUrl(p, 600);
+        const { data } = await (ApiClient as any).createSignedUrl(p, 600);
         if (data?.signedUrl) next[p] = data.signedUrl;
       }
       if (!cancelled) setPreviews(next);
@@ -2905,7 +2905,7 @@ function ClinicalPhotos({
         if (!/^image\//.test(f.type)) { toast.error(`${f.name}: must be an image`); continue; }
         const ext = (f.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
         const key = `${noteId}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error } = await ApiClient.upload(key, f, {
+        const { error } = await (ApiClient as any).upload(key, f, {
           contentType: f.type, upsert: false,
         });
         if (error) { toast.error(`${f.name}: ${error.message}`); continue; }
@@ -2916,7 +2916,7 @@ function ClinicalPhotos({
   }
 
   async function remove(key: string) {
-    await ApiClient.remove([key]);
+    await (ApiClient as any).remove([key]);
     onChange(paths.filter(p => p !== key));
   }
 
@@ -2997,8 +2997,8 @@ function ReadonlyBeforeAfterCompare({
       }
       const sharedOk = (byPath.get(bPath)?.shared ?? false) && (byPath.get(aPath)?.shared ?? false);
       const [b, a] = await Promise.all([
-        ApiClient.createSignedUrl(bPath, 600),
-        ApiClient.createSignedUrl(aPath, 600),
+        (ApiClient as any).createSignedUrl(bPath, 600),
+        (ApiClient as any).createSignedUrl(aPath, 600),
       ]);
       if (!cancelled && b.data?.signedUrl && a.data?.signedUrl) {
         setPair({ beforeUrl: b.data.signedUrl, afterUrl: a.data.signedUrl, sharedOk });
