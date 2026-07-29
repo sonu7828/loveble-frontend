@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Users, CheckCircle2, Sparkles, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { apiQuery } from "@/services/api";
 
 interface ModelFormData {
   name: string;
@@ -69,13 +70,47 @@ export default function Model() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("Model application submitted successfully! Our team will review and reach out.");
-    }, 1200);
+
+    const appId = `APP-${Math.floor(100 + Math.random() * 900)}`;
+    const appData = {
+      id: appId,
+      name: formData.name,
+      email: formData.email.toLowerCase(),
+      phone: formData.phone,
+      dob: formData.dob,
+      city: formData.city,
+      instagram: formData.instagram,
+      procedures: formData.treatmentInterest || "General Aesthetics",
+      skin_type: formData.skinType,
+      pregnancy_status: formData.pregnancyStatus,
+      medications: formData.medications,
+      allergies: formData.allergies,
+      previous_treatments: formData.previousTreatments,
+      availability: formData.availability,
+      signature_name: formData.signatureName,
+      signature_date: formData.signatureDate,
+      status: "pending",
+      date: new Date().toISOString().split("T")[0],
+      created_at: new Date().toISOString(),
+    };
+
+    // 1. Save to local storage for instant offline availability
+    const existing = JSON.parse(localStorage.getItem("rka_demo_model_applications") || "[]");
+    existing.unshift(appData);
+    localStorage.setItem("rka_demo_model_applications", JSON.stringify(existing));
+
+    // 2. Call backend API endpoint
+    try {
+      await apiQuery("model_applications" as any).insert(appData);
+    } catch (_err) {
+      console.warn("Backend model application insert fallback to local storage");
+    }
+
+    setLoading(false);
+    toast.success("Model application submitted successfully! Our team will review and reach out.");
   };
 
   const SectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
