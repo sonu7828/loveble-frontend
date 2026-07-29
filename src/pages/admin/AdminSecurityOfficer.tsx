@@ -1,16 +1,13 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
   ShieldCheck, ShieldAlert, Lock, BookOpen, History as HistoryIcon,
-  Laptop, UserCheck, CheckCircle2, Building2, ArrowUpRight, CheckSquare
+  UserCheck, CheckCircle2, Building2, ArrowUpRight
 } from "lucide-react";
 
 export default function AdminSecurityOfficer() {
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const officerName = user?.user_metadata?.first_name || user?.user_metadata?.last_name
