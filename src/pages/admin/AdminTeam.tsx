@@ -619,79 +619,51 @@ export default function AdminTeam() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+        <div className="flex justify-center py-20"><Loader2 className="h-5 w-5 animate-spin" /></div>
       ) : (
-        <div className="space-y-8">
-          {[
-            { key: "admin", label: "Administrators", roles: ["admin"] },
-            { key: "md", label: "Medical Directors", roles: ["medical_director"] },
-            { key: "np", label: "Nurse Practitioners", roles: ["nurse_practitioner"] },
-            { key: "provider", label: "Providers & Injectors", roles: ["provider"] },
-            { key: "staff", label: "Staff, Schedulers & Receptionists", roles: ["staff", "receptionist", "scheduler", "privacy_officer"] },
-          ].map((group) => {
-            const groupMembers = filteredMembers.filter((m) => {
-              const primaryRole = resolveMemberRole(m);
-              return group.roles.includes(primaryRole);
-            });
-
-            if (groupMembers.length === 0) return null;
+        <div className="space-y-2">
+          {filteredMembers.map((m) => {
+            const primaryRole = resolveMemberRole(m);
 
             return (
-              <section key={group.key} className="space-y-3">
-                <div className="flex items-center justify-between px-1 border-b border-border/40 pb-2">
-                  <h2 className="font-serif text-base sm:text-lg font-semibold text-foreground flex items-center gap-2">
-                    <span>{group.label}</span>
-                    <span className="text-xs font-mono font-normal text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full">
-                      {groupMembers.length} {groupMembers.length === 1 ? "member" : "members"}
-                    </span>
-                  </h2>
+              <div key={m.id} className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="h-10 w-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white shadow-xs" style={{ background: m.color }}>
+                    {getInitials(m.full_name)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{m.full_name || "Unnamed Member"}</div>
+                    <div className="text-xs text-muted-foreground truncate">{m.title} · {m.email || "no email"}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-1.5 items-center">
+                      {m.is_owner && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">Owner</span>}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2.5">
-                  {groupMembers.map((m) => {
-                    const primaryRole = resolveMemberRole(m);
+                <div className="flex items-center gap-2">
+                  {getRoleBadge(primaryRole)}
+
+                  {(() => {
                     const isSelf = !!(
                       (user?.email && m.email && user.email.toLowerCase() === m.email.toLowerCase()) ||
                       (user?.id && (m.user_id === user.id || m.id === user.id))
                     );
                     const isAdminMember = primaryRole === "admin";
-
                     return (
-                      <div key={m.id} className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-primary/30 transition-colors shadow-2xs">
-                        <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                          <div className="h-10 w-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white shadow-xs" style={{ background: m.color }}>
-                            {getInitials(m.full_name)}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-medium text-foreground truncate">{m.full_name || "Unnamed Member"}</div>
-                            <div className="text-xs text-muted-foreground truncate">{m.title} · {m.email || "no email"}</div>
-                            {m.is_owner && (
-                              <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-1.5 items-center">
-                                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">Owner</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {getRoleBadge(primaryRole)}
-
-                          <div className="flex items-center gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title={isAdminMember ? "View / Edit Admin Credentials" : "Edit Profile Details"}>
-                              {isAdminMember ? <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" /> : <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />}
-                            </Button>
-                            {!isAdminMember && !m.is_owner && !isSelf && (
-                              <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(m)} className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" title="Delete permanently">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title={isAdminMember ? "View / Edit Admin Credentials" : "Edit Profile Details"}>
+                          {isAdminMember ? <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" /> : <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />}
+                        </Button>
+                        {!isAdminMember && !m.is_owner && !isSelf && (
+                          <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(m)} className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" title="Delete permanently">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     );
-                  })}
+                  })()}
                 </div>
-              </section>
+              </div>
             );
           })}
         </div>
