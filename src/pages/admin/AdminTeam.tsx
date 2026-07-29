@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Loader2, Mail, CheckCircle2, Plus, MoreHorizontal, UserX, UserCheck, Trash2, DollarSign, ShieldCheck, Lock, KeyRound, AlertCircle, XCircle, Pencil, Eye } from "lucide-react";
+import { Loader2, Mail, CheckCircle2, Plus, MoreHorizontal, UserX, UserCheck, Trash2, ShieldCheck, Lock, KeyRound, AlertCircle, XCircle, Pencil, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import ChartNotesIndex from "../staff/clinical/ChartNotesIndex";
@@ -175,14 +175,7 @@ export default function AdminTeam() {
     load();
   };
 
-  const sendAll = async () => {
-    setBusy("all");
-    const { data, error } = await ApiClient.post("staff-invite-send", { body: { all: true } });
-    setBusy(null);
-    if (error || data?.error) { toast.error(data?.error || (typeof error === "string" ? error : (error as any)?.message) || "Failed"); return; }
-    toast.success(`Sent ${data?.sent ?? 0} invites`);
-    load();
-  };
+
 
   const addMember = async () => {
     if (!draft.full_name.trim() || !draft.email.trim()) {
@@ -278,41 +271,6 @@ export default function AdminTeam() {
   };
 
   const [confirmDelete, setConfirmDelete] = useState<Member | null>(null);
-  const [payEditing, setPayEditing] = useState<Member | null>(null);
-  const [payDraft, setPayDraft] = useState({ rate: "", pct: "" });
-  const [paySaving, setPaySaving] = useState(false);
-
-  const openPay = (m: Member) => {
-    setPayDraft({
-      rate: m.hourly_rate_cents != null ? (m.hourly_rate_cents / 100).toString() : "",
-      pct: m.commission_percent != null ? String(m.commission_percent) : "",
-    });
-    setPayEditing(m);
-  };
-
-  const savePay = async () => {
-    if (!payEditing) return;
-    setPaySaving(true);
-    const rate = payDraft.rate.trim() === "" ? null : Math.round(parseFloat(payDraft.rate) * 100);
-    const pct = payDraft.pct.trim() === "" ? null : parseFloat(payDraft.pct);
-    if (rate !== null && (isNaN(rate) || rate < 0)) { setPaySaving(false); return toast.error("Invalid rate"); }
-    if (pct !== null && (isNaN(pct) || pct < 0 || pct > 100)) { setPaySaving(false); return toast.error("Commission must be 0–100"); }
-
-    try {
-      await staffService.updateStaff(payEditing.id, {
-        hourly_rate_cents: rate,
-        commission_percent: pct,
-      } as any);
-      toast.success(`Saved pay settings for ${payEditing.full_name}`);
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to save pay settings");
-    } finally {
-      setPaySaving(false);
-      setPayEditing(null);
-      ApiClient.clearCache("/staff");
-      load();
-    }
-  };
 
   const deleteMember = async (m: Member) => {
     const isAdminAccount = m.email?.toLowerCase() === "admin@gmail.com" || resolveMemberRole(m) === "admin";
@@ -435,7 +393,7 @@ export default function AdminTeam() {
 
   if (currentTab === "notes") {
     return (
-      <div className="p-4 sm:p-8 max-w-6xl space-y-6">
+      <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-6">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="font-serif text-3xl">Staff & Provider Notes</h1>
@@ -454,7 +412,7 @@ export default function AdminTeam() {
 
   if (currentTab === "roles") {
     return (
-      <div className="p-4 sm:p-8 max-w-5xl space-y-8">
+      <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-8">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="font-serif text-3xl">Role & Permission Management</h1>
@@ -579,7 +537,7 @@ export default function AdminTeam() {
 
   if (currentTab === "mfa") {
     return (
-      <div className="p-4 sm:p-8 max-w-4xl space-y-6">
+      <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-6">
         <div>
           <h1 className="font-serif text-3xl">MFA Status & Governance</h1>
           <p className="text-xs text-muted-foreground mt-1">HIPAA §164.312 multi-factor authentication compliance across privileged roles.</p>
@@ -599,7 +557,7 @@ export default function AdminTeam() {
   }
 
   return (
-    <div className="p-4 sm:p-8 max-w-4xl">
+    <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="font-serif text-3xl">Staff Management</h1>
@@ -611,9 +569,6 @@ export default function AdminTeam() {
           <div className="flex gap-2">
             <Button onClick={openAdd} className="rounded-full">
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Add team member
-            </Button>
-            <Button variant="outline" onClick={sendAll} disabled={busy === "all"} className="rounded-full">
-              {busy === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-3.5 w-3.5 mr-1.5" />Invite all pending</>}
             </Button>
           </div>
         )}
@@ -672,13 +627,6 @@ export default function AdminTeam() {
                     <div className="text-xs text-muted-foreground truncate">{m.title} · {m.email || "no email"}</div>
                     <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-1.5 items-center">
                       {m.is_owner && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">Owner</span>}
-                      {(m.hourly_rate_cents != null || m.commission_percent != null) && (
-                        <span className="px-1.5 py-0.5 rounded bg-secondary/60 text-secondary-foreground border border-border/40 font-medium">
-                          Pay: {m.hourly_rate_cents != null ? `$${(m.hourly_rate_cents / 100).toFixed(0)}/hr` : ""}
-                          {m.hourly_rate_cents != null && m.commission_percent != null ? " + " : ""}
-                          {m.commission_percent != null ? `${m.commission_percent}% commission` : ""}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -697,11 +645,6 @@ export default function AdminTeam() {
                         <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title={isAdminMember ? "View / Edit Admin Credentials" : "Edit Profile Details"}>
                           {isAdminMember ? <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" /> : <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />}
                         </Button>
-                        {!isAdminMember && (
-                          <Button size="icon" variant="ghost" onClick={() => openPay(m)} className="h-8 w-8 rounded-full" title="Edit Pay / Commission">
-                            <DollarSign className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                          </Button>
-                        )}
                         {!isAdminMember && !m.is_owner && !isSelf && (
                           <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(m)} className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" title="Delete permanently">
                             <Trash2 className="h-3.5 w-3.5" />
@@ -809,38 +752,6 @@ export default function AdminTeam() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={!!payEditing} onOpenChange={(o) => !o && setPayEditing(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Pay · {payEditing?.full_name}</DialogTitle>
-            <DialogDescription>Set hourly rate, commission %, or both. Leave a field blank to disable it.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Hourly rate (USD)</Label>
-              <Input
-                type="number" min="0" step="0.50" placeholder="e.g. 20"
-                value={payDraft.rate}
-                onChange={(e) => setPayDraft(d => ({ ...d, rate: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Commission % on services + tips</Label>
-              <Input
-                type="number" min="0" max="100" step="1" placeholder="e.g. 25"
-                value={payDraft.pct}
-                onChange={(e) => setPayDraft(d => ({ ...d, pct: e.target.value }))}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Calculated from paid sales where this member is the provider.</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPayEditing(null)} disabled={paySaving}>Cancel</Button>
-            <Button onClick={savePay} disabled={paySaving}>{paySaving ? "Saving…" : "Save"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

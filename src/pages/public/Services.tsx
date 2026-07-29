@@ -7,6 +7,8 @@ import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import { CANCELLATION_POLICY_LONG } from "@/lib/cancellationPolicy";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
+import { applyServiceOverrides } from "@/lib/servicesSync";
+
 interface Cat { id: string; name: string; description: string | null; display_order: number; }
 interface Svc {
   id: string; category_id: string; name: string;
@@ -69,7 +71,7 @@ const Services = () => {
   const [query, setQuery] = useState("");
   const [concern, setConcern] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadCatalog = () => {
     Promise.all([
       apiQuery("service_categories").select("*").eq("is_active", true).order("display_order"),
       apiQuery("services").select("*").eq("is_active", true).order("display_order"),
@@ -77,7 +79,9 @@ const Services = () => {
     ]).then(([c, s, ps]) => {
       setCats(c.data ?? []);
       const rows = (s.data ?? []) as any[];
-      setSvcs(rows.filter(r => !/\bpackage of\b/i.test(r.name ?? "")) as any);
+      const filtered = rows.filter(r => !/\bpackage of\b/i.test(r.name ?? ""));
+      const withOverrides = applyServiceOverrides(filtered);
+      setSvcs(withOverrides as any);
       const byGroup: Record<string, string[]> = {};
       (ps.data ?? []).forEach((row: any) => {
         if (row.claimed_appointment_id) return;
@@ -85,6 +89,17 @@ const Services = () => {
       });
       setPromoSlots(byGroup);
     });
+  };
+
+  useEffect(() => {
+    loadCatalog();
+    const handleUpdate = () => loadCatalog();
+    window.addEventListener("rka_services_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("rka_services_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, []);
 
   const fmtSlot = (iso: string) =>

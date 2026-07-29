@@ -8,6 +8,8 @@ import { MarkdownLite } from "@/components/BookingExtras";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import FinancingBadge from "@/components/FinancingBadge";
 
+import { applySingleServiceOverride } from "@/lib/servicesSync";
+
 interface Service {
   id: string; name: string; description: string | null;
   duration_minutes: number; price_cents: number | null; price_note: string | null;
@@ -33,26 +35,36 @@ export default function ServiceDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  useEffect(() => {
+  const loadServiceDetails = async () => {
     if (!slug) return;
-    (async () => {
-      setLoading(true);
-      const { data: s } = await apiQuery
-        .from("services")
-        .select("id, name, description, duration_minutes, price_cents, price_note, image_url, category_id")
-        .eq("id", slug)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (!s) { setNotFound(true); setLoading(false); return; }
-      setService(s as Service);
-      const [{ data: p }, { data: po }] = await Promise.all([
-        apiQuery("service_pre_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
-        apiQuery("service_post_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
-      ]);
-      setPre(p?.body_markdown ? (p as PrePost) : null);
-      setPost(po?.body_markdown ? (po as PrePost) : null);
-      setLoading(false);
-    })();
+    setLoading(true);
+    const { data: s } = await apiQuery
+      .from("services")
+      .select("id, name, description, duration_minutes, price_cents, price_note, image_url, category_id")
+      .eq("id", slug)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!s) { setNotFound(true); setLoading(false); return; }
+    const merged = applySingleServiceOverride(s as Service);
+    setService(merged);
+    const [{ data: p }, { data: po }] = await Promise.all([
+      apiQuery("service_pre_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
+      apiQuery("service_post_op_instructions").select("title, body_markdown").eq("service_id", s.id).maybeSingle(),
+    ]);
+    setPre(p?.body_markdown ? (p as PrePost) : null);
+    setPost(po?.body_markdown ? (po as PrePost) : null);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadServiceDetails();
+    const handleUpdate = () => loadServiceDetails();
+    window.addEventListener("rka_services_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("rka_services_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, [slug]);
 
   usePageMeta({
