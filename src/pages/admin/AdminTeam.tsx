@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Loader2, Mail, CheckCircle2, Plus, MoreHorizontal, UserX, UserCheck, Trash2, DollarSign, ShieldCheck, Lock, KeyRound, AlertCircle, XCircle, Pencil } from "lucide-react";
+import { Loader2, Mail, CheckCircle2, Plus, MoreHorizontal, UserX, UserCheck, Trash2, DollarSign, ShieldCheck, Lock, KeyRound, AlertCircle, XCircle, Pencil, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import ChartNotesIndex from "../staff/clinical/ChartNotesIndex";
@@ -421,17 +421,25 @@ export default function AdminTeam() {
     }).length;
   };
 
-  const filteredMembers = members.filter((m) => {
-    if (roleFilter === "all") return true;
-    const primaryRole = resolveMemberRole(m);
+  const filteredMembers = members
+    .filter((m) => {
+      if (roleFilter === "all") return true;
+      const primaryRole = resolveMemberRole(m);
 
-    if (roleFilter === "admin") return primaryRole === "admin";
-    if (roleFilter === "md") return primaryRole === "medical_director";
-    if (roleFilter === "provider") return primaryRole === "provider";
-    if (roleFilter === "np") return primaryRole === "nurse_practitioner";
-    if (roleFilter === "staff") return primaryRole === "staff" || primaryRole === "receptionist" || primaryRole === "scheduler";
-    return true;
-  });
+      if (roleFilter === "admin") return primaryRole === "admin";
+      if (roleFilter === "md") return primaryRole === "medical_director";
+      if (roleFilter === "provider") return primaryRole === "provider";
+      if (roleFilter === "np") return primaryRole === "nurse_practitioner";
+      if (roleFilter === "staff") return primaryRole === "staff" || primaryRole === "receptionist" || primaryRole === "scheduler";
+      return true;
+    })
+    .sort((a, b) => {
+      const roleA = resolveMemberRole(a);
+      const roleB = resolveMemberRole(b);
+      if (roleA === "admin" && roleB !== "admin") return -1;
+      if (roleA !== "admin" && roleB === "admin") return 1;
+      return (a.full_name || "").localeCompare(b.full_name || "");
+    });
 
   if (currentTab === "notes") {
     return (
@@ -691,15 +699,18 @@ export default function AdminTeam() {
                       (user?.email && m.email && user.email.toLowerCase() === m.email.toLowerCase()) ||
                       (user?.id && (m.user_id === user.id || m.id === user.id))
                     );
+                    const isAdminMember = primaryRole === "admin";
                     return (
                       <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title="Edit Profile Details">
-                          <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title={isAdminMember ? "View / Edit Admin Credentials" : "Edit Profile Details"}>
+                          {isAdminMember ? <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" /> : <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />}
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => openPay(m)} className="h-8 w-8 rounded-full" title="Edit Pay / Commission">
-                          <DollarSign className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                        </Button>
-                        {!m.is_owner && !isSelf && (
+                        {!isAdminMember && (
+                          <Button size="icon" variant="ghost" onClick={() => openPay(m)} className="h-8 w-8 rounded-full" title="Edit Pay / Commission">
+                            <DollarSign className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                          </Button>
+                        )}
+                        {!isAdminMember && !m.is_owner && !isSelf && (
                           <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(m)} className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" title="Delete permanently">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -715,11 +726,11 @@ export default function AdminTeam() {
       )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{draft.id ? "Edit team member" : "Add team member"}</DialogTitle>
+            <DialogTitle>{draft.id ? (draft.role === "admin" ? "Edit admin account" : "Edit team member") : "Add team member"}</DialogTitle>
             <DialogDescription>
-              {draft.id ? "Update the profile details, role, and calendar color." : "Create a profile and submit an activation request for Admin approval."}
+              {draft.id ? "Update member details, password, and permissions." : "Create a profile and submit an activation request for Admin approval."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -744,33 +755,37 @@ export default function AdminTeam() {
                 {draft.id ? "Enter a new password to update staff login." : "Staff will use this password to sign into the Staff Portal."}
               </p>
             </div>
-            <div>
-              <Label>Role</Label>
-              <select
-                value={draft.role}
-                onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}
-                className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Calendar color</Label>
-              <div className="mt-1.5 flex gap-2 flex-wrap">
-                {PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setDraft({ ...draft, color: c })}
-                    className={`h-8 w-8 rounded-full border-2 transition ${draft.color === c ? "border-foreground scale-110" : "border-transparent"}`}
-                    style={{ background: c }}
-                    aria-label={`color ${c}`}
-                  />
-                ))}
-              </div>
-            </div>
+            {draft.role !== "admin" && (
+              <>
+                <div>
+                  <Label>Role</Label>
+                  <select
+                    value={draft.role}
+                    onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}
+                    className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Calendar color</Label>
+                  <div className="mt-1.5 flex gap-2 flex-wrap">
+                    {PALETTE.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, color: c })}
+                        className={`h-8 w-8 rounded-full border-2 transition ${draft.color === c ? "border-foreground scale-110" : "border-transparent"}`}
+                        style={{ background: c }}
+                        aria-label={`color ${c}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAddOpen(false)} disabled={addBusy}>Cancel</Button>
