@@ -10,96 +10,25 @@ export interface UnifiedStaffMember {
 }
 
 export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> {
-  let remote: UnifiedStaffMember[] = [];
   try {
-    const data = await staffService.getStaffProfiles();
-    if (data) {
-      remote = data.map((s) => ({
-        id: s.id,
-        full_name: s.full_name,
-        title: s.role ? s.role.replace("_", " ").toUpperCase() : "Staff Provider",
-        email: s.email || null,
-        is_active: s.is_active,
-      }));
-    }
-  } catch (e) {}
-
-  const demoMembers: any[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
-  const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-  const pendingRequests: any[] = JSON.parse(localStorage.getItem("rka_pending_member_requests") || "[]");
-
-  const approvedRoleMap = new Map<string, string>();
-  approvedAccounts.forEach((a) => {
-    if (a.email && a.role) approvedRoleMap.set(a.email.toLowerCase(), a.role);
-    if (a.full_name && a.role) approvedRoleMap.set(a.full_name.toLowerCase(), a.role);
-  });
-  demoMembers.forEach((d) => {
-    if (d.email && d.role) approvedRoleMap.set(d.email.toLowerCase(), d.role);
-    if (d.full_name && d.role) approvedRoleMap.set(d.full_name.toLowerCase(), d.role);
-  });
-
-  const combined: UnifiedStaffMember[] = remote.map((r) => ({
-    ...r,
-    role: (r.email && approvedRoleMap.get(r.email.toLowerCase())) || (r.full_name && approvedRoleMap.get(r.full_name.toLowerCase())) || r.role,
-  }));
-  const existingNames = new Set(combined.map((x) => x.full_name.toLowerCase()));
-
-  demoMembers.forEach((m: any) => {
-    if (m.full_name && !existingNames.has(m.full_name.toLowerCase())) {
-      combined.push({
-        id: m.id || `demo-staff-${m.full_name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`,
-        full_name: m.full_name,
-        title: m.title || "Staff Provider",
-        email: m.email || null,
-        role: m.role || (m.email && approvedRoleMap.get(m.email.toLowerCase())),
-        is_active: true,
+    const data = await staffService.getStaffProfiles(false);
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((s: any) => {
+        const roles = s.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
+        const primaryRole = roles.find((r: string) => r !== "staff") || roles[0] || s.role || "staff";
+        return {
+          id: s.id,
+          full_name: s.fullName || s.full_name || "Staff Member",
+          title: s.title || (primaryRole ? primaryRole.replace("_", " ").toUpperCase() : "Staff Provider"),
+          email: s.email || s.user?.email || null,
+          role: primaryRole,
+          is_active: s.isActive !== undefined ? s.isActive : true,
+        };
       });
-      existingNames.add(m.full_name.toLowerCase());
     }
-  });
+  } catch (e) {
+    console.error("Failed to fetch staff members from DB:", e);
+  }
 
-  approvedAccounts.forEach((a: any) => {
-    if (a.full_name && !existingNames.has(a.full_name.toLowerCase())) {
-      combined.push({
-        id: `approved-staff-${a.email ? a.email.replace(/[^a-z0-9]/gi, "-") : Date.now()}`,
-        full_name: a.full_name,
-        title: a.role ? a.role.replace("_", " ").toUpperCase() : "Staff Provider",
-        email: a.email || null,
-        role: a.role,
-        is_active: true,
-      });
-      existingNames.add(a.full_name.toLowerCase());
-    }
-  });
-
-  pendingRequests.forEach((p: any) => {
-    if (p.full_name && !existingNames.has(p.full_name.toLowerCase())) {
-      combined.push({
-        id: p.id || `pending-staff-${Date.now()}`,
-        full_name: p.full_name,
-        title: p.title || "Staff Provider",
-        email: p.email || null,
-        role: p.role,
-        is_active: true,
-      });
-      existingNames.add(p.full_name.toLowerCase());
-    }
-  });
-
-  const defaultProviders = [
-    { id: "staff-dhruva", full_name: "Dhruva", title: "Medical Director", email: "dhruva@gmail.com", role: "medical_director", is_active: true },
-    { id: "staff-shaley", full_name: "Shaley", title: "General Physician", email: "shaley@gmail.com", role: "provider", is_active: true },
-    { id: "staff-oggy", full_name: "Oggy", title: "General Practitioner", email: "oggy@gmail.com", role: "provider", is_active: true },
-    { id: "staff-cherry", full_name: "Cherry", title: "Provider", email: "cherry@gmail.com", role: "provider", is_active: true },
-  ];
-
-  defaultProviders.forEach((d) => {
-    if (!existingNames.has(d.full_name.toLowerCase())) {
-      const updatedRole = (d.email && approvedRoleMap.get(d.email.toLowerCase())) || (d.full_name && approvedRoleMap.get(d.full_name.toLowerCase())) || d.role;
-      combined.push({ ...d, role: updatedRole });
-      existingNames.add(d.full_name.toLowerCase());
-    }
-  });
-
-  return combined;
+  return [];
 }
