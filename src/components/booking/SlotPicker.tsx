@@ -47,11 +47,10 @@ export function SlotPicker({
   useEffect(() => {
     if (serviceIds.length === 0 || !locationId || !staffId) return;
     setLoadingRange(true);
-    ApiClient.post("get-availability-range", {
-      body: { serviceIds, staffId, locationId, days: 180 },
-    }).then(({ data }) => {
-      setAvailableSet(new Set(data?.availableDates ?? []));
-      setNextAvail(data?.nextAvailable ?? null);
+    ApiClient.post("get-availability-range", { serviceIds, staffId, locationId, days: 180 }).then(({ data }) => {
+      const inner = data?.data ?? data;
+      setAvailableSet(new Set(inner?.availableDates ?? []));
+      setNextAvail(inner?.nextAvailable ?? null);
       setLoadingRange(false);
     });
   }, [serviceIds.join(","), locationId, staffId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,10 +62,9 @@ export function SlotPicker({
       setInternalSlots([]); return;
     }
     setInternalLoading(true);
-    ApiClient.post("get-availability", {
-      body: { serviceIds, staffId, locationId, date: format(date, "yyyy-MM-dd") },
-    }).then(({ data }) => {
-      setInternalSlots(data?.slots ?? []);
+    ApiClient.post("get-availability", { serviceIds, staffId, locationId, date: format(date, "yyyy-MM-dd") }).then(({ data }) => {
+      const inner = data?.data ?? data;
+      setInternalSlots(inner?.slots ?? []);
       setInternalLoading(false);
     });
   }, [date, serviceIds.join(","), staffId, locationId, externalSlots]); // eslint-disable-line react-hooks/exhaustive-deps

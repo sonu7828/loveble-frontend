@@ -435,7 +435,7 @@ export const Book = () => {
             <StepDateTime
               date={date} onDate={setDate}
               slot={slot} onSlot={setSlot}
-              slots={slots} loading={loadingSlots}
+              slots={[]} loading={false}
               onContinue={goNext}
               durationMin={totalDurationMin}
               serviceIds={serviceIds} locationId={locationId!} staffId={staffId}
