@@ -4,11 +4,13 @@ import { apiQuery } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import {
-  Loader2, Download, ShieldCheck, Users,
-  Calendar as CalendarIcon, Printer, Search, CheckCircle2, FileText
+  Loader2, Download, ShieldCheck,
+  Calendar as CalendarIcon, Search, CheckCircle2, FileText
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 type Category = "phi" | "clinical" | "consent_signed" | "consent_email" | "appointment";
 
@@ -241,7 +243,6 @@ export default function AdminAuditReport() {
 
     await Promise.all(promises);
 
-    // Sort descending by timestamp
     results.sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime());
     setEvents(results);
     setLoading(false);
@@ -287,6 +288,10 @@ export default function AdminAuditReport() {
   }, [filteredEvents]);
 
   const exportCsv = () => {
+    if (filteredEvents.length === 0) {
+      toast.error("No audit logs available to export for this date range.");
+      return;
+    }
     const header = ["timestamp", "category", "action", "actor", "resource_type", "resource_id", "client_email", "detail"];
     const rows = filteredEvents.map((e) => [
       e.when, CATEGORY_LABEL[e.category], e.action, e.actor,
@@ -295,11 +300,128 @@ export default function AdminAuditReport() {
     const csv = [header.join(","), ...rows].join("\n");
     const filename = `hipaa_audit_report_${from}_to_${to}.csv`;
     downloadBlob(csv, filename);
+    toast.success("CSV export downloaded successfully!");
   };
 
-  const printSummary = () => {
-    window.focus();
-    window.print();
+  const generatePdfReport = () => {
+    if (filteredEvents.length === 0) {
+      toast.error("No audit logs available to export for this date range.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Branded Header Box
+    doc.setFillColor(248, 246, 242);
+    doc.rect(0, 0, pageWidth, 75, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(30, 41, 59);
+    doc.text("Radiantilyk Aesthetic — HIPAA Audit Trail Report", 40, 35);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`HIPAA §164.312(b) Compliance Evidence Record · Generated: ${format(new Date(), "MMM d, yyyy · HH:mm:ss")}`, 40, 55);
+
+    // Metadata Subheader
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    doc.text(`Date Range: ${from} to ${to}   |   Category: ${selectedCategory === "all" ? "All Categories" : CATEGORY_LABEL[selectedCategory]}   |   Total Events: ${filteredEvents.length}`, 40, 95);
+
+    // KPI Summary Box
+    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(40, 110, pageWidth - 80, 40, 6, 6, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(`Total Audit Events: ${summary.total}`, 60, 134);
+    doc.text(`Active Staff Actors: ${summary.uniqueActors}`, 260, 134);
+    doc.text(`Patients Audited: ${summary.uniquePatients}`, 460, 134);
+
+    // Table Header
+    const startY = 175;
+    const colX = [40, 140, 230, 320, 430, 540, 650];
+    const colWidths = [95, 85, 85, 105, 105, 105, pageWidth - 690];
+
+    doc.setFillColor(241, 245, 249);
+    doc.rect(40, startY - 15, pageWidth - 80, 22, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+
+    doc.text("TIMESTAMP", colX[0], startY);
+    doc.text("CATEGORY", colX[1], startY);
+    doc.text("ACTION", colX[2], startY);
+    doc.text("ACTOR / STAFF", colX[3], startY);
+    doc.text("RESOURCE", colX[4], startY);
+    doc.text("PATIENT EMAIL", colX[5], startY);
+    doc.text("DETAILS", colX[6], startY);
+
+    let currentY = startY + 22;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+
+    const maxRows = Math.min(filteredEvents.length, 500);
+
+    for (let i = 0; i < maxRows; i++) {
+      const e = filteredEvents[i];
+      if (currentY > pageHeight - 45) {
+        doc.addPage();
+        currentY = 40;
+
+        doc.setFillColor(241, 245, 249);
+        doc.rect(40, currentY - 15, pageWidth - 80, 22, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        doc.text("TIMESTAMP", colX[0], currentY);
+        doc.text("CATEGORY", colX[1], currentY);
+        doc.text("ACTION", colX[2], currentY);
+        doc.text("ACTOR / STAFF", colX[3], currentY);
+        doc.text("RESOURCE", colX[4], currentY);
+        doc.text("PATIENT EMAIL", colX[5], currentY);
+        doc.text("DETAILS", colX[6], currentY);
+        currentY += 22;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(30, 41, 59);
+      }
+
+      const timeStr = format(new Date(e.when), "MM/dd/yy HH:mm:ss");
+      const categoryStr = CATEGORY_LABEL[e.category] || e.category;
+      const actionStr = e.action || "view";
+      const actorStr = doc.splitTextToSize(e.actor || "System", colWidths[3] - 5)[0];
+      const resourceStr = doc.splitTextToSize(e.resource_type || "system", colWidths[4] - 5)[0];
+      const emailStr = doc.splitTextToSize(e.client_email || "—", colWidths[5] - 5)[0];
+      const detailStr = doc.splitTextToSize(e.detail || "—", colWidths[6] - 5)[0];
+
+      doc.text(timeStr, colX[0], currentY);
+      doc.text(categoryStr, colX[1], currentY);
+      doc.text(actionStr, colX[2], currentY);
+      doc.text(actorStr, colX[3], currentY);
+      doc.text(resourceStr, colX[4], currentY);
+      doc.text(emailStr, colX[5], currentY);
+      doc.text(detailStr, colX[6], currentY);
+
+      doc.setDrawColor(241, 245, 249);
+      doc.line(40, currentY + 4, pageWidth - 40, currentY + 4);
+
+      currentY += 18;
+    }
+
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Radiantilyk Aesthetic HIPAA Governance — Confidential Evidence Record — §164.312(b)", pageWidth / 2, pageHeight - 15, { align: "center" });
+
+    doc.save(`hipaa_audit_report_${from}_to_${to}.pdf`);
+    toast.success("HIPAA Audit Report PDF generated and downloaded!");
   };
 
   const pageEvents = filteredEvents.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
@@ -309,10 +431,10 @@ export default function AdminAuditReport() {
   if (!isAdmin && !isMedicalDirector && !isPrivacyOfficer) return <Navigate to="/staff/today" replace />;
 
   return (
-    <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-6 print:p-0 print:max-w-none">
+    <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-6">
       
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-5 print:hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-5">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight">HIPAA Audit Trail & Governance</h1>
@@ -327,17 +449,29 @@ export default function AdminAuditReport() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button onClick={exportCsv} variant="outline" size="sm" className="h-9 text-xs gap-1.5">
+          <Button
+            onClick={exportCsv}
+            disabled={filteredEvents.length === 0 || loading}
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+          >
             <Download className="h-3.5 w-3.5" /> Export CSV ({filteredEvents.length})
           </Button>
-          <Button onClick={printSummary} variant="default" size="sm" className="h-9 text-xs gap-1.5">
-            <Printer className="h-3.5 w-3.5" /> Print / Save PDF
+          <Button
+            onClick={generatePdfReport}
+            disabled={filteredEvents.length === 0 || loading}
+            variant="default"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+          >
+            <FileText className="h-3.5 w-3.5" /> Download PDF Report
           </Button>
         </div>
       </div>
 
       {/* Date & Preset Filters Bar */}
-      <div className="rounded-2xl border border-border/80 bg-card p-4 space-y-3.5 shadow-2xs print:hidden">
+      <div className="rounded-2xl border border-border/80 bg-card p-4 space-y-3.5 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
           
           {/* Quick Date Presets */}
@@ -426,7 +560,7 @@ export default function AdminAuditReport() {
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs">
           <div className="text-xs font-medium text-muted-foreground">Total Events</div>
           <div className="text-2xl font-bold tracking-tight text-foreground mt-1">{summary.total}</div>
@@ -507,7 +641,7 @@ export default function AdminAuditReport() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground bg-muted/20 print:hidden">
+              <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground bg-muted/20">
                 <div>
                   Page {page + 1} of {totalPages}
                 </div>
@@ -538,7 +672,7 @@ export default function AdminAuditReport() {
       </div>
 
       {/* Compliance Legal Footer */}
-      <div className="pt-2 text-center text-[11px] text-muted-foreground space-y-1 print:pt-4">
+      <div className="pt-2 text-center text-[11px] text-muted-foreground space-y-1">
         <p>Radiantilyk Aesthetic HIPAA Governance & Security Control</p>
         <p className="text-[10px] text-muted-foreground/70">
           Confidential Evidence Record — HIPAA §164.308(a)(1)(ii)(D) & §164.312(b)
