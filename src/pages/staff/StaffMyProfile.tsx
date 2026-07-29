@@ -124,19 +124,19 @@ export default function StaffMyProfile() {
         } catch {}
       } else {
         // Fallback default values for logged in staff without DB row
-        const isOfficer = myEmail === "officer@gmail.com";
-        const isAdminEmail = myEmail === "admin@gmail.com";
-        const defaultName = metadataName || (isOfficer ? "Dr. Kiem (Privacy & Security Officer)" : isAdminEmail ? "Dr. Kiem" : "Staff Provider");
-        const defaultTitle = isOfficer ? "Privacy & Security Officer" : isAdminEmail ? "Medical Director & Admin" : "Nurse Practitioner";
+        const isOfficer = myEmail === "securityofficer@gmail.com" || myEmail === "officer@gmail.com";
+        const defaultName = metadataName || (isOfficer ? "Dr. Kiem (Privacy Officer)" : isAdmin ? "Dr. Kiem" : "Staff Provider");
+        const defaultTitle = isOfficer ? "Privacy & Security Officer" : isAdmin ? "Medical Director & Admin" : "Nurse Practitioner";
+        const defaultEmail = isOfficer ? myEmail : isAdmin ? "admin@gmail.com" : "staff@gmail.com";
 
         const fallbackForm = {
           full_name: defaultName,
           title: defaultTitle,
-          email: myEmail,
+          email: defaultEmail,
           phone: "(555) 234-5678",
-          license_number: "NP-95021080",
+          license_number: isAdmin ? "NP-95021080" : "NP-12345678",
         };
-        const fallbackId = `staff-demo-${myEmail.replace(/[^a-z0-9]/gi, "-")}`;
+        const fallbackId = `staff-demo-${defaultEmail.replace(/[^a-z0-9]/gi, "-")}`;
         setStaffId(fallbackId);
         setForm(fallbackForm);
         localStorage.setItem(`rka_demo_profile_${myEmail}`, JSON.stringify({ id: fallbackId, form: fallbackForm }));
