@@ -205,12 +205,10 @@ export const StepService = ({
                               {isSel && <Check className="h-3 w-3" />}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-baseline justify-between gap-2">
-                                <div className="font-semibold text-xs sm:text-sm leading-snug">{s.name}</div>
-                                {price && (
-                                  <div className="text-xs font-bold shrink-0">{price}</div>
-                                )}
-                              </div>
+                              <div className="font-semibold text-xs sm:text-sm leading-snug">{s.name}</div>
+                              {price && (
+                                <div className="text-base font-bold mt-1 leading-none">{price}</div>
+                              )}
                               {s.price_note && (
                                 <div className={`text-[11px] mt-0.5 font-medium ${isSel ? "opacity-90" : "text-muted-foreground"}`}>
                                   {s.price_note}
