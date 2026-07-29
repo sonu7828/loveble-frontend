@@ -99,8 +99,13 @@ export const staffService = {
     return res.data;
   },
 
-  async updateStaff(id: string, data: Partial<StaffProfile>): Promise<any> {
-    const res = await ApiClient.patch<any>(`/staff/${id}`, data);
+  async updateStaff(id: string, data: any): Promise<any> {
+    const payload = {
+      ...data,
+      fullName: data.fullName || data.full_name,
+      roleName: data.roleName || data.role,
+    };
+    const res = await ApiClient.patch<any>(`/staff/${id}`, payload);
     return res.data;
   },
 

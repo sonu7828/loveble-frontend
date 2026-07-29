@@ -185,23 +185,28 @@ export default function AdminTeam() {
   };
 
   const addMember = async () => {
-    if (!draft.full_name.trim() || !draft.title.trim() || !draft.email.trim()) {
-      toast.error("Name, title, and email are required");
+    if (!draft.full_name.trim() || !draft.email.trim()) {
+      toast.error("Name and email are required");
       return;
     }
     setAddBusy(true);
 
     const email = draft.email.trim().toLowerCase();
     const password = draft.password.trim() || "12345678";
+    const title = draft.role ? draft.role.replace(/_/g, " ").toUpperCase() : "Staff Member";
 
     if (draft.id) {
       // EDIT MODE
       try {
         await staffService.updateStaff(draft.id, {
+          fullName: draft.full_name.trim(),
           full_name: draft.full_name.trim(),
-          title: draft.title.trim(),
+          title,
           email,
           color: draft.color,
+          roleName: draft.role,
+          role: draft.role,
+          password,
         });
         toast.success(`Member ${draft.full_name} updated successfully!`);
       } catch (e: any) {
@@ -212,7 +217,7 @@ export default function AdminTeam() {
       try {
         await staffService.createStaffWithUser({
           fullName: draft.full_name.trim(),
-          title: draft.title.trim(),
+          title,
           email,
           password,
           roleName: draft.role,
@@ -718,15 +723,9 @@ export default function AdminTeam() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Full name</Label>
-                <Input value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} className="mt-1.5" placeholder="Jane Doe" />
-              </div>
-              <div>
-                <Label>Title</Label>
-                <Input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className="mt-1.5" placeholder="Esthetician" />
-              </div>
+            <div>
+              <Label>Full name</Label>
+              <Input value={draft.full_name} onChange={(e) => setDraft({ ...draft, full_name: e.target.value })} className="mt-1.5" placeholder="Jane Doe" />
             </div>
             <div>
               <Label>Email</Label>
