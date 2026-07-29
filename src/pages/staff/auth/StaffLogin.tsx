@@ -135,9 +135,9 @@ export default function StaffLogin() {
           setMode("ready");
           let fallbackTarget = "/staff/today";
           try {
-            const { data: { session: fs } } = await supabase.auth.getSession();
+            const { data: { session: fs } } = await authService.getSession();
             if (fs?.user?.id) {
-              const { data: frd } = await supabase.from("user_roles").select("role").eq("user_id", fs.user.id);
+              const { data: frd } = await apiQuery("user_roles").select("role").eq("user_id", fs.user.id);
               fallbackTarget = resolveRedirectTarget((frd ?? []).map((x: any) => x.role));
             }
           } catch { /* keep fallback */ }
@@ -201,9 +201,25 @@ export default function StaffLogin() {
     setErrMsg("");
     const cleanEmail = email.trim().toLowerCase();
 
-    // 0. Check if account has been deleted by an Administrator
-    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-    if (deletedEmails.includes(cleanEmail)) {
+    // 0. Check if account has been deleted by an Administrator (Built-in accounts can never be deleted)
+    const BUILTIN_EMAILS = [
+      "admin@gmail.com",
+      "staff@gmail.com",
+      "securityofficer@gmail.com",
+      "officer@gmail.com",
+      "medicaldirector@gmail.com",
+      "md@gmail.com",
+      "user@gmail.com",
+    ];
+
+    const rawDeletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+    if (rawDeletedEmails.some((e: string) => BUILTIN_EMAILS.includes(e.toLowerCase()))) {
+      const sanitized = rawDeletedEmails.filter((e: string) => !BUILTIN_EMAILS.includes(e.toLowerCase()));
+      localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitized));
+    }
+    const deletedEmails = rawDeletedEmails.filter((e: string) => !BUILTIN_EMAILS.includes(e.toLowerCase()));
+
+    if (!BUILTIN_EMAILS.includes(cleanEmail) && deletedEmails.includes(cleanEmail)) {
       setLoading(false);
       setPassword("");
       const errorMsg = "This staff account has been deleted by an Administrator. Access denied.";

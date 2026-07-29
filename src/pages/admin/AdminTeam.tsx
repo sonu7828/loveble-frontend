@@ -22,7 +22,7 @@ interface Member {
   pending_role?: Role;
 }
 
-type Role = "admin" | "provider" | "nurse_practitioner" | "medical_director" | "receptionist" | "staff" | "privacy_officer";
+type Role = "admin" | "provider" | "nurse_practitioner" | "medical_director" | "receptionist" | "scheduler" | "staff" | "privacy_officer";
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin (full access)",
   privacy_officer: "Privacy & Security Officer (HIPAA Policy Approval & Security)",
@@ -30,6 +30,7 @@ const ROLE_LABELS: Record<Role, string> = {
   provider: "Provider (clinical provider)",
   nurse_practitioner: "Nurse Practitioner (GFE + clinical co-sign)",
   receptionist: "Front Desk Receptionist (book, check in, schedule)",
+  scheduler: "Scheduler (manage appointments & schedule)",
   staff: "Staff (own bookings only)",
 };
 
@@ -63,7 +64,8 @@ export default function AdminTeam() {
   const { isAdmin, isMedicalDirector, isPrivacyOfficer, isStaff, isNP, isPrivileged, user } = useAuth();
   const canAccessTeam = isAdmin || isMedicalDirector || isPrivacyOfficer || isStaff || isNP || isPrivileged;
   const [sp, setSp] = useSearchParams();
-  const roleFilter = sp.get("role") || (sp.get("tab") === "providers" ? "provider" : "all");
+  const isMDOnly = !isAdmin && isMedicalDirector;
+  const roleFilter = isMDOnly ? "provider" : (sp.get("role") || (sp.get("tab") === "providers" ? "provider" : "all"));
   const currentTab = sp.get("tab");
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -127,9 +129,20 @@ export default function AdminTeam() {
       color: x.color || PALETTE[0],
     })) as Member[];
 
-    // Filter out any members that were previously deleted by the user
+    // Filter out any members that were previously deleted by the user (excluding system accounts)
+    const BUILTIN_EMAILS = [
+      "admin@gmail.com",
+      "staff@gmail.com",
+      "securityofficer@gmail.com",
+      "officer@gmail.com",
+      "medicaldirector@gmail.com",
+      "md@gmail.com",
+      "user@gmail.com",
+    ];
     const deletedIds: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_ids") || "[]");
-    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+    const rawDeletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+    const deletedEmails = rawDeletedEmails.filter(e => !BUILTIN_EMAILS.includes(e.toLowerCase()));
+
     const filteredFetched = fetchedMembers.filter(x =>
       !deletedIds.includes(x.id) &&
       !(x.email && deletedEmails.includes((x.email || "").toLowerCase()))
@@ -492,6 +505,20 @@ export default function AdminTeam() {
   };
 
   const deleteMember = async (m: Member) => {
+    const BUILTIN_EMAILS = [
+      "admin@gmail.com",
+      "staff@gmail.com",
+      "securityofficer@gmail.com",
+      "officer@gmail.com",
+      "medicaldirector@gmail.com",
+      "md@gmail.com",
+      "user@gmail.com",
+    ];
+    if (m.email && BUILTIN_EMAILS.includes(m.email.toLowerCase())) {
+      toast.error("Built-in system accounts cannot be deleted.");
+      setConfirmDelete(null);
+      return;
+    }
     if (user && ((user.email && m.email && user.email.toLowerCase() === m.email.toLowerCase()) || (user.id && (m.user_id === user.id || m.id === user.id)))) {
       toast.error("You cannot delete your own account");
       setConfirmDelete(null);
@@ -801,51 +828,56 @@ export default function AdminTeam() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="font-serif text-3xl">Staff Management</h1>
-          <p className="text-xs text-muted-foreground mt-1">Manage all practice members, assign roles, and send activation emails.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {isMDOnly ? "View clinical providers and practice team members." : "Manage all practice members, assign roles, and send activation emails."}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={openAdd} className="rounded-full">
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Add team member
-          </Button>
-          <Button variant="outline" onClick={sendAll} disabled={busy === "all"} className="rounded-full">
-            {busy === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-3.5 w-3.5 mr-1.5" />Invite all pending</>}
-          </Button>
-        </div>
+        {!isMDOnly && (
+          <div className="flex gap-2">
+            <Button onClick={openAdd} className="rounded-full">
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Add team member
+            </Button>
+            <Button variant="outline" onClick={sendAll} disabled={busy === "all"} className="rounded-full">
+              {busy === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-3.5 w-3.5 mr-1.5" />Invite all pending</>}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Role Filter Tabs */}
-      <div className="flex items-center gap-1.5 p-1 mb-6 rounded-xl bg-muted/60 border border-border text-xs font-medium overflow-x-auto">
-        <button
-          onClick={() => setSp({})}
-          className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "all" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          All Staff ({members.length})
-        </button>
-        <button
-          onClick={() => setSp({ role: "provider" })}
-          className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "provider" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          Providers
-        </button>
-        <button
-          onClick={() => setSp({ role: "md" })}
-          className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "md" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          Medical Directors
-        </button>
-        <button
-          onClick={() => setSp({ role: "np" })}
-          className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "np" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          Nurse Practitioners
-        </button>
-        <button
-          onClick={() => setSp({ role: "staff" })}
-          className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "staff" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          Staff & Receptionists
-        </button>
-      </div>
+      {!isMDOnly && (
+        <div className="flex items-center gap-1.5 p-1 mb-6 rounded-xl bg-muted/60 border border-border text-xs font-medium overflow-x-auto">
+          <button
+            onClick={() => setSp({})}
+            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "all" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            All Staff ({members.length})
+          </button>
+          <button
+            onClick={() => setSp({ role: "provider" })}
+            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "provider" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Providers
+          </button>
+          <button
+            onClick={() => setSp({ role: "md" })}
+            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "md" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Medical Directors
+          </button>
+          <button
+            onClick={() => setSp({ role: "np" })}
+            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "np" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Nurse Practitioners
+          </button>
+          <button
+            onClick={() => setSp({ role: "staff" })}
+            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "staff" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Staff & Receptionists
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-5 w-5 animate-spin" /></div>

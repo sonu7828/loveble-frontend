@@ -32,13 +32,7 @@ export interface AuthSession {
 export function getUserProfileByEmail(email: string): UserProfile | null {
   const clean = (email || "").trim().toLowerCase();
 
-  // 1. Check deleted staff list
-  const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-  if (deletedEmails.includes(clean)) {
-    return null;
-  }
-
-  // 2. Built-in Admin
+  // 1. Built-in Admin (Never deleted)
   if (clean === "admin@gmail.com") {
     return {
       id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -50,6 +44,12 @@ export function getUserProfileByEmail(email: string): UserProfile | null {
       created_at: new Date().toISOString(),
       email_confirmed_at: new Date().toISOString(),
     };
+  }
+
+  // 2. Check deleted staff list for non-system accounts
+  const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+  if (deletedEmails.includes(clean)) {
+    return null;
   }
 
   // 3. Built-in Medical Director
@@ -248,6 +248,14 @@ export const authService = {
         return { data: { user: null }, error: null };
       }
       return { error: { message: "Invalid 2-Factor authentication code." } };
+    },
+    async enroll(_params: { factorType: string; friendlyName?: string }): Promise<{ data: { id: string; totp: { qr_code: string; secret: string } } | null; error: any }> {
+      // Demo environment: MFA enrollment is bypassed (verified factor already exists)
+      return { data: null, error: { message: "MFA enrollment is managed by the demo session." } };
+    },
+    async unenroll(_params: { factorId: string }): Promise<{ data: any; error: any }> {
+      // Demo environment: no real factors to unenroll
+      return { data: {}, error: null };
     },
   },
 };
