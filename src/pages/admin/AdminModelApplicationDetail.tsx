@@ -39,21 +39,27 @@ export default function AdminModelApplicationDetail() {
   const [app, setApp] = useState<any>(null);
 
   useEffect(() => {
-    const localApps = JSON.parse(localStorage.getItem("rka_demo_model_applications") || "[]");
-    const found = localApps.find((a: any) => a.id === id);
-    if (found) {
-      setApp(found);
-    } else {
-      apiQuery("model_applications" as any).select("*").eq("id", id).then(({ data }) => {
+    async function loadApp() {
+      const localApps = JSON.parse(localStorage.getItem("rka_demo_model_applications") || "[]");
+      const found = localApps.find((a: any) => a.id === id);
+      if (found) {
+        setApp(found);
+        return;
+      }
+
+      try {
+        const { data } = await apiQuery("model_applications" as any).select("*").eq("id", id);
         if (data && data[0]) {
           setApp(data[0]);
         } else {
           setApp({ ...DEFAULT_MOCK, id: id || "APP-001" });
         }
-      }).catch(() => {
+      } catch (_err) {
         setApp({ ...DEFAULT_MOCK, id: id || "APP-001" });
-      });
+      }
     }
+
+    loadApp();
   }, [id]);
 
   const handleUpdateStatus = async (newStatus: "approved" | "rejected") => {
