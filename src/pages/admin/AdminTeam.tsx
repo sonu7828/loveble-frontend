@@ -227,16 +227,19 @@ export default function AdminTeam() {
     setAddBusy(false);
     setAddOpen(false);
     setDraft({ id: "", full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "staff", sendInvite: true });
+    ApiClient.clearCache("/staff");
     load();
   };
 
   const approveMemberRequest = async (_req: PendingRequest) => {
     toast.info("Member approval processed");
+    ApiClient.clearCache("/staff");
     load();
   };
 
   const rejectMemberRequest = (_reqId: string) => {
     toast.info("Member request rejected");
+    ApiClient.clearCache("/staff");
     load();
   };
 
@@ -251,6 +254,7 @@ export default function AdminTeam() {
     setBusy(null);
     if (insErr) { toast.error(insErr.message); return; }
     toast.success(`Role updated to ${newRole}`);
+    ApiClient.clearCache("/staff");
     load();
   };
 
@@ -263,6 +267,7 @@ export default function AdminTeam() {
       toast.error(e?.message || "Failed to toggle status");
     } finally {
       setBusy(null);
+      ApiClient.clearCache("/staff");
       load();
     }
   };
@@ -299,6 +304,7 @@ export default function AdminTeam() {
     } finally {
       setPaySaving(false);
       setPayEditing(null);
+      ApiClient.clearCache("/staff");
       load();
     }
   };
@@ -332,6 +338,7 @@ export default function AdminTeam() {
     } finally {
       setBusy(null);
       setConfirmDelete(null);
+      ApiClient.clearCache("/staff");
       load();
     }
   };
@@ -345,20 +352,20 @@ export default function AdminTeam() {
       (memberRoles.includes("admin")
         ? "admin"
         : memberRoles.includes("medical_director")
-        ? "medical_director"
-        : memberRoles.includes("provider")
-        ? "provider"
-        : memberRoles.includes("nurse_practitioner")
-        ? "nurse_practitioner"
-        : memberRoles.includes("privacy_officer")
-        ? "privacy_officer"
-        : memberRoles.includes("scheduler")
-        ? "scheduler"
-        : memberRoles.includes("receptionist")
-        ? "receptionist"
-        : memberRoles.includes("staff")
-        ? "staff"
-        : null);
+          ? "medical_director"
+          : memberRoles.includes("provider")
+            ? "provider"
+            : memberRoles.includes("nurse_practitioner")
+              ? "nurse_practitioner"
+              : memberRoles.includes("privacy_officer")
+                ? "privacy_officer"
+                : memberRoles.includes("scheduler")
+                  ? "scheduler"
+                  : memberRoles.includes("receptionist")
+                    ? "receptionist"
+                    : memberRoles.includes("staff")
+                      ? "staff"
+                      : null);
 
     if (explicitRole) return explicitRole as Role;
 
@@ -732,7 +739,7 @@ export default function AdminTeam() {
                 value={draft.password}
                 onChange={(e) => setDraft({ ...draft, password: e.target.value })}
                 className="mt-1.5 font-mono"
-                placeholder="Set password (e.g. dhruva123)"
+                placeholder="Set password"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
                 {draft.id ? "Enter a new password to update staff login." : "Staff will use this password to sign into the Staff Portal."}
