@@ -198,7 +198,19 @@ export default function StaffLogin() {
   const submitCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrMsg("");
     const cleanEmail = email.trim().toLowerCase();
+
+    // 0. Check if account has been deleted by an Administrator
+    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+    if (deletedEmails.includes(cleanEmail)) {
+      setLoading(false);
+      setPassword("");
+      const errorMsg = "This staff account has been deleted by an Administrator. Access denied.";
+      setErrMsg(errorMsg);
+      toast.error(errorMsg);
+      return;
+    }
 
     // 1. Check built-in demo patient user account
     if (cleanEmail === "user@gmail.com") {
@@ -260,10 +272,12 @@ export default function StaffLogin() {
       return;
     }
 
-    const { error } = await authService.signInWithPassword({ email: cleanEmail, password });
+    const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password });
     setLoading(false);
-    if (error) {
-      toast.error(error.message);
+    if (error || !data?.user) {
+      const err = error?.message || "Invalid email or password. Access denied.";
+      setErrMsg(err);
+      toast.error(err);
       return;
     }
     setPassword("");
@@ -426,6 +440,15 @@ export default function StaffLogin() {
                   <span>Signed out after 15m of inactivity for privacy. Please sign in again.</span>
                 </div>
               )}
+
+              {/* Bold Red Error Alert Banner directly inside Form */}
+              {errMsg && (
+                <div className="mb-3 p-3 rounded-xl border border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300 text-xs font-semibold flex items-start gap-2.5 shadow-2xs">
+                  <ShieldAlert className="h-4.5 w-4.5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 leading-snug">{errMsg}</div>
+                </div>
+              )}
+
               {/* Demo Credentials Quick Fill Box */}
               <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 p-2.5 text-xs">
                 <div className="font-semibold text-foreground mb-0.5 text-[11px]">⚡ Quick Demo Credentials</div>
@@ -446,7 +469,7 @@ export default function StaffLogin() {
                 )}
 
                 {activeRole === "staff" && (
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                     <button
                       type="button"
                       onClick={() => fillDemoCredentials("medicaldirector@gmail.com")}

@@ -60,7 +60,7 @@ const resolveName = (m: any): string => {
 };
 
 export default function AdminTeam() {
-  const { isAdmin, isMedicalDirector, isPrivacyOfficer, isStaff, isNP, isPrivileged } = useAuth();
+  const { isAdmin, isMedicalDirector, isPrivacyOfficer, isStaff, isNP, isPrivileged, user } = useAuth();
   const canAccessTeam = isAdmin || isMedicalDirector || isPrivacyOfficer || isStaff || isNP || isPrivileged;
   const [sp, setSp] = useSearchParams();
   const roleFilter = sp.get("role") || (sp.get("tab") === "providers" ? "provider" : "all");
@@ -492,6 +492,11 @@ export default function AdminTeam() {
   };
 
   const deleteMember = async (m: Member) => {
+    if (user && ((user.email && m.email && user.email.toLowerCase() === m.email.toLowerCase()) || (user.id && (m.user_id === user.id || m.id === user.id)))) {
+      toast.error("You cannot delete your own account");
+      setConfirmDelete(null);
+      return;
+    }
     setBusy(m.id);
     try {
       await Promise.allSettled([
@@ -874,19 +879,27 @@ export default function AdminTeam() {
                 <div className="flex items-center gap-2">
                   {getRoleBadge(primaryRole)}
 
-                  {!m.is_owner && (
-                    <div className="flex items-center gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title="Edit Profile Details">
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => openPay(m)} className="h-8 w-8 rounded-full" title="Edit Pay / Commission">
-                        <DollarSign className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(m)} className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" title="Delete permanently">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  )}
+                  {(() => {
+                    const isSelf = !!(
+                      (user?.email && m.email && user.email.toLowerCase() === m.email.toLowerCase()) ||
+                      (user?.id && (m.user_id === user.id || m.id === user.id))
+                    );
+                    return (
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title="Edit Profile Details">
+                          <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => openPay(m)} className="h-8 w-8 rounded-full" title="Edit Pay / Commission">
+                          <DollarSign className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                        </Button>
+                        {!m.is_owner && !isSelf && (
+                          <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(m)} className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10" title="Delete permanently">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );

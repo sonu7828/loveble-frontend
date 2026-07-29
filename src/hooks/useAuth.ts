@@ -44,11 +44,17 @@ export function useAuth(): AuthState {
   useEffect(() => {
     async function loadUserSession() {
       const session = await authService.getSession();
-      if (session && session.user) {
+      const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+      const userEmail = (session?.user?.email || "").toLowerCase();
+
+      if (session && session.user && !deletedEmails.includes(userEmail)) {
         setUser(session.user);
         setRoles(session.user.roles || ["admin", "staff"]);
         setStaffId(session.user.staff_id || session.user.id);
       } else {
+        if (session && session.user && deletedEmails.includes(userEmail)) {
+          authService.logout();
+        }
         setUser(null);
         setRoles([]);
         setStaffId(null);
