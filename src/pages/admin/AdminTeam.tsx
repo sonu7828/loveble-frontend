@@ -218,7 +218,16 @@ export default function AdminTeam() {
         });
         toast.success(`Member ${draft.full_name} created successfully! Login credentials: Email: ${email} | Password: ${password}`);
       } catch (e: any) {
-        toast.error(e?.message || "Failed to create staff member");
+        const rawErr = e?.message || e?.error?.message || (typeof e === "string" ? e : "");
+        if (
+          rawErr.toLowerCase().includes("already exists") ||
+          rawErr.includes("P2002") ||
+          rawErr.includes("RES_002")
+        ) {
+          toast.error(`An account with email "${email}" already exists. Please enter a different email address.`);
+        } else {
+          toast.error(rawErr || "Failed to create staff member");
+        }
       }
     }
 
