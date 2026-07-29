@@ -178,7 +178,8 @@ export const StepService = ({
                     <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {catServices.map(s => {
                         const isSel = selected.includes(s.id);
-                        const price = typeof s.price_cents === "number"
+                        const isModelDay = s.name.trim() === "Model Day";
+                        const price = typeof s.price_cents === "number" && !isModelDay
                           ? (s.price_cents === 0
                             ? "Complimentary"
                             : `$${(s.price_cents / 100).toFixed(s.price_cents % 100 === 0 ? 0 : 2)}`)
@@ -209,9 +210,9 @@ export const StepService = ({
                               {price && (
                                 <div className="text-base font-bold mt-1 leading-none">{price}</div>
                               )}
-                              {s.price_note && (
+                              {(s.price_note && !isModelDay) && (
                                 <div className={`text-[11px] mt-0.5 font-medium ${isSel ? "opacity-90" : "text-muted-foreground"}`}>
-                                  {s.price_note}
+                                  {s.price_note.toLowerCase()}
                                 </div>
                               )}
                               {s.description && (
