@@ -177,20 +177,7 @@ export class ApiTableQuery {
     return this;
   }
 
-  public gt(column: string, value: any): this {
-    this.filters.push({ col: column, op: "gt", val: value });
-    return this;
-  }
 
-  public lte(column: string, value: any): this {
-    this.filters.push({ col: column, op: "lte", val: value });
-    return this;
-  }
-
-  public lt(column: string, value: any): this {
-    this.filters.push({ col: column, op: "lt", val: value });
-    return this;
-  }
 
   public is(column: string, value: any): this {
     this.filters.push({ col: column, op: "is", val: value });

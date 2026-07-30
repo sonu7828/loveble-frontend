@@ -110,16 +110,6 @@ export default function StaffAppointmentDetail() {
       if (!a) { setLoading(false); return; }
       setAppt(a);
 
-<<<<<<< HEAD
-    let staffInfo = st;
-    if (!staffInfo) {
-      const unified = await fetchUnifiedStaffMembers();
-      const found = unified.find((u: any) => u.id === a.staff_id || (u.full_name && a.staff_id && u.full_name.toLowerCase().includes(a.staff_id.toLowerCase())));
-      if (found) {
-        staffInfo = { full_name: found.full_name, title: found.title, email: found.email };
-      } else {
-        staffInfo = { full_name: "Staff Provider", title: "Provider", email: null };
-=======
       if (a.client_email) {
         try {
           const { data: gfeData } = await apiQuery
@@ -132,7 +122,6 @@ export default function StaffAppointmentDetail() {
             .maybeSingle();
           setGfe(gfeData ?? null);
         } catch (_err) {}
->>>>>>> 84c7527154a4a323a41185aca4697aad4cf5bc8a
       }
 
       let s: any = null, st: any = null, l: any = null, hist: any[] = [], apsv: any[] = [], consentRows: any[] = [];
