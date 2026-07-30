@@ -100,7 +100,24 @@ export const Book = () => {
       if (c.data) setCategories(c.data as any);
       if (s.data) setServices(s.data as any);
       if (l.data) setLocations(l.data as any);
-      if (sp.data) setStaff(sp.data as any);
+      if (sp.data && Array.isArray(sp.data)) {
+        const rawStaff = (sp.data as any[]).map(x => ({
+          ...x,
+          full_name: x.full_name || x.fullName || x.name || "Staff Member",
+          title: x.title || "Licensed Specialist",
+          color: x.color || "#8B6B5D",
+          role: (x.role || x.pending_role || "").toLowerCase(),
+        }));
+        
+        const providerStaff = rawStaff.filter(x => {
+          const r = x.role;
+          const t = (x.title || "").toLowerCase();
+          const n = (x.full_name || "").toLowerCase();
+          return r === "provider" || r === "nurse_practitioner" || t.includes("provider") || n.includes("girish");
+        });
+
+        setStaff(providerStaff.length > 0 ? providerStaff : rawStaff);
+      }
       if (p.data) setProviders(p.data as any);
 
       if (sess?.data?.user) {

@@ -23,7 +23,7 @@ export const StepLocationStaff = ({
 
   // Auto-select provider if none selected
   useEffect(() => {
-    if (!staffId) {
+    if (!staffId || (staffId === "any-available" && staff.length > 0)) {
       if (staff.length > 0) {
         onStaff(staff[0].id);
       } else {
@@ -104,31 +104,35 @@ export const StepLocationStaff = ({
         </Label>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {/* Option A: Any Available Provider */}
-          <button
-            type="button"
-            onClick={() => onStaff("any-available")}
-            className={`rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer flex items-center gap-3.5 ${
-              staffId === "any-available" || (!staffId && staff.length === 0)
-                ? "border-primary bg-primary/5 shadow-2xs ring-1 ring-primary/30"
-                : "border-border/80 bg-card hover:border-primary/40"
-            }`}
-          >
-            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Users className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold text-xs sm:text-sm text-foreground">Any Available Provider</div>
-              <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
-                First available licensed specialist
+          {/* Option A: Only show 'Any Available Provider' if no specific provider exists */}
+          {staff.length === 0 && (
+            <button
+              type="button"
+              onClick={() => onStaff("any-available")}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer flex items-center gap-3.5 ${
+                staffId === "any-available" || !staffId
+                  ? "border-primary bg-primary/5 shadow-2xs ring-1 ring-primary/30"
+                  : "border-border/80 bg-card hover:border-primary/40"
+              }`}
+            >
+              <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Users className="h-5 w-5" />
               </div>
-            </div>
-          </button>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-xs sm:text-sm text-foreground">Any Available Provider</div>
+                <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                  First available licensed specialist
+                </div>
+              </div>
+            </button>
+          )}
 
-          {/* Option B: Real Registered Staff / Providers */}
-          {staff.length > 0 ? (
+          {/* Option B: Specific Registered Providers */}
+          {staff.length > 0 &&
             staff.map(s => {
               const isSelected = staffId === s.id;
+              const name = s.full_name || (s as any).fullName || (s as any).name || "Staff Member";
+              const initials = name.trim().split(/\s+/).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "P";
               return (
                 <button
                   key={s.id}
@@ -144,11 +148,11 @@ export const StepLocationStaff = ({
                     className="h-10 w-10 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold text-white shadow-2xs"
                     style={{ background: s.color || "#8B6B5D" }}
                   >
-                    {s.full_name.charAt(0)}
+                    {initials}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-xs sm:text-sm text-foreground leading-snug truncate">
-                      {s.full_name}
+                      {name}
                     </div>
                     <div className="text-[11px] text-muted-foreground leading-snug mt-0.5 truncate">
                       {s.title || "Licensed Practitioner"}
@@ -157,16 +161,7 @@ export const StepLocationStaff = ({
                   {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
                 </button>
               );
-            })
-          ) : (
-            /* Fallback Card when no specific provider is assigned */
-            <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-4 text-left flex items-center gap-3 col-span-full">
-              <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0" />
-              <div className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">No specific provider pre-assigned.</span> Select <span className="font-medium text-primary">"Any Available Provider"</span> to continue booking.
-              </div>
-            </div>
-          )}
+            })}
         </div>
       </div>
 

@@ -5,6 +5,28 @@
 import { ApiClient } from "./client";
 
 const MOCK_FALLBACKS: Record<string, any[]> = {
+  staff_directory: [
+    {
+      id: "st-girish",
+      full_name: "Girish",
+      fullName: "Girish",
+      title: "Provider",
+      color: "#8B6B5D",
+      is_active: true,
+      role: "provider",
+    },
+  ],
+  staff_profiles: [
+    {
+      id: "st-girish",
+      full_name: "Girish",
+      fullName: "Girish",
+      title: "Provider",
+      color: "#8B6B5D",
+      is_active: true,
+      role: "provider",
+    },
+  ],
   locations: [
     {
       id: "loc-sj-01",
