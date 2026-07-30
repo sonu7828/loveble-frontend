@@ -23,7 +23,7 @@ export const StepLocationStaff = ({
 
   // Auto-select provider if none selected
   useEffect(() => {
-    if (!staffId) {
+    if (!staffId || (staffId === "any-available" && staff.length > 0)) {
       if (staff.length > 0) {
         onStaff(staff[0].id);
       } else {
@@ -104,28 +104,30 @@ export const StepLocationStaff = ({
         </Label>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {/* Option A: Any Available Provider */}
-          <button
-            type="button"
-            onClick={() => onStaff("any-available")}
-            className={`rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer flex items-center gap-3.5 ${
-              staffId === "any-available" || (!staffId && staff.length === 0)
-                ? "border-primary bg-primary/5 shadow-2xs ring-1 ring-primary/30"
-                : "border-border/80 bg-card hover:border-primary/40"
-            }`}
-          >
-            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Users className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold text-xs sm:text-sm text-foreground">Any Available Provider</div>
-              <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
-                First available licensed specialist
+          {/* Option A: Only show 'Any Available Provider' if no specific provider exists */}
+          {staff.length === 0 && (
+            <button
+              type="button"
+              onClick={() => onStaff("any-available")}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer flex items-center gap-3.5 ${
+                staffId === "any-available" || !staffId
+                  ? "border-primary bg-primary/5 shadow-2xs ring-1 ring-primary/30"
+                  : "border-border/80 bg-card hover:border-primary/40"
+              }`}
+            >
+              <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Users className="h-5 w-5" />
               </div>
-            </div>
-          </button>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-xs sm:text-sm text-foreground">Any Available Provider</div>
+                <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                  First available licensed specialist
+                </div>
+              </div>
+            </button>
+          )}
 
-          {/* Option B: Real Registered Staff / Providers */}
+          {/* Option B: Specific Registered Providers */}
           {staff.length > 0 &&
             staff.map(s => {
               const isSelected = staffId === s.id;
