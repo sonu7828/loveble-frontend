@@ -93,7 +93,14 @@ export default function PatientAuth() {
     });
     if (error) {
       setLoading(false);
-      toast.error(error.message);
+      const msg = error.message || "";
+      const is409 = (error as any)?.statusCode === 409 || msg.includes("409") || msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("conflict");
+      if (is409) {
+        toast.error("An account with this email address already exists. Switching to Sign In.");
+        setMode("signin");
+      } else {
+        toast.error(msg || "Failed to create account. Please try again.");
+      }
       return;
     }
 
