@@ -409,9 +409,11 @@ export default function PatientAccount() {
                   })()}
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Link to="/book">
-                    <Button className="rounded-full gap-1"><Plus className="h-4 w-4" /> Book Visit</Button>
-                  </Link>
+                  <Button asChild className="rounded-full gap-1">
+                    <Link to="/book">
+                      <Plus className="h-4 w-4" /> Book Visit
+                    </Link>
+                  </Button>
                 </div>
               </div>
             )}

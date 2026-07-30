@@ -177,10 +177,7 @@ export class ApiTableQuery {
     return this;
   }
 
-  public lte(column: string, value: any): this {
-    this.filters.push({ col: column, op: "lte", val: value });
-    return this;
-  }
+
 
   public is(column: string, value: any): this {
     this.filters.push({ col: column, op: "is", val: value });
@@ -261,6 +258,14 @@ export class ApiTableQuery {
         if (f.op === "lt") return v !== undefined && v !== null && new Date(v).getTime() < new Date(f.val).getTime();
         if (f.op === "in") return Array.isArray(f.val) && f.val.map(String).includes(String(v));
         if (f.op === "is") return f.val === null ? v == null : v === f.val;
+        if (f.op === "gt") return v > f.val;
+        if (f.op === "gte") return v >= f.val;
+        if (f.op === "lt") return v < f.val;
+        if (f.op === "lte") return v <= f.val;
+        if (f.op === "ilike") {
+           const pat = String(f.val).toLowerCase().replace(/%/g, "");
+           return typeof v === "string" && v.toLowerCase().includes(pat);
+        }
         return true; // pass through for ops we can't handle client-side
       })
     );

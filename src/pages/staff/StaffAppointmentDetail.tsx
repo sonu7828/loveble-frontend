@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
@@ -310,17 +311,17 @@ export default function StaffAppointmentDetail() {
       // Fire-and-forget side effects — never let them blank the page
       ApiClient.post("google-calendar-sync", {
         body: { appointmentId: appt.id, action: "delete" },
-      }).catch(() => {});
+      }).catch(() => { });
       ApiClient.post("process-waitlist-fill", {
         body: { appointmentId: appt.id },
-      }).catch(() => {});
+      }).catch(() => { });
       ApiClient.post("notify-cancellation", {
         body: { appointmentId: appt.id, cancelledBy: "staff" },
-      }).catch(() => {});
+      }).catch(() => { });
       if (appt.client_email) {
         ApiClient.post("ghl-sync-contact", {
           body: { email: appt.client_email, tags: ["rkabook", "appointment-cancelled"] },
-        }).catch(() => {});
+        }).catch(() => { });
       }
       toast.dismiss(t);
       toast.success("Appointment cancelled", {
@@ -404,11 +405,11 @@ export default function StaffAppointmentDetail() {
 
   const statusColor =
     appt.status === "pending" ? "bg-warning-soft text-warning-soft-foreground" :
-    appt.status === "approved" ? "bg-success-soft text-success-soft-foreground" :
-    appt.status === "arrived" ? "bg-info-soft text-info-soft-foreground" :
-    appt.status === "denied" ? "bg-destructive-soft text-destructive-soft-foreground" :
-    appt.status === "no_show" ? "bg-destructive-soft text-destructive-soft-foreground" :
-    "bg-secondary text-muted-foreground";
+      appt.status === "approved" ? "bg-success-soft text-success-soft-foreground" :
+        appt.status === "arrived" ? "bg-info-soft text-info-soft-foreground" :
+          appt.status === "denied" ? "bg-destructive-soft text-destructive-soft-foreground" :
+            appt.status === "no_show" ? "bg-destructive-soft text-destructive-soft-foreground" :
+              "bg-secondary text-muted-foreground";
 
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
@@ -747,9 +748,9 @@ export default function StaffAppointmentDetail() {
                   {emailLog.map((e) => {
                     const badge =
                       e.status === "sent" ? "bg-success-soft text-success-soft-foreground" :
-                      e.status === "pending" ? "bg-warning-soft text-warning-soft-foreground" :
-                      e.status === "suppressed" ? "bg-warning-soft text-warning-soft-foreground" :
-                      "bg-destructive-soft text-destructive-soft-foreground";
+                        e.status === "pending" ? "bg-warning-soft text-warning-soft-foreground" :
+                          e.status === "suppressed" ? "bg-warning-soft text-warning-soft-foreground" :
+                            "bg-destructive-soft text-destructive-soft-foreground";
                     return (
                       <li key={e.id} className="flex items-center gap-2 py-1.5 text-xs">
                         <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${badge}`}>{e.status}</span>
