@@ -105,16 +105,21 @@ export function InjectionTreatmentRecord({
     return () => window.clearTimeout(t);
   }, [editingIdx, withPointUnits]);
 
-  const guardrails = useToxGuardrails(product);
+  const rawGuardrails = useToxGuardrails(product);
+  const guardrails = Array.isArray(rawGuardrails) ? rawGuardrails : [];
   const gMap = useMemo(() => {
     const m = new Map<string, typeof guardrails[number]>();
-    guardrails.forEach(g => m.set(g.zone, g));
+    (Array.isArray(guardrails) ? guardrails : []).forEach(g => {
+      if (g && g.zone) m.set(g.zone, g);
+    });
     return m;
   }, [guardrails]);
 
   const zoneMap = useMemo(() => {
     const m = new Map<string, number>();
-    value.forEach(v => m.set(v.zone, v.units));
+    (Array.isArray(value) ? value : []).forEach(v => {
+      if (v && v.zone) m.set(v.zone, v.units);
+    });
     return m;
   }, [value]);
 
