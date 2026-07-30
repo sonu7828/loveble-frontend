@@ -167,7 +167,7 @@ export const authService = {
         window.dispatchEvent(new Event("rka_demo_auth_change"));
         return res.data;
       }
-    } catch {}
+    } catch { }
 
     // Fallback lookup
     const demoUser = getUserProfileByEmail(email);
@@ -219,7 +219,7 @@ export const authService = {
   async logout(): Promise<void> {
     try {
       await ApiClient.post("/auth/logout");
-    } catch {}
+    } catch { }
     sessionStorage.removeItem("auth_token");
     sessionStorage.removeItem("user_profile");
     sessionStorage.removeItem("rka_demo_session");
