@@ -5,6 +5,42 @@
 import { ApiClient } from "./client";
 
 const MOCK_FALLBACKS: Record<string, any[]> = {
+  staff_directory: [
+    {
+      id: "st-01",
+      full_name: "Dr. Sarah Jenkins, MD",
+      fullName: "Dr. Sarah Jenkins, MD",
+      title: "Medical Director",
+      color: "#8B6B5D",
+      is_active: true,
+    },
+    {
+      id: "st-02",
+      full_name: "Jessica Taylor, RN",
+      fullName: "Jessica Taylor, RN",
+      title: "Aesthetic Specialist",
+      color: "#7c9dd1",
+      is_active: true,
+    },
+  ],
+  staff_profiles: [
+    {
+      id: "st-01",
+      full_name: "Dr. Sarah Jenkins, MD",
+      fullName: "Dr. Sarah Jenkins, MD",
+      title: "Medical Director",
+      color: "#8B6B5D",
+      is_active: true,
+    },
+    {
+      id: "st-02",
+      full_name: "Jessica Taylor, RN",
+      fullName: "Jessica Taylor, RN",
+      title: "Aesthetic Specialist",
+      color: "#7c9dd1",
+      is_active: true,
+    },
+  ],
   locations: [
     {
       id: "loc-sj-01",
