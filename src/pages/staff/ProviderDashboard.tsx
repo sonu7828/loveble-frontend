@@ -59,116 +59,80 @@ export function ProviderDashboard() {
   const [loading, setLoading] = useState(true);
   const [appts, setAppts] = useState<Appt[]>([]);
   const [recentPatients, setRecentPatients] = useState<Patient[]>([]);
-  const [unsignedNotesCount, setUnsignedNotesCount] = useState<number>(3);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(2);
+  const [unsignedNotesCount, setUnsignedNotesCount] = useState<number>(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+  const [notifications, setNotifications] = useState<ClinicalNotification[]>([]);
 
-  const [notifications, setNotifications] = useState<ClinicalNotification[]>([
-    {
-      id: "n-1",
-      type: "checkin",
-      title: "Sarah Jenkins checked in for Botox Cosmetic",
-      time: "10 mins ago",
-      urgent: true,
-    },
-    {
-      id: "n-2",
-      type: "note",
-      title: "1 Chart Note pending your final electronic signature",
-      time: "25 mins ago",
-    },
-    {
-      id: "n-3",
-      type: "lab",
-      title: "Lab results uploaded for Michael Scott",
-      time: "1 hour ago",
-    },
-  ]);
-
-  const providerName = user?.first_name || user?.user_metadata?.first_name
-    ? `Dr. ${user?.first_name || user?.user_metadata?.first_name || ""} ${user?.last_name || user?.user_metadata?.last_name || ""}`.trim()
-    : user?.email || "Provider";
+  // Resolve provider name from approved accounts (real staff data)
+  const providerName = (() => {
+    const userEmail = (user?.email || "").toLowerCase();
+    if (userEmail) {
+      try {
+        const approved: Array<{ email: string; full_name?: string }> =
+          JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        const match = approved.find((a) => a.email?.toLowerCase() === userEmail);
+        if (match?.full_name) return match.full_name;
+      } catch {}
+    }
+    return user?.first_name || user?.user_metadata?.first_name
+      ? `${user?.first_name || user?.user_metadata?.first_name || ""} ${user?.last_name || user?.user_metadata?.last_name || ""}`.trim()
+      : user?.email || "Provider";
+  })();
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch today's appointments
-      const { data, error } = await apiQuery("appointments")
+      const { data: apptData } = await apiQuery("appointments")
         .select("*")
         .order("start_at", { ascending: true })
         .limit(10);
+      setAppts(Array.isArray(apptData) ? apptData : []);
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        setAppts(data);
+      // Fetch recent patient profiles
+      const { data: clientData } = await apiQuery("client_profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (Array.isArray(clientData) && clientData.length > 0) {
+        setRecentPatients(
+          clientData.map((c: any) => ({
+            id: c.id,
+            name: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.email || "Patient",
+            email: c.email || "",
+            phone: c.phone || "",
+            lastVisit: c.created_at ? new Date(c.created_at).toLocaleDateString() : "Recent",
+            primaryConcern: c.notes || "General Consultation",
+          }))
+        );
       } else {
-        // Fallback sample appointments for demonstration
-        setAppts([
-          {
-            id: "apt-101",
-            status: "arrived",
-            start_at: new Date(Date.now() - 15 * 60000).toISOString(),
-            client_first_name: "Sarah",
-            client_last_name: "Jenkins",
-            client_email: "sarah.j@example.com",
-            client_phone: "(408) 555-0192",
-            service_id: "srv-botox",
-            service_name: "Botox Cosmetic (Forehead & Glabella)",
-            checked_in_at: new Date(Date.now() - 10 * 60000).toISOString(),
-          },
-          {
-            id: "apt-102",
-            status: "confirmed",
-            start_at: new Date(Date.now() + 45 * 60000).toISOString(),
-            client_first_name: "Emily",
-            client_last_name: "Watson",
-            client_email: "emily.w@example.com",
-            client_phone: "(408) 555-0144",
-            service_id: "srv-filler",
-            service_name: "Juvederm Voluma XC Lip Augmentation",
-            checked_in_at: null,
-          },
-          {
-            id: "apt-103",
-            status: "confirmed",
-            start_at: new Date(Date.now() + 120 * 60000).toISOString(),
-            client_first_name: "David",
-            client_last_name: "Miller",
-            client_email: "david.m@example.com",
-            client_phone: "(408) 555-0188",
-            service_id: "srv-gfe",
-            service_name: "Good Faith Examination (GFE) + Consult",
-            checked_in_at: null,
-          },
-        ]);
+        setRecentPatients([]);
       }
 
-      // Populate recent patients
-      setRecentPatients([
-        {
-          id: "p-1",
-          name: "Sarah Jenkins",
-          email: "sarah.j@example.com",
-          phone: "(408) 555-0192",
-          lastVisit: "Today",
-          primaryConcern: "Facial Wrinkle Reduction",
-        },
-        {
-          id: "p-2",
-          name: "Emily Watson",
-          email: "emily.w@example.com",
-          phone: "(408) 555-0144",
-          lastVisit: "2 weeks ago",
-          primaryConcern: "Dermal Filler Follow-up",
-        },
-        {
-          id: "p-3",
-          name: "David Miller",
-          email: "david.m@example.com",
-          phone: "(408) 555-0188",
-          lastVisit: "1 month ago",
-          primaryConcern: "Skin Rejuvenation Consult",
-        },
-      ]);
+      // Fetch unsigned draft notes count
+      const { data: draftNotes } = await apiQuery("clinical_notes")
+        .select("id")
+        .eq("status", "draft");
+      setUnsignedNotesCount(Array.isArray(draftNotes) ? draftNotes.length : 0);
+
+      // Fetch unread messages count if table exists
+      try {
+        const { data: msgData } = await apiQuery("messages")
+          .select("id")
+          .eq("read", false);
+        setUnreadMessagesCount(Array.isArray(msgData) ? msgData.length : 0);
+      } catch {
+        setUnreadMessagesCount(0);
+      }
+
+      setNotifications([]);
     } catch (_e) {
+      setAppts([]);
+      setRecentPatients([]);
+      setUnsignedNotesCount(0);
+      setUnreadMessagesCount(0);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -350,21 +314,27 @@ export function ProviderDashboard() {
               <Badge variant="secondary" className="text-[10px]">{notifications.length} New</Badge>
             </CardHeader>
             <CardContent className="p-3 space-y-2.5">
-              {notifications.map((n) => (
-                <div key={n.id} className="p-2.5 rounded-xl border border-border bg-card hover:bg-muted/30 transition flex items-start gap-2.5 text-xs">
-                  <div className="mt-0.5">
-                    {n.urgent ? (
-                      <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground leading-snug">{n.title}</p>
-                    <span className="text-[10px] text-muted-foreground">{n.time}</span>
-                  </div>
+              {notifications.length === 0 ? (
+                <div className="py-6 text-center text-xs text-muted-foreground">
+                  No new clinical notifications.
                 </div>
-              ))}
+              ) : (
+                notifications.map((n) => (
+                  <div key={n.id} className="p-2.5 rounded-xl border border-border bg-card hover:bg-muted/30 transition flex items-start gap-2.5 text-xs">
+                    <div className="mt-0.5">
+                      {n.urgent ? (
+                        <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground leading-snug">{n.title}</p>
+                      <span className="text-[10px] text-muted-foreground">{n.time}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -380,19 +350,25 @@ export function ProviderDashboard() {
               </Button>
             </CardHeader>
             <CardContent className="p-3 space-y-2">
-              {recentPatients.map((p) => (
-                <div
-                  key={p.id}
-                  className="p-2.5 rounded-xl border border-border hover:bg-muted/30 transition cursor-pointer flex items-center justify-between"
-                  onClick={() => navigate(`/staff/clinical/clients/${encodeURIComponent(p.email)}`)}
-                >
-                  <div className="space-y-0.5 min-w-0">
-                    <p className="font-semibold text-xs text-foreground truncate">{p.name}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{p.primaryConcern}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />
+              {recentPatients.length === 0 ? (
+                <div className="py-6 text-center text-xs text-muted-foreground">
+                  No recent patients found.
                 </div>
-              ))}
+              ) : (
+                recentPatients.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-2.5 rounded-xl border border-border hover:bg-muted/30 transition cursor-pointer flex items-center justify-between"
+                    onClick={() => navigate(`/staff/clinical/clients/${encodeURIComponent(p.email)}`)}
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-semibold text-xs text-foreground truncate">{p.name}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{p.primaryConcern}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

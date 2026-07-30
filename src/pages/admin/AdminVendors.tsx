@@ -247,17 +247,6 @@ export default function AdminVendors() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
-      <div className="border-b border-border pb-5">
-        <h1 className="font-serif text-3xl">
-          {activeTab === "devices" ? "Device Inventory" : "Vendor Management"}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {activeTab === "devices"
-            ? "Track workstations, laptops, tablets, and other clinic IT hardware with encryption status for HIPAA compliance."
-            : "Every vendor that touches PHI must have a signed Business Associate Agreement (45 CFR §164.504(e))."}
-        </p>
-      </div>
-
       <div>
         {activeTab === "devices" ? <DeviceTab /> : <VendorTab />}
       </div>
@@ -378,12 +367,17 @@ function VendorTab() {
   const overdue = (d: string | null) => d && new Date(d) < new Date();
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">
-          Every vendor that touches PHI must have a signed Business Associate Agreement (45 CFR §164.504(e)).
-        </p>
-        <Button onClick={openNew} className="rounded-full"><Plus className="h-4 w-4 mr-1.5" /> Add vendor</Button>
+    <div className="space-y-6">
+      <div className="border-b border-border pb-5">
+        <h1 className="font-serif text-3xl mb-1">Vendor Management</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground flex-1">
+            Every vendor that touches PHI must have a signed Business Associate Agreement (45 CFR §164.504(e)).
+          </p>
+          <Button onClick={openNew} className="rounded-full shrink-0">
+            <Plus className="h-4 w-4 mr-1.5" /> Add vendor
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -450,47 +444,6 @@ function VendorTab() {
           </div>
         </div>
       )}
-
-      {/* HIPAA Written Policies & BAA Archive Store */}
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-4 shadow-xs mt-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-serif text-xl flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              HIPAA Compliance &amp; Policy Document Store
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              45 CFR §164.308 / §164.310 — Official signed administrative policies, BAA contracts, and disaster recovery plans.
-            </p>
-          </div>
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[11px]">
-            6-Year Mandatory Retention
-          </Badge>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2">
-          {COMPLIANCE_DOCUMENTS.map((doc) => (
-            <div key={doc.id} className={`p-4 rounded-xl border border-border/80 bg-muted/20 space-y-2 ${doc.id === "doc-5" ? "md:col-span-2" : ""}`}>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-xs text-foreground">{doc.num}. {doc.title}</span>
-                <Badge className={`${doc.badgeClass} text-[10px]`} variant="outline">{doc.badge}</Badge>
-              </div>
-              <p className="text-[11px] text-muted-foreground">{doc.summary}</p>
-              <div className="pt-1 flex items-center justify-between text-[10px] text-muted-foreground border-t border-border/50">
-                <span>{doc.date}</span>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="sm" className="h-7 text-xs rounded-full gap-1" onClick={() => setPreviewDoc(doc)}>
-                    <FileText className="h-3 w-3 text-primary" /> View &amp; Download
-                  </Button>
-                  <Button variant="default" size="sm" className="h-7 text-xs rounded-full gap-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => triggerDownloadDoc(doc)}>
-                    <Download className="h-3 w-3" /> Download
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Document Preview & Download Modal */}
       <Dialog open={!!previewDoc} onOpenChange={(v) => !v && setPreviewDoc(null)}>
@@ -619,42 +572,54 @@ function DeviceTab() {
   async function loadStaffOptions() {
     const list: Array<{ name: string; title?: string }> = [
       { name: "Unassigned", title: "" },
-      { name: "Dr. Kiem (Admin)", title: "Medical Director" },
-      { name: "Staff Provider", title: "General Physician" },
     ];
 
     try {
-      const { data } = await apiQuery("staff_profiles").select("full_name, title");
-      if (data) {
-        data.forEach((s: any) => {
-          if (s.full_name && !list.some((x) => x.name.toLowerCase() === s.full_name.toLowerCase())) {
-            list.push({ name: s.full_name, title: s.title || "" });
+      const approvedAccs: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+      if (approvedAccs.length > 0) {
+        approvedAccs.forEach((a: any) => {
+          if (
+            a.full_name &&
+            a.role !== "patient" &&
+            !list.some((x) => x.name.toLowerCase() === a.full_name.toLowerCase())
+          ) {
+            list.push({
+              name: a.full_name,
+              title: (a.role || "").replace(/_/g, " ").toUpperCase(),
+            });
           }
         });
+      } else {
+        const { data } = await apiQuery("staff_profiles").select("full_name, title");
+        if (data) {
+          data.forEach((s: any) => {
+            if (s.full_name && !list.some((x) => x.name.toLowerCase() === s.full_name.toLowerCase())) {
+              list.push({ name: s.full_name, title: s.title || "" });
+            }
+          });
+        }
       }
     } catch (e) { }
-
-    const demoMembers: any[] = JSON.parse(localStorage.getItem("rka_demo_team_members") || "[]");
-    demoMembers.forEach((m: any) => {
-      if (m.full_name && !list.some((x) => x.name.toLowerCase() === m.full_name.toLowerCase())) {
-        list.push({ name: m.full_name, title: m.title || "" });
-      }
-    });
-
-    const approvedAccs: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-    approvedAccs.forEach((a: any) => {
-      if (a.full_name && !list.some((x) => x.name.toLowerCase() === a.full_name.toLowerCase())) {
-        list.push({ name: a.full_name, title: "" });
-      }
-    });
 
     setStaffOptions(list);
   }
 
   async function load() {
     setLoading(true);
+    let remote: Device[] = [];
+    try {
+      const { data } = await apiQuery("device_inventory" as any).select("*");
+      if (Array.isArray(data) && data.length > 0) {
+        remote = data as any;
+      }
+    } catch (_e) { }
+
     const local: Device[] = JSON.parse(localStorage.getItem("rka_demo_devices") || "[]");
-    setRows(local);
+    const mergedMap = new Map<string, Device>();
+    remote.forEach(d => mergedMap.set(d.id, d));
+    local.forEach(d => { if (!mergedMap.has(d.id)) mergedMap.set(d.id, d); });
+
+    setRows(Array.from(mergedMap.values()));
     await loadStaffOptions();
     setLoading(false);
   }
@@ -670,26 +635,37 @@ function DeviceTab() {
       return;
     }
     setSaving(true);
-    const local: Device[] = JSON.parse(localStorage.getItem("rka_demo_devices") || "[]");
+    const payload = {
+      device_name: form.device_name!.trim(),
+      manufacturer: form.manufacturer || "Other",
+      model: form.model || null,
+      serial_number: form.serial_number || null,
+      assigned_to: form.assigned_to || null,
+      location: form.location || null,
+      device_type: form.device_type || "Workstation",
+      encryption_status: form.encryption_status || "Encrypted",
+      os_version: form.os_version || null,
+      purchase_date: form.purchase_date || null,
+      warranty_expiry: form.warranty_expiry || null,
+      notes: form.notes || null,
+    };
 
+    try {
+      if (form.id) {
+        await apiQuery("device_inventory" as any).update({ ...payload, id: form.id }).eq("id", form.id);
+      } else {
+        await apiQuery("device_inventory" as any).insert(payload);
+      }
+    } catch (_e) { }
+
+    const local: Device[] = JSON.parse(localStorage.getItem("rka_demo_devices") || "[]");
     if (form.id) {
-      const updated = local.map(d => d.id === form.id ? { ...d, ...form } as Device : d);
+      const updated = local.map(d => d.id === form.id ? { ...d, ...payload } as Device : d);
       localStorage.setItem("rka_demo_devices", JSON.stringify(updated));
     } else {
       const newDevice: Device = {
         id: `device-${Date.now()}`,
-        device_name: form.device_name!.trim(),
-        manufacturer: form.manufacturer || "Other",
-        model: form.model || null,
-        serial_number: form.serial_number || null,
-        assigned_to: form.assigned_to || null,
-        location: form.location || null,
-        device_type: form.device_type || "Workstation",
-        encryption_status: form.encryption_status || "Encrypted",
-        os_version: form.os_version || null,
-        purchase_date: form.purchase_date || null,
-        warranty_expiry: form.warranty_expiry || null,
-        notes: form.notes || null,
+        ...payload,
       };
       local.push(newDevice);
       localStorage.setItem("rka_demo_devices", JSON.stringify(local));
@@ -703,6 +679,10 @@ function DeviceTab() {
 
   async function remove(id: string) {
     if (!(await confirmDialog({ title: "Delete device?", description: "This will remove the device from your IT inventory log. This action cannot be undone.", destructive: true, confirmLabel: "Delete Device" }))) return;
+    try {
+      await apiQuery("device_inventory" as any).delete().eq("id", id);
+    } catch (_e) { }
+
     const local: Device[] = JSON.parse(localStorage.getItem("rka_demo_devices") || "[]");
     localStorage.setItem("rka_demo_devices", JSON.stringify(local.filter(d => d.id !== id)));
     toast({ title: "Device deleted" });
@@ -717,12 +697,17 @@ function DeviceTab() {
   const warrantyOverdue = (d: string | null) => d && new Date(d) < new Date();
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">
-          Track workstations, laptops, tablets, and other clinic IT hardware with encryption status for HIPAA compliance.
-        </p>
-        <Button onClick={openNew} className="rounded-full"><Plus className="h-4 w-4 mr-1.5" /> Add device</Button>
+    <div className="space-y-6">
+      <div className="border-b border-border pb-5">
+        <h1 className="font-serif text-3xl mb-1">Device Inventory</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground flex-1">
+            Track workstations, laptops, tablets, and other clinic IT hardware with encryption status for HIPAA compliance.
+          </p>
+          <Button onClick={openNew} className="rounded-full shrink-0">
+            <Plus className="h-4 w-4 mr-1.5" /> Add device
+          </Button>
+        </div>
       </div>
 
       {loading ? (

@@ -47,29 +47,15 @@ export function useAuth(): AuthState {
   useEffect(() => {
     async function loadUserSession() {
       const session = await authService.getSession();
-      const BUILTIN_EMAILS = [
-        "admin@gmail.com",
-        "staff@gmail.com",
-        "securityofficer@gmail.com",
-        "officer@gmail.com",
-        "medicaldirector@gmail.com",
-        "md@gmail.com",
-        "user@gmail.com",
-      ];
-      const rawDeleted: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-      if (rawDeleted.some(e => BUILTIN_EMAILS.includes(e.toLowerCase()))) {
-        const sanitized = rawDeleted.filter(e => !BUILTIN_EMAILS.includes(e.toLowerCase()));
-        localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitized));
-      }
-      const deletedEmails: string[] = rawDeleted.filter(e => !BUILTIN_EMAILS.includes(e.toLowerCase()));
+      const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
       const userEmail = (session?.user?.email || "").toLowerCase();
 
-      if (session && session.user && (!deletedEmails.includes(userEmail) || BUILTIN_EMAILS.includes(userEmail))) {
+      if (session && session.user && !deletedEmails.includes(userEmail)) {
         setUser(session.user);
         setRoles(session.user.roles || ["admin", "staff"]);
         setStaffId(session.user.staff_id || session.user.id);
       } else {
-        if (session && session.user && deletedEmails.includes(userEmail) && !BUILTIN_EMAILS.includes(userEmail)) {
+        if (session && session.user && deletedEmails.includes(userEmail)) {
           authService.logout();
         }
         setUser(null);

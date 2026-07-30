@@ -39,99 +39,9 @@ const MOCK_FALLBACKS: Record<string, any[]> = {
       is_active: true,
     },
   ],
-  client_profiles: [
-    {
-      id: "cp-01",
-      email: "user@gmail.com",
-      first_name: "Jane",
-      last_name: "Doe",
-      phone: "(555) 019-2831",
-      dob: "1992-05-15",
-      is_lead: false,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "cp-02",
-      email: "sarah.connor@gmail.com",
-      first_name: "Sarah",
-      last_name: "Connor",
-      phone: "(408) 555-0142",
-      dob: "1988-11-20",
-      is_lead: false,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "cp-03",
-      email: "emily.watson@gmail.com",
-      first_name: "Emily",
-      last_name: "Watson",
-      phone: "(408) 555-0188",
-      dob: "1995-03-12",
-      is_lead: false,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "cp-04",
-      email: "jessica.alba@gmail.com",
-      first_name: "Jessica",
-      last_name: "Alba",
-      phone: "(415) 555-0123",
-      dob: "1990-08-25",
-      is_lead: false,
-      created_at: new Date().toISOString(),
-    },
-  ],
-  appointments: [
-    {
-      id: "apt-01",
-      client_first_name: "Jane",
-      client_last_name: "Doe",
-      client_email: "user@gmail.com",
-      client_phone: "(555) 019-2831",
-      client_dob: "1992-05-15",
-      status: "COMPLETED",
-      start_at: new Date().toISOString(),
-      service_id: "svc-01",
-      service_name: "Botox Cosmetic (Per Unit)",
-    },
-    {
-      id: "apt-02",
-      client_first_name: "Sarah",
-      client_last_name: "Connor",
-      client_email: "sarah.connor@gmail.com",
-      client_phone: "(408) 555-0142",
-      client_dob: "1988-11-20",
-      status: "CONFIRMED",
-      start_at: new Date(Date.now() + 86400000).toISOString(),
-      service_id: "svc-02",
-      service_name: "Juvederm Voluma Lip Filler",
-    },
-    {
-      id: "apt-03",
-      client_first_name: "Emily",
-      client_last_name: "Watson",
-      client_email: "emily.watson@gmail.com",
-      client_phone: "(408) 555-0188",
-      client_dob: "1995-03-12",
-      status: "CHECKED_IN",
-      start_at: new Date().toISOString(),
-      service_id: "svc-03",
-      service_name: "RF Microneedling Face",
-    },
-  ],
-  imported_clients: [
-    {
-      id: "imp-01",
-      first_name: "Jessica",
-      last_name: "Alba",
-      email: "jessica.alba@gmail.com",
-      phone: "(415) 555-0123",
-      dob: "1990-08-25",
-      gender: "female",
-      notes: "VIP Client",
-      created_at: new Date().toISOString(),
-    },
-  ],
+  client_profiles: [],
+  appointments: [],
+  imported_clients: [],
 };
 
 export class ApiTableQuery {
@@ -300,6 +210,25 @@ export class ApiTableQuery {
       res = { data: null, error: null };
     }
 
+    // If insert/upsert action, persist payload to local demo storage
+    if ((this.action === "insert" || this.action === "upsert") && this.payload) {
+      try {
+        const storeKey = `rka_demo_${this.tableName}`;
+        const existing: any[] = JSON.parse(localStorage.getItem(storeKey) || "[]");
+        const items = Array.isArray(this.payload) ? this.payload : [this.payload];
+        for (const item of items) {
+          if (item && typeof item === "object") {
+            const idx = existing.findIndex((e) => e.id && item.id && String(e.id) === String(item.id));
+            if (idx >= 0) existing[idx] = { ...existing[idx], ...item };
+            else existing.unshift(item);
+          }
+        }
+        localStorage.setItem(storeKey, JSON.stringify(existing));
+      } catch (e) {
+        console.warn("Failed to save local demo table data", e);
+      }
+    }
+
     let data = res?.data;
     if (data && typeof data === "object" && !Array.isArray(data) && "data" in data) {
       data = data.data;
@@ -310,22 +239,19 @@ export class ApiTableQuery {
     data = Array.isArray(data) ? [...data] : (data ? [data] : []);
 
     if (this.action === "select") {
-      if (this.tableName === "appointments") {
-        const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-        const existingIds = new Set(data.map((x: any) => x.id));
-        for (const la of localAppts) {
-          if (!existingIds.has(la.id)) {
-            data.unshift(la);
+      try {
+        const storeKey = `rka_demo_${this.tableName}`;
+        const localItems: any[] = JSON.parse(localStorage.getItem(storeKey) || "[]");
+        if (localItems.length > 0) {
+          const existingIds = new Set(data.map((x: any) => x.id).filter(Boolean));
+          for (const item of localItems) {
+            if (item && item.id && !existingIds.has(item.id)) {
+              data.unshift(item);
+            }
           }
         }
-      } else if (this.tableName === "client_profiles") {
-        const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-        const existingIds = new Set(data.map((x: any) => x.id));
-        for (const lc of localClients) {
-          if (!existingIds.has(lc.id)) {
-            data.unshift(lc);
-          }
-        }
+      } catch (e) {
+        console.warn("Failed to load local demo table data", e);
       }
     }
 

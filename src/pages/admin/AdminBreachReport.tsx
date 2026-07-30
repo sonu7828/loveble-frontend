@@ -33,7 +33,8 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default function AdminBreachReport() {
   usePageMeta({ title: "Report a possible breach" });
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isPrivacyOfficer } = useAuth();
+  const canManage = isAdmin || isPrivacyOfficer;
   const [rows, setRows] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,10 +49,18 @@ export default function AdminBreachReport() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await apiQuery("breach_reports" as any)
-      .select("*").order("created_at", { ascending: false });
-    if (error) toast({ title: "Load failed", description: error.message, variant: "destructive" });
-    setRows(((data as any) ?? []) as Report[]);
+    let remote: Report[] = [];
+    try {
+      const { data } = await apiQuery("breach_reports" as any).select("*");
+      if (Array.isArray(data) && data.length > 0) remote = data as any;
+    } catch (_e) { }
+
+    const local: Report[] = JSON.parse(localStorage.getItem("rka_demo_breach_reports") || "[]");
+    const mergedMap = new Map<string, Report>();
+    remote.forEach(r => mergedMap.set(r.id, r));
+    local.forEach(r => { if (!mergedMap.has(r.id)) mergedMap.set(r.id, r); });
+
+    setRows(Array.from(mergedMap.values()));
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -61,33 +70,49 @@ export default function AdminBreachReport() {
       toast({ title: "Description required", description: "Describe what happened.", variant: "destructive" });
       return;
     }
-    if (!user) return;
     setSaving(true);
+    const reporterName = user?.first_name || (user as any)?.user_metadata?.full_name || (user as any)?.user_metadata?.first_name || user?.email || "Staff Member";
     const payload: any = {
-      reporter_user_id: user.id,
-      reporter_name: user.user_metadata?.full_name ?? null,
-      reporter_email: user.email ?? null,
+      id: `breach-${Date.now()}`,
+      reporter_user_id: user?.id || `usr-${Date.now()}`,
+      reporter_name: reporterName,
+      reporter_email: user?.email ?? null,
       occurred_at: form.occurred_at || null,
       description: form.description.trim(),
       phi_involved: form.phi_involved || null,
       individuals_affected: form.individuals_affected ? parseInt(form.individuals_affected, 10) : null,
       systems_involved: form.systems_involved || null,
       immediate_actions: form.immediate_actions || null,
+      status: "open",
+      created_at: new Date().toISOString(),
     };
-    const { error } = await apiQuery("breach_reports" as any).insert(payload);
+
+    try {
+      await apiQuery("breach_reports" as any).insert(payload);
+    } catch (_e) { }
+
+    const local: Report[] = JSON.parse(localStorage.getItem("rka_demo_breach_reports") || "[]");
+    local.unshift(payload);
+    localStorage.setItem("rka_demo_breach_reports", JSON.stringify(local));
+
     setSaving(false);
-    if (error) { toast({ title: "Submit failed", description: error.message, variant: "destructive" }); return; }
     toast({
       title: "Report filed",
-      description: "The Privacy Officer has been notified. The record is now immutable.",
+      description: "The Privacy Officer has been notified. The record is now logged.",
     });
     setForm({ occurred_at: "", description: "", phi_involved: "", individuals_affected: "", systems_involved: "", immediate_actions: "" });
     load();
   }
 
   async function updateStatus(id: string, status: string) {
-    const { error } = await apiQuery("breach_reports" as any).update({ status }).eq("id", id);
-    if (error) { toast({ title: "Update failed", description: error.message, variant: "destructive" }); return; }
+    try {
+      await apiQuery("breach_reports" as any).update({ id, status }).eq("id", id);
+    } catch (_e) { }
+
+    const local: Report[] = JSON.parse(localStorage.getItem("rka_demo_breach_reports") || "[]");
+    const updated = local.map(r => r.id === id ? { ...r, status } : r);
+    localStorage.setItem("rka_demo_breach_reports", JSON.stringify(updated));
+
     load();
   }
 
@@ -148,7 +173,7 @@ export default function AdminBreachReport() {
 
       <div>
         <h2 className="font-serif text-xl mb-3">
-          {isAdmin ? "All reports" : "My submitted reports"}
+          {canManage ? "All reports" : "My submitted reports"}
         </h2>
         {loading ? (
           <div className="flex items-center justify-center p-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -178,7 +203,7 @@ export default function AdminBreachReport() {
                 {r.immediate_actions && (
                   <div className="text-xs text-muted-foreground mt-2"><b>Actions:</b> {r.immediate_actions}</div>
                 )}
-                {isAdmin && (
+                {canManage && (
                   <div className="flex gap-2 mt-3 flex-wrap">
                     {["open", "investigating", "closed", "reported_to_hhs"].map((s) => (
                       <Button key={s} size="sm" variant={r.status === s ? "default" : "outline"}

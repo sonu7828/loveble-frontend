@@ -437,30 +437,47 @@ export default function StaffClients() {
     } finally { setBusyEmail(null); }
   };
 
-  const deleteClient = async (c: { email: string; first_name: string; last_name: string; imported_id: string | null; appt_count: number }) => {
-    if (c.appt_count > 0) {
-      toast.error("Can't delete: client has appointment history. Block them instead.");
-      return;
-    }
-    if (!c.imported_id) {
-      toast.error("Nothing to delete for this client.");
-      return;
-    }
+  const deleteClient = async (c: { email: string; first_name: string; last_name: string; imported_id?: string | null }) => {
+    const name = `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.email;
     if (!(await confirmDialog({
-      title: `Delete ${c.first_name} ${c.last_name}?`,
-      description: `Permanently remove ${c.email} from your client list.\n\nThis cannot be undone.`,
+      title: `Delete ${name}?`,
+      description: `Permanently remove ${c.email || name} from your patient directory.\n\nThis cannot be undone.`,
       destructive: true,
       confirmLabel: "Delete client",
     }))) return;
+
+    const emailLower = (c.email || "").toLowerCase();
     setBusyEmail(c.email);
     try {
-      const { error } = await apiQuery("imported_clients").delete().eq("id", c.imported_id);
-      if (error) throw error;
-      await reloadImported();
+      if (c.imported_id) {
+        await apiQuery("imported_clients").delete().eq("id", c.imported_id);
+      }
+      if (emailLower) {
+        await apiQuery("client_profiles").delete().eq("email", emailLower);
+        await apiQuery("appointments").delete().eq("client_email", emailLower);
+
+        // Clear from browser local storage keys
+        for (const key of ["rka_demo_clients", "rka_demo_client_profiles", "rka_demo_appointments", "rka_imported_clients"]) {
+          try {
+            const arr: any[] = JSON.parse(localStorage.getItem(key) || "[]");
+            const next = arr.filter((x: any) =>
+              (x.email || x.client_email || "").toLowerCase() !== emailLower &&
+              (!c.imported_id || x.id !== c.imported_id)
+            );
+            localStorage.setItem(key, JSON.stringify(next));
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
       toast.success("Client deleted");
     } catch (e: any) {
       toast.error(e.message ?? "Failed to delete");
-    } finally { setBusyEmail(null); }
+    } finally {
+      setBusyEmail(null);
+    }
   };
 
 
@@ -792,12 +809,12 @@ export default function StaffClients() {
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem
-                        disabled={busyEmail === c.email || c.appt_count > 0 || !c.imported_id}
-                        onClick={() => deleteClient({ email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id, appt_count: c.appt_count })}
-                        className="text-destructive-soft-foreground focus:text-destructive-soft-foreground"
+                        disabled={busyEmail === c.email}
+                        onClick={() => deleteClient({ email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
+                        className="text-destructive focus:text-destructive text-destructive-soft-foreground"
                       >
                         <Trash2 className="h-3.5 w-3.5 mr-2" />
-                        {c.appt_count > 0 ? "Can't delete (has visits)" : "Delete client"}
+                        Delete client
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
