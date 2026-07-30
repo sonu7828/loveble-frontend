@@ -340,8 +340,8 @@ export default function AdminHipaaPolicies() {
   const [staffSignName, setStaffSignName] = useState("");
 
   const getOfficerName = () => {
-    const fn = (user?.user_metadata?.first_name || "").trim();
-    const ln = (user?.user_metadata?.last_name || "").trim();
+    const fn = (user?.first_name || (user as any)?.user_metadata?.first_name || "").trim();
+    const ln = (user?.last_name || (user as any)?.user_metadata?.last_name || "").trim();
     if (fn || ln) {
       return `${fn} ${ln}`.trim() + " (Privacy & Security Officer)";
     }
