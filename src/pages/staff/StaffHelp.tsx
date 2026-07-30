@@ -1,149 +1,184 @@
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-  BookOpen, Download, AlertTriangle, Siren
+  BookOpen, Calendar, Users, ShieldAlert, Laptop, Building2,
+  FileCheck, Stethoscope, HelpCircle, CheckCircle2, ChevronRight
 } from "lucide-react";
-import hero from "@/assets/help/hero-welcome.jpg";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function StaffHelp() {
-  useEffect(() => { try { localStorage.setItem("rka_handbook_read", "1"); } catch {} }, []);
+  usePageMeta({ title: "Staff Handbook & Guide" });
+
+  useEffect(() => {
+    try { localStorage.setItem("rka_handbook_read", "1"); } catch {}
+  }, []);
+
+  const WORKFLOW_CARDS = [
+    {
+      icon: Calendar,
+      title: "1. Appointments & Calendar",
+      desc: "View your daily schedule, manage client bookings, update appointment statuses, and sync personal Google Calendar.",
+      link: "/staff/today",
+      linkText: "View Today's Schedule",
+      color: "text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900",
+    },
+    {
+      icon: Users,
+      title: "2. Client Profiles & Charting",
+      desc: "Access client medical records, complete Good Faith Examinations (GFEs), upload photos, and manage consent signatures.",
+      link: "/staff/team",
+      linkText: "View Practice Team",
+      color: "text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900",
+    },
+    {
+      icon: ShieldAlert,
+      title: "3. HIPAA & Security Incidents",
+      desc: "Report security incidents or lost devices immediately. Automatically logged for Privacy Officer review under 15-day CMIA rules.",
+      link: "/staff/breach-report",
+      linkText: "File Breach Report",
+      color: "text-red-600 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900",
+    },
+    {
+      icon: Building2,
+      title: "4. Vendor & BAA Management",
+      desc: "Track software vendors (Supabase, Twilio/GHL, Resend, Stripe) and ensure signed Business Associate Agreements are on file.",
+      link: "/staff/vendors",
+      linkText: "Manage Vendors",
+      color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900",
+    },
+    {
+      icon: Laptop,
+      title: "5. IT Hardware & Device Inventory",
+      desc: "Log workstations, iPads, and mobile devices used in the clinic to ensure full-disk encryption and screen-lock compliance.",
+      link: "/staff/vendors?tab=devices",
+      linkText: "View IT Devices",
+      color: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900",
+    },
+    {
+      icon: Stethoscope,
+      title: "6. Digital Signature & Profile",
+      desc: "Set up your provider title, license number, and draw your saved digital signature for auto-signing chart notes and GFEs.",
+      link: "/staff/me",
+      linkText: "Edit My Profile",
+      color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900",
+    },
+  ];
+
+  const FAQS = [
+    {
+      q: "How do I sign chart notes and GFEs?",
+      a: "Go to My Profile (/staff/me) -> Draw your signature on the pad and click 'Save signature'. Your signature will auto-fill whenever you sign a chart note or GFE.",
+    },
+    {
+      q: "What should I do if a device is lost or a privacy breach happens?",
+      a: "Go to Breach Reports (/staff/breach-report) -> Fill the description field and submit. The Privacy & Security Officer will be notified immediately to handle investigation.",
+    },
+    {
+      q: "How does the 15-minute auto-logout work?",
+      a: "For HIPAA compliance, if your screen is left idle for 15 minutes without activity, the system automatically signs out to protect patient data.",
+    },
+    {
+      q: "Where do I find active services and pricing?",
+      a: "Go to Services & Pricing in the sidebar menu to review all active treatment categories, appointment durations, and pricing.",
+    },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-10">
+    <div className="w-[90%] max-w-6xl mx-auto p-4 md:p-8 space-y-8">
       {/* Header */}
-      <div className="mb-10 flex flex-col md:flex-row gap-8 items-start">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground mb-3">
-            <BookOpen className="h-3.5 w-3.5" /> Staff Handbook
-          </div>
-          <h1 className="font-serif text-4xl md:text-5xl mb-3 leading-tight">Welcome to Radiantilyk Aesthetic.</h1>
-          <p className="text-muted-foreground max-w-xl leading-relaxed">
-            Your onboarding guide and day-to-day handbook. Start with <em>Know your brand</em> below to learn who we are and what we promise our clients, then jump to any workflow when you need it.
-          </p>
-          <a
-            href="/staff-handbook.pdf"
-            target="_blank"
-            rel="noopener"
-            className="inline-flex items-center gap-1.5 mt-4 text-xs uppercase tracking-wider text-primary hover:underline"
-          >
-            <Download className="h-3.5 w-3.5" /> Download PDF version
-          </a>
+      <div className="border-b border-border pb-6">
+        <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-2">
+          <BookOpen className="h-4 w-4" /> Staff Handbook &amp; System Guide
         </div>
-        <img src={hero} alt="Welcoming a client at the front desk" className="w-full md:w-72 rounded-2xl shadow-soft" loading="eager" width={1024} height={1024} />
-      </div>
-
-      {/* Clinical Protocols */}
-      <section className="mt-20">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-9 w-9 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Siren className="h-4 w-4 text-destructive" />
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Part three</div>
-            <h2 className="font-serif text-2xl md:text-3xl">Clinical protocols</h2>
-          </div>
-        </div>
-        <p className="text-muted-foreground max-w-2xl leading-relaxed mb-8">
-          Mandatory clinical reference documents. Every injector must read, sign, and keep these immediately accessible in every treatment room.
+        <h1 className="font-serif text-3xl md:text-4xl mb-2">Welcome to Radiantilyk Aesthetic</h1>
+        <p className="text-muted-foreground text-sm max-w-3xl leading-relaxed">
+          Your day-to-day practice guide and software manual. Learn how to manage client appointments, report security incidents, manage IT devices, and update your provider profile.
         </p>
 
-        <div className="max-w-3xl rounded-2xl border-2 border-destructive/40 bg-destructive/5 p-6">
-          <div className="flex items-start gap-4 mb-4">
-            <div className="h-10 w-10 rounded-full bg-destructive/15 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            </div>
-            <div className="flex-1">
-              <div className="text-[10px] uppercase tracking-[0.3em] text-destructive mb-1">Emergency Protocol · v1.0</div>
-              <h3 className="font-serif text-xl mb-1">Vascular Occlusion — Recognition, Response & Management</h3>
-              <p className="text-xs text-muted-foreground">Authors: Kiem Vukadinovic, NP (Lead Injector) · Aloysius Fobi, MD (Medical Director)</p>
-            </div>
+        {/* Practice Meta Box */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 p-4 rounded-xl border border-border bg-card">
+          <div>
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">Practice Name</div>
+            <div className="text-sm font-medium text-foreground">Radiantilyk Aesthetic</div>
+            <div className="text-xs text-muted-foreground">San Jose, CA</div>
           </div>
-
-          <p className="text-sm text-foreground/80 leading-relaxed mb-4">
-            Vascular occlusion is a <strong>time-critical medical emergency</strong> that can occur during or after any dermal filler injection. Filler entering or compressing an artery can lead to tissue necrosis, permanent scarring, blindness, or stroke. <strong>Begin hyaluronidase within 60–90 minutes</strong> for HA fillers; for periocular involvement, treat immediately.
-          </p>
-
-          <div className="grid sm:grid-cols-2 gap-3 mb-4">
-            <div className="rounded-lg bg-card border border-border p-3">
-              <div className="text-[10px] uppercase tracking-wider text-destructive mb-1">High-risk zones</div>
-              <div className="text-xs text-foreground/80">Glabella · Nose · Nasolabial fold · Deep forehead</div>
-            </div>
-            <div className="rounded-lg bg-card border border-border p-3">
-              <div className="text-[10px] uppercase tracking-wider text-warning-soft-foreground mb-1">Moderate-risk zones</div>
-              <div className="text-xs text-foreground/80">Temple · Lips · Cheek/midface · Chin</div>
-            </div>
+          <div>
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">Lead Injector &amp; Founder</div>
+            <div className="text-sm font-medium text-foreground">Kiem Vukadinovic, NP</div>
+            <div className="text-xs text-muted-foreground">Privacy &amp; Security Officer</div>
           </div>
-
-          <div className="rounded-lg bg-card border border-border p-4 mb-4">
-            <div className="text-[10px] uppercase tracking-wider text-primary mb-2">Emergency response — at a glance</div>
-            <ol className="space-y-1.5 text-sm text-foreground/80">
-              <li><strong>1. Recognize</strong> — disproportionate pain, blanching, livedo, delayed cap refill. Say it aloud.</li>
-              <li><strong>2. Stop &amp; notify</strong> — stop injecting, alert the team, call the Medical Director.</li>
-              <li><strong>3. Warm compress + massage</strong> the affected territory.</li>
-              <li><strong>4. Hyaluronidase</strong> (HA fillers) — flood the entire vascular distribution, 10–30 units per site, repeat every 60 min until reperfusion.</li>
-              <li><strong>5. Adjuncts</strong> — aspirin 325 mg, NTG paste (per MD), antibiotics if skin compromise.</li>
-              <li><strong>6. Reassess</strong> at 60 min — color, cap refill, pain.</li>
-              <li><strong>7. Follow up</strong> at 24h / 48h / 72h / 1 wk · photograph · plastics if necrosis.</li>
-            </ol>
+          <div>
+            <div className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">Medical Director</div>
+            <div className="text-sm font-medium text-foreground">Dr. Aloysius N. Fobi, MD</div>
+            <div className="text-xs text-muted-foreground">Clinical Oversight</div>
           </div>
+        </div>
+      </div>
 
-          <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 mb-4">
-            <div className="text-xs font-medium text-destructive mb-1">⚠ Vision symptoms = call 911 immediately</div>
-            <div className="text-xs text-foreground/80">Sudden vision loss, eye pain, severe one-sided headache, facial droop, slurred speech, or altered mental status — activate EMS and state: <em>"vascular emergency, possible filler embolism."</em></div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button asChild className="rounded-full">
-              <a href="/handbook/Vascular_Occlusion_Protocol.docx" download>
-                <Download className="h-3.5 w-3.5 mr-1.5" /> Download full protocol (20 pages)
-              </a>
-            </Button>
-            <Button asChild variant="outline" className="rounded-full">
-              <a href="/handbook/Vascular_Occlusion_Protocol.docx" target="_blank" rel="noopener">
-                Open in new tab
-              </a>
-            </Button>
-          </div>
-
-          <p className="text-[11px] text-muted-foreground mt-4 italic">
-            This summary is for quick reference only and does not replace the full protocol. Every injector must read the complete document, sign the acknowledgment page, and re-review at minimum annually.
-          </p>
+      {/* System Workflows Grid */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="font-serif text-2xl">Staff Workflows &amp; Modules</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Click any module below to quickly navigate to its practice workflow.</p>
         </div>
 
-        {/* Device & treatment manuals */}
-        <div className="max-w-3xl mt-8">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-3">Device & treatment manuals</div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Manufacturer IFUs and internal staff guides for every device in the clinic. Read before operating; keep accessible in-room during treatment.
-          </p>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {[
-              { title: "Geneo — User Manual", desc: "OxyPod facial system · operation, settings, maintenance", href: "/handbook/Geneo_User_Manual.pdf" },
-              { title: "Ultherapy Prime — IFU", desc: "Manufacturer instructions for use (Merz)", href: "/handbook/Ultherapy_Prime_IFU.pdf" },
-              { title: "HIFU / Ultherapy — Staff Manual", desc: "Comprehensive staff instruction & treatment guide", href: "/handbook/HIFU_Ultherapy_Staff_Manual.pdf" },
-              { title: "CO₂ Laser — Staff Manual", desc: "Pre-op, settings, safety, post-op protocol", href: "/handbook/CO2_Laser_Staff_Manual.pdf" },
-              { title: "BTL Exilis Ultra 360 — Staff Guide", desc: "Treatment parameters, body & face protocols", href: "/handbook/BTL_Exilis_Ultra_360_Staff_Guide.pdf" },
-            ].map((m) => (
-              <div key={m.href} className="rounded-xl border border-border bg-card p-4 flex flex-col">
-                <div className="font-medium text-sm mb-1">{m.title}</div>
-                <div className="text-xs text-muted-foreground mb-3 flex-1">{m.desc}</div>
-                <div className="flex gap-2">
-                  <Button asChild size="sm" variant="outline" className="rounded-full">
-                    <a href={m.href} target="_blank" rel="noopener">Open</a>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {WORKFLOW_CARDS.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card key={card.title} className="flex flex-col justify-between hover:shadow-md transition">
+                <CardHeader className="p-5 pb-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`p-2.5 rounded-xl border ${card.color}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-base font-semibold">{card.title}</CardTitle>
+                  </div>
+                  <CardDescription className="text-xs leading-relaxed mt-1">
+                    {card.desc}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5 pt-0">
+                  <Button asChild variant="ghost" size="sm" className="w-full justify-between rounded-lg hover:bg-primary/5 text-xs text-primary font-medium p-0 h-8">
+                    <Link to={card.link}>
+                      <span>{card.linkText}</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
                   </Button>
-                  <Button asChild size="sm" variant="ghost" className="rounded-full">
-                    <a href={m.href} download><Download className="h-3.5 w-3.5 mr-1.5" />Download</a>
-                  </Button>
-                </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="space-y-4 pt-4 border-t border-border">
+        <div className="flex items-center gap-2">
+          <HelpCircle className="h-5 w-5 text-primary" />
+          <h2 className="font-serif text-2xl">Frequently Asked Questions</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {FAQS.map((faq, i) => (
+            <div key={i} className="p-5 rounded-2xl border border-border bg-card space-y-2">
+              <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                {faq.q}
               </div>
-            ))}
-          </div>
+              <p className="text-xs text-muted-foreground leading-relaxed pl-6">
+                {faq.a}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Footer */}
-      <div className="mt-20 pt-8 border-t border-border text-center text-xs text-muted-foreground">
-        Radiantilyk Aesthetic · Staff Handbook · v1.0 · Last updated {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+      <div className="pt-6 border-t border-border text-center text-xs text-muted-foreground">
+        Radiantilyk Aesthetic · Staff Handbook &amp; System Guide · Last updated July 2026
       </div>
     </div>
   );

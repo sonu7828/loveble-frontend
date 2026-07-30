@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 import GoogleCalendarConnect from "@/components/staff/GoogleCalendarConnect";
 import { useAuth } from "@/hooks/useAuth";
-import SharedOwnerCalendarCard from "@/components/staff/SharedOwnerCalendarCard";
 
 import { SavedSignatureCard } from "@/components/staff/SavedSignatureCard";
 
@@ -194,62 +193,79 @@ export default function StaffMyProfile() {
   }
 
   return (
-    <div className="max-w-xl mx-auto p-6 md:p-10">
-      <h1 className="font-serif text-2xl md:text-3xl mb-1">My Profile</h1>
-      <p className="text-sm text-muted-foreground mb-6">Update your details and connect your Google Calendar.</p>
-
-      <div className="mb-6">
-        <GoogleCalendarConnect staffId={staffId} />
+    <div className="w-[90%] max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+      <div className="border-b border-border pb-4">
+        <h1 className="font-serif text-3xl mb-1">My Profile</h1>
+        <p className="text-sm text-muted-foreground">
+          Manage your personal details, professional credentials, digital signature, and Google Calendar sync.
+        </p>
       </div>
 
-      {isAdmin && (
-        <div className="mb-6">
-          <SharedOwnerCalendarCard />
-        </div>
-      )}
-
       {!staffId && (
-        <div className="mb-6 rounded-2xl border border-warning/30 bg-warning-soft dark:bg-warning-soft p-4 text-sm">
+        <div className="rounded-2xl border border-warning/30 bg-warning-soft p-4 text-sm">
           <div className="font-medium mb-1">No staff profile linked to this account</div>
           <p className="text-muted-foreground">
             You're signed in as <span className="font-mono">{userEmail}</span>, but that email isn't on any
             staff profile yet. Ask an admin to either invite this email from <span className="font-medium">Staff → Team</span>, or
-            update the email on your existing staff profile to match. Until then, saving here won't update your real profile.
+            update the email on your existing staff profile to match.
           </p>
         </div>
       )}
 
-      <div className="space-y-4 rounded-2xl border border-border bg-card p-6">
-        <div>
-          <Label>Full name</Label>
-          <Input className="mt-1.5" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Left Column (2 Cols): Personal Details & Signature */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-5">
+            <h2 className="font-serif text-xl border-b border-border pb-3">Personal &amp; Professional Info</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Full name</Label>
+                <Input className="mt-1.5" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+              </div>
+              <div>
+                <Label>Title</Label>
+                <Input className="mt-1.5" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. RN Injector" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Email</Label>
+                <Input className="mt-1.5" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <p className="text-[11px] text-muted-foreground mt-1">Updates sign-in email. You'll get a confirmation link.</p>
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input className="mt-1.5" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(555) 123-4567" />
+              </div>
+            </div>
+
+            <div>
+              <Label>CA license # (NP/RN/MD)</Label>
+              <Input className="mt-1.5" value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} placeholder="e.g., NP-F 12345 or 95021080" />
+              <p className="text-[11px] text-muted-foreground mt-1">Auto-fills on GFE and chart note signatures.</p>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <Button onClick={save} disabled={saving} className="rounded-full px-6">
+                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Save changes
+              </Button>
+            </div>
+          </div>
+
+          {staffId && (
+            <div>
+              <SavedSignatureCard staffId={staffId} defaultName={form.full_name} />
+            </div>
+          )}
         </div>
-        <div>
-          <Label>Title</Label>
-          <Input className="mt-1.5" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. RN Injector" />
+
+        {/* Right Column (1 Col): Integrations & Calendar Sync */}
+        <div className="lg:col-span-1 space-y-6">
+          <GoogleCalendarConnect staffId={staffId} />
         </div>
-        <div>
-          <Label>Email</Label>
-          <Input className="mt-1.5" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <p className="text-[11px] text-muted-foreground mt-1">Changing this also updates your sign-in email. You'll get a confirmation link.</p>
-        </div>
-        <div>
-          <Label>Phone</Label>
-          <Input className="mt-1.5" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(555) 123-4567" />
-        </div>
-        <div>
-          <Label>CA license # (NP/RN/MD)</Label>
-          <Input className="mt-1.5" value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} placeholder="e.g., NP-F 12345 or 95021080" />
-          <p className="text-[11px] text-muted-foreground mt-1">Auto-fills on GFE signatures.</p>
-        </div>
-        <Button onClick={save} disabled={saving} className="rounded-full">
-          {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Save changes
-        </Button>
       </div>
-
-      {staffId && <SavedSignatureCard staffId={staffId} defaultName={form.full_name} />}
-
-
     </div>
   );
 }
