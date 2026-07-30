@@ -190,25 +190,9 @@ export default function StaffLogin() {
     setErrMsg("");
     const cleanEmail = email.trim().toLowerCase();
 
-    // 0. Check if account has been deleted by an Administrator (Built-in accounts can never be deleted)
-    const BUILTIN_EMAILS = [
-      "admin@gmail.com",
-      "staff@gmail.com",
-      "securityofficer@gmail.com",
-      "officer@gmail.com",
-      "medicaldirector@gmail.com",
-      "md@gmail.com",
-      "user@gmail.com",
-    ];
-
-    const rawDeletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-    if (rawDeletedEmails.some((e: string) => BUILTIN_EMAILS.includes(e.toLowerCase()))) {
-      const sanitized = rawDeletedEmails.filter((e: string) => !BUILTIN_EMAILS.includes(e.toLowerCase()));
-      localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitized));
-    }
-    const deletedEmails = rawDeletedEmails.filter((e: string) => !BUILTIN_EMAILS.includes(e.toLowerCase()));
-
-    if (!BUILTIN_EMAILS.includes(cleanEmail) && deletedEmails.includes(cleanEmail)) {
+    // 0. Check if account has been deleted
+    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+    if (deletedEmails.includes(cleanEmail)) {
       setLoading(false);
       setPassword("");
       const errorMsg = "This staff account has been deleted by an Administrator. Access denied.";
@@ -235,26 +219,12 @@ export default function StaffLogin() {
       return;
     }
 
-    // 3. Fallback for initial demo seed accounts (if not yet present in DB)
-    if (
-      cleanEmail === "admin@gmail.com" ||
-      cleanEmail === "staff@gmail.com" ||
-      cleanEmail === "securityofficer@gmail.com" ||
-      cleanEmail === "officer@gmail.com" ||
-      cleanEmail === "medicaldirector@gmail.com" ||
-      cleanEmail === "md@gmail.com"
-    ) {
-      const isAd = cleanEmail === "admin@gmail.com";
-      const isOfficer = cleanEmail.includes("officer") || cleanEmail.includes("security");
-      const isMD = cleanEmail.includes("md") || cleanEmail.includes("medical");
-      const roles: AppRole[] = isAd
-        ? ["admin", "staff"]
-        : isOfficer
-        ? ["privacy_officer", "staff"]
-        : isMD
-        ? ["medical_director", "staff"]
-        : ["staff"];
-      setPendingDemoLogin({ cleanEmail, roles, isAd });
+    // 3. Check if email matches any staff in approved accounts or built-in getUserProfileByEmail
+    const { getUserProfileByEmail } = await import("@/services/api/authService");
+    const resolvedUser = getUserProfileByEmail(cleanEmail, password);
+    if (resolvedUser) {
+      const isAd = resolvedUser.roles.includes("admin");
+      setPendingDemoLogin({ cleanEmail, roles: resolvedUser.roles as AppRole[], isAd });
       setLoading(false);
       setCode("");
       setStep("mfa-verify");
@@ -447,34 +417,53 @@ export default function StaffLogin() {
                   </button>
                 )}
 
-                {activeRole === "staff" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => fillDemoCredentials("medicaldirector@gmail.com")}
-                      className="p-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition text-left text-[11px] font-medium cursor-pointer text-purple-900 dark:text-purple-300 flex flex-col justify-between"
-                    >
-                      <div>🩺 <strong>Medical Director</strong></div>
-                      <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">medicaldirector@gmail.com</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fillDemoCredentials("securityofficer@gmail.com")}
-                      className="p-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition text-left text-[11px] font-medium cursor-pointer text-emerald-800 dark:text-emerald-300 flex flex-col justify-between"
-                    >
-                      <div>🛡️ <strong>Security Officer</strong></div>
-                      <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">securityofficer@gmail.com</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fillDemoCredentials("staff@gmail.com")}
-                      className="p-1.5 rounded-lg border border-border bg-background hover:bg-secondary/60 transition text-left text-[11px] font-medium cursor-pointer flex flex-col justify-between"
-                    >
-                      <div>💉 <strong>Staff</strong></div>
-                      <span className="text-[9px] text-muted-foreground font-mono block mt-0.5 truncate">staff@gmail.com</span>
-                    </button>
-                  </div>
-                )}
+                {activeRole === "staff" && (() => {
+                  const approvedStaff: Array<{ email: string; full_name?: string; role: string }> =
+                    JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+                  const staffList = approvedStaff.filter(
+                    (a) => a.email && a.email !== "admin@gmail.com" && a.email !== "user@gmail.com" && a.role !== "patient"
+                  );
+                  if (staffList.length === 0) {
+                    // fallback if no staff in localStorage yet
+                    return (
+                      <div className="grid grid-cols-1 gap-1.5">
+                        <button type="button" onClick={() => fillDemoCredentials("staff@gmail.com")}
+                          className="p-1.5 rounded-lg border border-border bg-background hover:bg-secondary/60 transition text-left text-[11px] font-medium cursor-pointer">
+                          <div>💉 <strong>Staff</strong></div>
+                          <span className="text-[9px] text-muted-foreground font-mono block mt-0.5">staff@gmail.com</span>
+                        </button>
+                      </div>
+                    );
+                  }
+                  const roleEmoji: Record<string, string> = {
+                    admin: "👑", medical_director: "🩺", privacy_officer: "🛡️", security_officer: "🛡️",
+                    provider: "💉", nurse_practitioner: "💊", scheduler: "📅", receptionist: "🏥", staff: "👤",
+                  };
+                  const roleColor: Record<string, string> = {
+                    medical_director: "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-900 dark:text-purple-300",
+                    privacy_officer: "border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300",
+                    security_officer: "border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300",
+                    provider: "border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-300",
+                  };
+                  const cols = staffList.length <= 2 ? `grid-cols-1 sm:grid-cols-${staffList.length}` : "grid-cols-1 sm:grid-cols-3";
+                  return (
+                    <div className={`grid ${cols} gap-1.5`}>
+                      {staffList.map((s) => (
+                        <button
+                          key={s.email}
+                          type="button"
+                          onClick={() => fillDemoCredentials(s.email)}
+                          className={`p-1.5 rounded-lg border transition text-left text-[11px] font-medium cursor-pointer flex flex-col justify-between ${
+                            roleColor[s.role] || "border-border bg-background hover:bg-secondary/60"
+                          }`}
+                        >
+                          <div>{roleEmoji[s.role] || "👤"} <strong>{s.full_name || s.email.split("@")[0]}</strong></div>
+                          <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">{s.email}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {activeRole === "user" && (
                   <button

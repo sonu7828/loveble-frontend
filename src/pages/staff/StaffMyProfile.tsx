@@ -121,20 +121,26 @@ export default function StaffMyProfile() {
 
 
       } else {
-        // Fallback default values for logged in staff without DB row
-        const isOfficer = myEmail === "officer@gmail.com";
-        const isAdminEmail = myEmail === "admin@gmail.com";
-        const defaultName = metadataName || (isOfficer ? "Dr. Kiem (Privacy & Security Officer)" : isAdminEmail ? "Dr. Kiem" : "Staff Provider");
-        const defaultTitle = isOfficer ? "Privacy & Security Officer" : isAdminEmail ? "Medical Director & Admin" : "Nurse Practitioner";
+        // Fallback: check rka_approved_staff_accounts for this email
+        let fallbackForm = { full_name: "", title: "", email: myEmail, phone: "", license_number: "" };
+        let fallbackId = `staff-demo-${myEmail.replace(/[^a-z0-9]/gi, "-")}`;
+        try {
+          const approved: Array<{ id?: string; email: string; full_name?: string; role?: string }> =
+            JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+          const match = approved.find((a) => a.email?.toLowerCase() === myEmail);
+          if (match) {
+            fallbackForm.full_name = match.full_name || myEmail.split("@")[0];
+            fallbackForm.title = (match.role || "Staff").replace(/_/g, " ").toUpperCase();
+            fallbackId = match.id || fallbackId;
+          }
+        } catch {}
 
-        const fallbackForm = {
-          full_name: defaultName,
-          title: defaultTitle,
-          email: myEmail,
-          phone: "(555) 234-5678",
-          license_number: "NP-95021080",
-        };
-        const fallbackId = `staff-demo-${myEmail.replace(/[^a-z0-9]/gi, "-")}`;
+        // If still no name, use auth metadata or generic defaults
+        if (!fallbackForm.full_name) {
+          fallbackForm.full_name = metadataName || myEmail.split("@")[0] || "Staff Member";
+          fallbackForm.title = "Staff";
+        }
+
         setStaffId(fallbackId);
         setForm(fallbackForm);
         localStorage.setItem(`rka_demo_profile_${myEmail}`, JSON.stringify({ id: fallbackId, form: fallbackForm }));

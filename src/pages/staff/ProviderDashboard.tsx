@@ -63,9 +63,21 @@ export function ProviderDashboard() {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<ClinicalNotification[]>([]);
 
-  const providerName = user?.first_name || user?.user_metadata?.first_name
-    ? `Dr. ${user?.first_name || user?.user_metadata?.first_name || ""} ${user?.last_name || user?.user_metadata?.last_name || ""}`.trim()
-    : user?.email || "Provider";
+  // Resolve provider name from approved accounts (real staff data)
+  const providerName = (() => {
+    const userEmail = (user?.email || "").toLowerCase();
+    if (userEmail) {
+      try {
+        const approved: Array<{ email: string; full_name?: string }> =
+          JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        const match = approved.find((a) => a.email?.toLowerCase() === userEmail);
+        if (match?.full_name) return match.full_name;
+      } catch {}
+    }
+    return user?.first_name || user?.user_metadata?.first_name
+      ? `${user?.first_name || user?.user_metadata?.first_name || ""} ${user?.last_name || user?.user_metadata?.last_name || ""}`.trim()
+      : user?.email || "Provider";
+  })();
 
   const loadData = useCallback(async () => {
     setLoading(true);

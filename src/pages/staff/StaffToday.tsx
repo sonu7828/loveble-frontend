@@ -428,9 +428,21 @@ function StandardStaffToday() {
   }, [loadData]);
 
   const uMeta = (user as any)?.user_metadata;
-  const staffName = user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
-    ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim()
-    : user?.email || "Clinical Staff";
+  // Resolve staff name from approved accounts (real staff data) rather than hardcoded auth names
+  const staffName = (() => {
+    const userEmail = (user?.email || "").toLowerCase();
+    if (userEmail) {
+      try {
+        const approved: Array<{ email: string; full_name?: string }> =
+          JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        const match = approved.find((a) => a.email?.toLowerCase() === userEmail);
+        if (match?.full_name) return match.full_name;
+      } catch {}
+    }
+    return user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
+      ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim()
+      : user?.email || "Clinical Staff";
+  })();
 
   const toggleStaffTask = (id: number) => {
     setMyTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));

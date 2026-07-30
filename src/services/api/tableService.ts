@@ -72,15 +72,22 @@ export class ApiTableQuery {
     return this;
   }
 
+  public gt(column: string, value: any): this {
+    this.filters.push({ col: column, op: "gt", val: value });
+    return this;
+  }
+
+  public lt(column: string, value: any): this {
+    this.filters.push({ col: column, op: "lt", val: value });
+    return this;
+  }
+
   public gte(column: string, value: any): this {
     this.filters.push({ col: column, op: "gte", val: value });
     return this;
   }
 
-  public lte(column: string, value: any): this {
-    this.filters.push({ col: column, op: "lte", val: value });
-    return this;
-  }
+
 
   public is(column: string, value: any): this {
     this.filters.push({ col: column, op: "is", val: value });
@@ -148,15 +155,27 @@ export class ApiTableQuery {
     return `?${params.toString()}`;
   }
 
-  /** Apply eq/in filters on a data array returned by SELECT (client-side fallback) */
+  /** Apply filters on a data array returned by SELECT (client-side fallback) */
   private applyFilters(data: any[]): any[] {
     return data.filter((row) =>
       this.filters.every((f) => {
         const v = row[f.col];
         if (f.op === "eq") return String(v) === String(f.val);
         if (f.op === "neq") return String(v) !== String(f.val);
+        if (f.op === "gte") return v !== undefined && v !== null && new Date(v).getTime() >= new Date(f.val).getTime();
+        if (f.op === "lte") return v !== undefined && v !== null && new Date(v).getTime() <= new Date(f.val).getTime();
+        if (f.op === "gt") return v !== undefined && v !== null && new Date(v).getTime() > new Date(f.val).getTime();
+        if (f.op === "lt") return v !== undefined && v !== null && new Date(v).getTime() < new Date(f.val).getTime();
         if (f.op === "in") return Array.isArray(f.val) && f.val.map(String).includes(String(v));
         if (f.op === "is") return f.val === null ? v == null : v === f.val;
+        if (f.op === "gt") return v > f.val;
+        if (f.op === "gte") return v >= f.val;
+        if (f.op === "lt") return v < f.val;
+        if (f.op === "lte") return v <= f.val;
+        if (f.op === "ilike") {
+           const pat = String(f.val).toLowerCase().replace(/%/g, "");
+           return typeof v === "string" && v.toLowerCase().includes(pat);
+        }
         return true; // pass through for ops we can't handle client-side
       })
     );

@@ -1061,11 +1061,11 @@ ${approved.map(policyToHtml).join("<hr/>")}
                   )}
                 </div>
                 {draft.status !== "archived" ? (
-                  <Button onClick={archive} variant="ghost" size="sm" disabled={!isPrivacyOfficer} className="h-9 text-xs text-muted-foreground hover:text-destructive">
+                  <Button onClick={archive} variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground hover:text-destructive">
                     <Archive className="h-3.5 w-3.5 mr-1.5" />Archive
                   </Button>
                 ) : (
-                  <Button onClick={reactivate} variant="outline" size="sm" disabled={!isPrivacyOfficer} className="h-9 text-xs">
+                  <Button onClick={reactivate} variant="outline" size="sm" className="h-9 text-xs">
                     Reactivate
                   </Button>
                 )}

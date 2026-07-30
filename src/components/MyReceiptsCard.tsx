@@ -41,7 +41,16 @@ export default function MyReceiptsCard() {
       </section>
     );
   }
-  if (rows.length === 0) return null;
+  if (rows.length === 0) {
+    return (
+      <section className="mb-10">
+        <h2 className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-4">Receipts</h2>
+        <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+          No receipts found.
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mb-10">
