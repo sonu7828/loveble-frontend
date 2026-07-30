@@ -108,7 +108,7 @@ export const Book = () => {
           color: x.color || "#8B6B5D",
           role: (x.role || x.pending_role || "").toLowerCase(),
         }));
-        
+
         const providerStaff = rawStaff.filter(x => {
           const r = x.role;
           const t = (x.title || "").toLowerCase();
@@ -231,33 +231,33 @@ export const Book = () => {
       location_id: locationId,
       locations: selectedLoc
         ? {
-            id: selectedLoc.id,
-            name: selectedLoc.name,
-            address: selectedLoc.address,
-            city: selectedLoc.city,
-            state: "CA",
-            zip: "95124",
-          }
+          id: selectedLoc.id,
+          name: selectedLoc.name,
+          address: selectedLoc.address,
+          city: selectedLoc.city,
+          state: "CA",
+          zip: "95124",
+        }
         : {
-            name: "San Jose Clinic",
-            address: "2100 Curtner Ave, Ste 1B",
-            city: "San Jose",
-            state: "CA",
-            zip: "95124",
-          },
+          name: "San Jose Clinic",
+          address: "2100 Curtner Ave, Ste 1B",
+          city: "San Jose",
+          state: "CA",
+          zip: "95124",
+        },
       staff_id: staffId,
       staff_profiles: selectedStaffObj
         ? {
-            id: selectedStaffObj.id,
-            full_name: selectedStaffObj.full_name,
-            title: selectedStaffObj.title,
-          }
+          id: selectedStaffObj.id,
+          full_name: selectedStaffObj.full_name,
+          title: selectedStaffObj.title,
+        }
         : staffId === "any-available"
-        ? {
+          ? {
             full_name: "Any Available Provider",
             title: "First available specialist",
           }
-        : {
+          : {
             full_name: "Girish",
             title: "Provider",
           },
@@ -273,7 +273,7 @@ export const Book = () => {
     // Try remote database insert (safely handled if backend endpoint is unavailable)
     try {
       await apiQuery("appointments").insert(newAppointment);
-    } catch (_e) {}
+    } catch (_e) { }
 
     // Store client profile locally
     const newClientProfile = {
@@ -293,11 +293,11 @@ export const Book = () => {
     }
     try {
       await apiQuery("client_profiles").insert(newClientProfile);
-    } catch (_e) {}
+    } catch (_e) { }
 
     try {
       localStorage.removeItem("rka_book_draft");
-    } catch (_e) {}
+    } catch (_e) { }
 
     setSubmitting(false);
     navigate(`/booking-confirmation?id=${aptId}`);
@@ -306,27 +306,18 @@ export const Book = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col justify-between">
-        <SiteHeader />
         <div className="flex-1 flex flex-col items-center justify-center py-16">
           <Loader2 className="h-7 w-7 animate-spin text-primary mb-2" />
           <p className="text-xs text-muted-foreground font-serif">Loading booking menu...</p>
         </div>
-        <SiteFooter />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <SiteHeader />
-
       {/* Main Container — Middle 90% Width */}
-      <main className="flex-1 w-[95%] xl:w-[90%] max-w-[1440px] mx-auto px-3 sm:px-5 pt-2 pb-12">
-        
-        {/* SEPARATE Nurse Discount Banner — Placed right-aligned on top */}
-        <div className="flex justify-end mb-2">
-          <NurseDiscountBanner />
-        </div>
+      <main className="flex-1 w-[95%] xl:w-[90%] max-w-[1440px] mx-auto px-3 sm:px-5 pt-8 pb-12">
 
         {draftBanner && draftRestored && (
           <div className="mb-2.5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 flex items-center justify-between gap-3 text-xs shadow-2xs">
@@ -354,7 +345,7 @@ export const Book = () => {
         )}
 
         {/* Clean 6-Step Header Card */}
-        <div className="sticky top-2 z-30 mb-2.5 rounded-xl border border-border/70 bg-background/95 backdrop-blur-md shadow-xs p-3 sm:p-3.5">
+        <div className="mb-6 rounded-xl border border-border/70 bg-background shadow-xs p-3 sm:p-3.5">
           <div className="flex items-center justify-between gap-2 mb-2">
             {/* Step Label */}
             <div className="flex items-center gap-2 min-w-0">
@@ -401,59 +392,18 @@ export const Book = () => {
                   key={n}
                   type="button"
                   onClick={() => handleJumpToStep(n)}
-                  className={`h-2 flex-1 rounded-full transition-all duration-300 cursor-pointer ${
-                    isCurrent
-                      ? "bg-primary ring-3 ring-primary/20 scale-[1.01]"
-                      : filled
+                  className={`h-2 flex-1 rounded-full transition-all duration-300 cursor-pointer ${isCurrent
+                    ? "bg-primary ring-3 ring-primary/20 scale-[1.01]"
+                    : filled
                       ? "bg-primary/85 hover:bg-primary"
                       : "bg-secondary/90 hover:bg-primary/30"
-                  }`}
+                    }`}
                   title={`Step ${n}`}
                 />
               );
             })}
           </div>
         </div>
-
-        {/* Compact "What Happens Next" Cards — Positioned Directly Below Progress Header */}
-        {step === 1 && (
-          <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs shadow-2xs">
-            <div className="text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
-              What happens next
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
-                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">
-                  1
-                </span>
-                <div className="min-w-0">
-                  <div className="font-semibold text-foreground text-xs">Pick your service</div>
-                  <div className="text-[10px] text-muted-foreground truncate">Browse menu, duration & clear pricing</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
-                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">
-                  2
-                </span>
-                <div className="min-w-0">
-                  <div className="font-semibold text-foreground text-xs">Pick a time</div>
-                  <div className="text-[10px] text-muted-foreground truncate">Real-time availability & instant reservation</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
-                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">
-                  3
-                </span>
-                <div className="min-w-0">
-                  <div className="font-semibold text-foreground text-xs">Save card (No charge today)</div>
-                  <div className="text-[10px] text-muted-foreground truncate">Card on file only used for visit or 48h cancel</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         <Suspense fallback={<StepFallback />}>
           {step === 1 && (
@@ -544,8 +494,6 @@ export const Book = () => {
           )}
         </Suspense>
       </main>
-
-      <SiteFooter />
     </div>
   );
 };
