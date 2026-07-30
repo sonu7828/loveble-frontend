@@ -46,7 +46,7 @@ export default function StaffMyProfile() {
             ? `${user.user_metadata?.first_name || ""} ${user.user_metadata?.last_name || ""}`.trim()
             : "";
         }
-      } catch (e) {}
+      } catch (e) { }
 
       if (!myEmail) {
         const demoSession = JSON.parse(
@@ -119,9 +119,7 @@ export default function StaffMyProfile() {
           license_number: s.license_number ?? "",
         });
 
-        try {
-          const tpls = await loadStaffMessageTemplates(s.id);
-        } catch {}
+
       } else {
         // Fallback default values for logged in staff without DB row
         const isOfficer = myEmail === "officer@gmail.com";
