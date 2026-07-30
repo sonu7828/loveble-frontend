@@ -67,7 +67,7 @@ export default function StaffAppointmentDetail() {
         body: { appointmentId: id, consentFormIds },
       });
       if (invErr || data?.error) {
-        toast.error(data?.error || invErr?.message || "Could not resend");
+        toast.error(data?.error || (invErr as any)?.message || "Could not resend");
         return;
       }
       toast.success(`Resent signing link for ${consentFormIds.length} form${consentFormIds.length > 1 ? "s" : ""}`);
@@ -86,7 +86,7 @@ export default function StaffAppointmentDetail() {
         body: { appointmentId: appt.id },
       });
       if (error || data?.error || !data?.url) {
-        toast.error(data?.error || error?.message || "Could not generate PDF");
+        toast.error(data?.error || (error as any)?.message || "Could not generate PDF");
         return;
       }
       void import("@/lib/phiAudit").then(({ logPhiAccess }) =>
@@ -276,7 +276,7 @@ export default function StaffAppointmentDetail() {
 
   const resyncCal = async () => {
     const { data, error } = await ApiClient.post("google-calendar-sync", { body: { appointmentId: id } });
-    if (error || data?.error) { toast.error(data?.error || error?.message || "Calendar sync failed"); return; }
+    if (error || data?.error) { toast.error(data?.error || (error as any)?.message || "Calendar sync failed"); return; }
     if (data?.skipped) { toast.message("Calendar not connected"); return; }
     toast.success("Synced to Google Calendar");
     load();
@@ -387,7 +387,7 @@ export default function StaffAppointmentDetail() {
     const { data: po, error: poErr } = await ApiClient.post("send-post-op-instructions", { body: { appointmentId: appt.id, force: !!resend } });
     toast.dismiss(t);
     if (poErr || po?.error) {
-      toast.error(po?.error || poErr?.message || "Could not send post-op email");
+      toast.error(po?.error || (poErr as any)?.message || "Could not send post-op email");
       return;
     }
     toast.success(resend ? "Post-op instructions resent to client" : "Post-op instructions emailed to client");
@@ -585,7 +585,7 @@ export default function StaffAppointmentDetail() {
                 const t = toast.loading("Completing…");
                 const { data, error } = await ApiClient.post("mark-appointment-complete", { body: { appointmentId: appt.id } });
                 toast.dismiss(t);
-                if (error || data?.error) { toast.error(data?.error || error?.message || "Could not complete"); return; }
+                if (error || data?.error) { toast.error(data?.error || (error as any)?.message || "Could not complete"); return; }
                 toast.success(data?.reviewSent ? "Completed — review email sent" : "Completed (no review URL set for this location)");
                 load();
               }}
