@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -34,6 +35,7 @@ import { clearDemoAuthSession } from "@/hooks/useAuth";
 import {
   CANCELLATION_NOTICE_HOURS, CLINIC_PHONE_DISPLAY, CLINIC_PHONE_TEL, WITHIN_WINDOW_WARNING,
 } from "@/lib/cancellationPolicy";
+import Book from "./Book";
 
 const TABS = [
   "dashboard",
@@ -47,6 +49,7 @@ const TABS = [
   "profile",
   "privacy",
   "support",
+  "book",
 ] as const;
 
 type TabKey = typeof TABS[number];
@@ -409,10 +412,8 @@ export default function PatientAccount() {
                   })()}
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Button asChild className="rounded-full gap-1">
-                    <Link to="/book">
-                      <Plus className="h-4 w-4" /> Book Visit
-                    </Link>
+                  <Button onClick={() => onTabChange("book")} className="rounded-full gap-1">
+                    <Plus className="h-4 w-4" /> Book Visit
                   </Button>
                 </div>
               </div>
@@ -597,6 +598,13 @@ export default function PatientAccount() {
               {/* 7. REQUEST RECORD AMENDMENT */}
               <TabsContent value="amendment" className="mt-0 space-y-6">
                 <PatientAmendmentModal userEmail={user?.email || ""} />
+              </TabsContent>
+
+              {/* BOOKING WIZARD */}
+              <TabsContent value="book" className="mt-0">
+                <div className="pb-8">
+                  <Book />
+                </div>
               </TabsContent>
 
               {/* 8. NOTIFICATIONS & MESSAGES */}
