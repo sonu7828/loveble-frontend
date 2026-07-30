@@ -378,6 +378,7 @@ function StandardStaffToday() {
   const [recentPatients, setRecentPatients] = useState<any[]>([]);
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -426,6 +427,24 @@ function StandardStaffToday() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const approveAppointment = async (apptId: string) => {
+    setApprovingId(apptId);
+    try {
+      const { error } = await apiQuery("appointments")
+        .update({ status: "approved" })
+        .eq("id", apptId);
+      if (error) throw error;
+      setAppts((prev) =>
+        prev.map((a) => (a.id === apptId ? { ...a, status: "approved" } : a))
+      );
+      toast.success("Appointment approved!");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to approve appointment");
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   const uMeta = (user as any)?.user_metadata;
   // Resolve staff name from approved accounts (real staff data) rather than hardcoded auth names
@@ -588,9 +607,23 @@ function StandardStaffToday() {
                             <Badge variant="outline" className="text-[10px] uppercase">{a.status}</Badge>
                           </td>
                           <td className="p-3 text-right">
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate(`/staff/appointments/${a.id}`)}>
-                              View Chart
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              {a.status === "pending" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs border-emerald-500 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 gap-1"
+                                  disabled={approvingId === a.id}
+                                  onClick={() => approveAppointment(a.id)}
+                                >
+                                  <Check className="h-3 w-3" />
+                                  {approvingId === a.id ? "Approving…" : "Approve"}
+                                </Button>
+                              )}
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate(`/staff/appointments/${a.id}`)}>
+                                View Chart
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))
