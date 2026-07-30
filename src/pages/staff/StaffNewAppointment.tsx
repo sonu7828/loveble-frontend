@@ -229,7 +229,7 @@ export default function StaffNewAppointment() {
   const availableToAdd = services.filter(s => !serviceIds.includes(s.id));
 
   return (
-    <div className="p-4 pb-36 sm:p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-2xl mx-auto">
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-3 w-3" /> Back
       </button>
@@ -420,8 +420,7 @@ export default function StaffNewAppointment() {
           )}
         </section>
 
-        <div className="h-28 sm:hidden" aria-hidden />
-        <div className="fixed inset-x-0 bottom-[calc(3.65rem+env(safe-area-inset-bottom))] sm:static bg-background/95 backdrop-blur sm:backdrop-blur-none border-y sm:border-0 border-border p-4 sm:p-0 z-40 shadow-lg sm:shadow-none">
+        <div className="pt-2">
           <Button type="submit" disabled={busy} size="lg" className="rounded-full w-full">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create appointment"}
           </Button>

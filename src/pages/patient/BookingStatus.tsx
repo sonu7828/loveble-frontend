@@ -37,17 +37,48 @@ const BookingStatus = () => {
     setLoadError(null);
     try {
       const { data: dbData } = await apiQuery("appointments").select("*").eq("id", idParam).maybeSingle();
-      if (dbData) {
-        setData(dbData);
+      let appt = dbData;
+      if (!appt) {
+        const res = await ApiClient.get(`/booking?token=${encodeURIComponent(idParam)}`);
+        if (res.data) appt = res.data;
+      }
+
+      if (appt) {
+        const enriched = { ...appt };
+
+        // Fallback location object
+        const locName = enriched.locations?.name || enriched.location_name || "San Jose Clinic";
+        const locAddr = enriched.locations?.address || enriched.location_address || "2100 Curtner Ave, Ste 1B";
+        const locCity = enriched.locations?.city || enriched.location_city || "San Jose";
+        const locState = enriched.locations?.state || "CA";
+        const locZip = enriched.locations?.zip || "95124";
+        enriched.locations = {
+          name: locName,
+          address: locAddr,
+          city: locCity,
+          state: locState,
+          zip: locZip,
+        };
+
+        // Fallback provider object
+        const staffName = enriched.staff_profiles?.full_name || enriched.staff_name || (enriched.staff_id === "any-available" ? "Any Available Provider" : "Girish");
+        const staffTitle = enriched.staff_profiles?.title || enriched.staff_title || (enriched.staff_id === "any-available" ? "First available specialist" : "Provider");
+        enriched.staff_profiles = {
+          full_name: staffName,
+          title: staffTitle,
+        };
+
+        // Fallback service object
+        if (!enriched.services?.name && !enriched.services_list?.length) {
+          const svcName = enriched.service_name || "Medical Consultation";
+          enriched.services = { name: svcName };
+        }
+
+        setData(enriched);
         setLoading(false);
         return;
       }
-      const res = await ApiClient.get(`/booking?token=${encodeURIComponent(idParam)}`);
-      if (res.data) {
-        setData(res.data);
-      } else {
-        throw new Error(res.error || "Appointment not found");
-      }
+      throw new Error("Appointment not found");
     } catch (e) {
       setLoadError((e as Error).message || "Could not load appointment");
     } finally {
@@ -168,19 +199,36 @@ const BookingStatus = () => {
                 <Row label="Service">
                   {data.services_list && data.services_list.length > 0
                     ? data.services_list.map((s: any) => s.name).filter(Boolean).join(" + ")
-                    : data.services?.name}
+                    : (data.services?.name || data.service_name || "Medical Consultation")}
                 </Row>
-                <Row label="Provider">{data.staff_profiles?.full_name}<span className="text-muted-foreground"> · {data.staff_profiles?.title}</span></Row>
-                <Row label="When"><span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-primary" />{format(new Date(data.start_at), "EEEE, MMM d · h:mm a")}</span></Row>
+                <Row label="Provider">
+                  {data.staff_profiles?.full_name || data.staff_name || "Girish"}
+                  <span className="text-muted-foreground"> · {data.staff_profiles?.title || data.staff_title || "Provider"}</span>
+                </Row>
+                <Row label="When">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-primary" />
+                    {data.start_at ? format(new Date(data.start_at), "EEEE, MMM d · h:mm a") : "Scheduled Time"}
+                  </span>
+                </Row>
                 <Row label="Where">
                   <span className="flex items-start gap-1.5">
                     <MapPin className="h-3.5 w-3.5 text-primary mt-0.5" />
-                    <span>{data.locations?.name}<br/>
-                      <span className="text-muted-foreground">{data.locations?.address}, {data.locations?.city}, {data.locations?.state} {data.locations?.zip}</span>
+                    <span>
+                      {data.locations?.name || data.location_name || "San Jose Clinic"}
+                      <br />
+                      <span className="text-muted-foreground">
+                        {[
+                          data.locations?.address || data.location_address || "2100 Curtner Ave, Ste 1B",
+                          data.locations?.city || data.location_city || "San Jose",
+                          data.locations?.state || "CA",
+                          data.locations?.zip || "95124"
+                        ].filter(Boolean).join(", ")}
+                      </span>
                     </span>
                   </span>
                 </Row>
-                <Row label="Name">{data.client_first_name} {data.client_last_name}</Row>
+                <Row label="Name">{data.client_first_name || data.first_name} {data.client_last_name || data.last_name}</Row>
                 {data.denial_reason && <Row label="Note">{data.denial_reason}</Row>}
               </dl>
 

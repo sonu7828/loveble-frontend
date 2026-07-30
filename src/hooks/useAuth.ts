@@ -16,6 +16,7 @@ export interface AuthState {
   isNP: boolean;
   isMedicalDirector: boolean;
   isPrivacyOfficer: boolean;
+  isProvider: boolean;
   isClinicalStaff: boolean;
   isPrivileged: boolean;
   canSeeAll: boolean;
@@ -97,6 +98,7 @@ export function useAuth(): AuthState {
   const isNP = roles.includes("nurse_practitioner") || isAdmin;
   const isMedicalDirector = roles.includes("medical_director");
   const isPrivacyOfficer = roles.includes("privacy_officer");
+  const isProvider = (roles.includes("nurse_practitioner") || roles.includes("provider") || (roles.includes("staff") && !isAdmin)) && !isMedicalDirector && !isPrivacyOfficer && !isAdmin;
   const isClinicalStaff = isAdmin || isStaff || isScheduler || isNP || isMedicalDirector;
   const isPrivileged = isAdmin || isStaff || isNP || isMedicalDirector || isPrivacyOfficer;
   const canOverride = isAdmin || isScheduler || isReceptionist || isNP || isMedicalDirector;
@@ -115,6 +117,7 @@ export function useAuth(): AuthState {
     isNP,
     isMedicalDirector,
     isPrivacyOfficer,
+    isProvider,
     isClinicalStaff,
     isPrivileged,
     canSeeAll,

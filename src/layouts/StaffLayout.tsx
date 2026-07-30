@@ -41,7 +41,7 @@ interface Group {
 }
 
 export default function StaffLayout() {
-  const { user, loading, roles, isAdmin, isNP, isStaff, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged } = useAuth();
+  const { user, loading, roles, isAdmin, isNP, isStaff, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged, isProvider } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -200,6 +200,56 @@ export default function StaffLayout() {
       ];
     }
 
+    if (isProvider) {
+      return [
+        {
+          key: "prov_dashboard",
+          label: "Dashboard",
+          icon: LayoutDashboard,
+          show: true,
+          children: [
+            { to: "/staff/today", label: "Dashboard", icon: LayoutDashboard },
+          ],
+        },
+        {
+          key: "prov_schedule",
+          label: "Today's Schedule",
+          icon: CalIcon,
+          show: true,
+          children: [
+            { to: "/staff/calendar", label: "Today's Schedule", icon: CalIcon },
+          ],
+        },
+        {
+          key: "prov_patients",
+          label: "Patients",
+          icon: Users,
+          show: true,
+          children: [
+            { to: "/staff/clients", label: "Patients", icon: Users },
+          ],
+        },
+        {
+          key: "prov_clinical",
+          label: "Clinical Notes",
+          icon: FileText,
+          show: true,
+          children: [
+            { to: "/staff/clinical", label: "Clinical Notes", icon: FileText },
+          ],
+        },
+        {
+          key: "prov_messages",
+          label: "Messages",
+          icon: MessageSquare,
+          show: true,
+          children: [
+            { to: "/staff/messages", label: "Messages", icon: MessageSquare, badge: unreadSms },
+          ],
+        },
+      ];
+    }
+
     const canClinical = isNP || isStaff;
     return [
       {
@@ -258,7 +308,7 @@ export default function StaffLayout() {
         ],
       },
     ];
-  }, [isMedicalDirector, isScheduler, isReceptionist, isStaff, isNP, isPrivacyOfficer, isAdmin, pendingCount, unreadSms]);
+  }, [isMedicalDirector, isPrivacyOfficer, isProvider, isScheduler, isReceptionist, isStaff, isNP, isAdmin, pendingCount, unreadSms]);
 
   if (loading || (user && !mfaChecked)) {
     return (
@@ -411,7 +461,7 @@ export default function StaffLayout() {
   );
 
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-background flex flex-col">
+    <div className="h-screen max-h-screen w-full overflow-hidden bg-background flex flex-col">
       {/* Top Full-width Portal Header Bar */}
       <header className="w-full border-b border-border bg-card/80 backdrop-blur px-4 md:px-6 py-2.5 flex items-center justify-between z-30 shrink-0">
         {/* Left Corner: Mobile Menu & Company Logo */}
@@ -449,7 +499,11 @@ export default function StaffLayout() {
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                {roles.includes("medical_director") ? "Medical Director Hub" : roles.includes("privacy_officer") ? "Security Officer Hub" : "Staff Hub"}
+                {roles.includes("medical_director")
+                  ? "Medical Director Hub"
+                  : roles.includes("privacy_officer")
+                  ? "Security Officer Hub"
+                  : "Staff Hub"}
               </div>
             </div>
           </Link>
@@ -502,7 +556,7 @@ export default function StaffLayout() {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-background min-w-0">
+        <main className="flex-1 overflow-y-auto bg-background min-w-0 xl:pb-0 pb-16">
           <Outlet />
         </main>
       </div>
