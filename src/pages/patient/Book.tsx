@@ -34,7 +34,7 @@ const detailsSchema = z.object({
   nppAck: z.literal(true, { errorMap: () => ({ message: "Required to book" }) }),
 });
 
-export const Book = () => {
+export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>(1);
@@ -306,18 +306,27 @@ export const Book = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col justify-between">
+        {!isEmbedded && <SiteHeader />}
         <div className="flex-1 flex flex-col items-center justify-center py-16">
           <Loader2 className="h-7 w-7 animate-spin text-primary mb-2" />
           <p className="text-xs text-muted-foreground font-serif">Loading booking menu...</p>
         </div>
+        {!isEmbedded && <SiteFooter />}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {!isEmbedded && <SiteHeader />}
+
       {/* Main Container — Middle 90% Width */}
       <main className="flex-1 w-[95%] xl:w-[90%] max-w-[1440px] mx-auto px-3 sm:px-5 pt-8 pb-12">
+        {!isEmbedded && (
+          <div className="flex justify-end mb-2">
+            <NurseDiscountBanner />
+          </div>
+        )}
 
         {draftBanner && draftRestored && (
           <div className="mb-2.5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2 flex items-center justify-between gap-3 text-xs shadow-2xs">
@@ -404,6 +413,37 @@ export const Book = () => {
             })}
           </div>
         </div>
+
+        {!isEmbedded && step === 1 && (
+          <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs shadow-2xs">
+            <div className="text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-2">
+              What happens next
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">1</span>
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground text-xs">Pick your service</div>
+                  <div className="text-[10px] text-muted-foreground truncate">Browse menu, duration & clear pricing</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">2</span>
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground text-xs">Pick a time</div>
+                  <div className="text-[10px] text-muted-foreground truncate">Real-time availability & instant reservation</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 rounded-lg border border-primary/15 bg-background/90 p-2.5">
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center justify-center shrink-0">3</span>
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground text-xs">Save card (No charge today)</div>
+                  <div className="text-[10px] text-muted-foreground truncate">Card on file only used for visit or 48h cancel</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Suspense fallback={<StepFallback />}>
           {step === 1 && (
@@ -494,6 +534,7 @@ export const Book = () => {
           )}
         </Suspense>
       </main>
+      {!isEmbedded && <SiteFooter />}
     </div>
   );
 };

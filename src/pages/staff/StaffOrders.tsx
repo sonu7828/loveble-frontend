@@ -40,11 +40,11 @@ export default function StaffOrders() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="w-full sm:w-auto justify-start bg-muted/60 p-1 rounded-xl gap-1 border border-border">
-          <TabsTrigger value="rx" className="gap-2 text-xs rounded-lg">
+        <TabsList className="flex w-full overflow-x-auto justify-start bg-muted/60 p-1 rounded-xl gap-1 border border-border no-scrollbar">
+          <TabsTrigger value="rx" className="gap-2 text-xs rounded-lg whitespace-nowrap shrink-0">
             <Pill className="h-3.5 w-3.5" /> Prescription Approvals (0)
           </TabsTrigger>
-          <TabsTrigger value="labs" className="gap-2 text-xs rounded-lg">
+          <TabsTrigger value="labs" className="gap-2 text-xs rounded-lg whitespace-nowrap shrink-0">
             <Activity className="h-3.5 w-3.5" /> Lab & Imaging Orders (0)
           </TabsTrigger>
         </TabsList>
