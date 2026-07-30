@@ -19,7 +19,7 @@ import {
   Stethoscope, ShieldCheck, ShieldAlert, Boxes, UserCircle2,
   BookOpen, History as HistoryIcon, Laptop, Building2, LogOut, Loader2,
   LayoutDashboard, FileCheck, FileText, Pill, Activity, Users, BarChart3, Settings,
-  ChevronDown, ChevronRight, Tag
+  ChevronDown, ChevronRight, Tag, UserPlus, CreditCard, UserCheck
 } from "lucide-react";
 import rkaLogo from "@/assets/rka-logo.webp";
 
@@ -55,6 +55,8 @@ export default function StaffLayout() {
     today: true,
     schedule: true,
     clients: true,
+    operations: true,
+    settings: true,
     security_officer: true,
     clinical: true,
     admin: true,
@@ -149,52 +151,29 @@ export default function StaffLayout() {
           icon: LayoutDashboard,
           show: true,
           children: [
-            { to: "/staff/security-officer", label: "Dashboard", icon: LayoutDashboard },
+            { to: "/staff/today", label: "Dashboard", icon: LayoutDashboard },
           ],
         },
         {
-          key: "sec_audit",
-          label: "Audit Logs",
-          icon: HistoryIcon,
-          show: true,
-          children: [
-            { to: "/staff/audit-report", label: "Audit Logs", icon: HistoryIcon },
-          ],
-        },
-        {
-          key: "sec_hipaa",
-          label: "HIPAA Compliance",
-          icon: BookOpen,
-          show: true,
-          children: [
-            { to: "/staff/hipaa-policies", label: "HIPAA Compliance", icon: BookOpen },
-          ],
-        },
-        {
-          key: "sec_incidents",
-          label: "Security Incidents",
+          key: "security_officer",
+          label: "HIPAA & Compliance",
           icon: ShieldAlert,
           show: true,
           children: [
-            { to: "/staff/breach-report", label: "Security Incidents", icon: ShieldAlert },
+            { to: "/staff/security-officer", label: "Compliance Overview", icon: ShieldCheck },
+            { to: "/staff/audit-report", label: "PHI Access Audit", icon: FileText },
+            { to: "/staff/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
+            { to: "/staff/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
+            { to: "/staff/vendors", label: "BAA & Vendors", icon: Building2 },
           ],
         },
         {
-          key: "sec_access",
-          label: "Access Management",
-          icon: Laptop,
+          key: "sec_messages",
+          label: "Messages",
+          icon: MessageSquare,
           show: true,
           children: [
-            { to: "/staff/vendors?tab=devices", label: "Access Management", icon: Laptop },
-          ],
-        },
-        {
-          key: "sec_reports",
-          label: "Reports",
-          icon: BarChart3,
-          show: true,
-          children: [
-            { to: "/staff/reports", label: "Reports", icon: BarChart3 },
+            { to: "/staff/messages", label: "Messages", icon: MessageSquare, badge: unreadSms },
           ],
         },
       ];
@@ -212,30 +191,24 @@ export default function StaffLayout() {
           ],
         },
         {
+          key: "prov_clinical",
+          label: "Clinical Workspace",
+          icon: Stethoscope,
+          show: true,
+          children: [
+            { to: "/staff/clinical", label: "Charts", icon: FileText },
+            { to: "/staff/clinical/cosign", label: "Cosign Queue", icon: FileCheck },
+            { to: "/staff/clinical/safety", label: "Safety & Protocols", icon: ShieldCheck },
+          ],
+        },
+        {
           key: "prov_schedule",
-          label: "Today's Schedule",
+          label: "Schedule",
           icon: CalIcon,
           show: true,
           children: [
-            { to: "/staff/calendar", label: "Today's Schedule", icon: CalIcon },
-          ],
-        },
-        {
-          key: "prov_patients",
-          label: "Patients",
-          icon: Users,
-          show: true,
-          children: [
-            { to: "/staff/clients", label: "Patients", icon: Users },
-          ],
-        },
-        {
-          key: "prov_clinical",
-          label: "Clinical Notes",
-          icon: FileText,
-          show: true,
-          children: [
-            { to: "/staff/clinical", label: "Clinical Notes", icon: FileText },
+            { to: "/staff/calendar", label: "Calendar", icon: CalIcon },
+            { to: "/staff/my-schedule", label: "My Schedule", icon: UserCircle2 },
           ],
         },
         {
@@ -250,7 +223,9 @@ export default function StaffLayout() {
       ];
     }
 
-    const canClinical = isNP || isStaff;
+    // Front Desk Receptionist navigation menu layout
+    const isFrontDesk = !isAdmin && (isReceptionist || isScheduler || isStaff);
+
     return [
       {
         key: "today",
@@ -258,7 +233,7 @@ export default function StaffLayout() {
         icon: LayoutDashboard,
         show: true,
         children: [
-          { to: "/staff/today", label: "Today", icon: LayoutDashboard },
+          { to: "/staff/today", label: "Dashboard", icon: LayoutDashboard },
           { to: "/staff/inbox", label: "Booking Requests", icon: Inbox, badge: pendingCount },
           { to: "/staff/messages", label: "Messages", icon: MessageSquare, badge: unreadSms },
         ],
@@ -270,8 +245,8 @@ export default function StaffLayout() {
         show: true,
         children: [
           { to: "/staff/calendar", label: "Calendar", icon: CalIcon },
+          { to: "/staff/today?view=schedule", label: "Today's Schedule", icon: CalIcon },
           { to: "/staff/my-schedule", label: "My Schedule", icon: UserCircle2 },
-          { to: "/staff/time-clock", label: "Time Clock", icon: Clock },
         ],
       },
       {
@@ -281,32 +256,56 @@ export default function StaffLayout() {
         show: true,
         children: [
           { to: "/staff/clients", label: "All Clients", icon: Users },
+          { to: "/staff/clients?new=1", label: "New Client", icon: UserPlus },
         ],
       },
       {
-        key: "clinical",
-        label: "CLINICAL",
-        icon: Stethoscope,
+        key: "operations",
+        label: "OPERATIONS",
+        icon: CreditCard,
         show: true,
         children: [
-          { to: "/staff/clinical", label: "Charts", icon: FileText },
-          { to: "/staff/clinical/cosign", label: "Cosign Queue", icon: FileCheck },
-          { to: "/staff/clinical/safety", label: "Safety & Protocols", icon: ShieldCheck },
-          { to: "/staff/compliance", label: "My Compliance", icon: BookOpen },
-          { to: "/staff/inventory", label: "Inventory & Supplies", icon: Boxes },
+          { to: "/staff/checkout", label: "Payments", icon: CreditCard },
+          { to: "/staff/time-clock", label: "Time Clock", icon: Clock },
         ],
       },
       {
-        key: "admin_services",
-        label: "SERVICES & ADMIN",
-        icon: Tag,
-        show: isAdmin,
+        key: "settings",
+        label: "SETTINGS",
+        icon: Settings,
+        show: true,
         children: [
-          { to: "/staff/services", label: "Services & Pricing", icon: Tag },
-          { to: "/staff/admin", label: "Admin Overview", icon: LayoutDashboard },
-          { to: "/staff/team", label: "Staff Management", icon: Users },
+          { to: "/staff/me", label: "Profile", icon: UserCircle2 },
         ],
       },
+      ...(isAdmin
+        ? [
+            {
+              key: "clinical",
+              label: "CLINICAL",
+              icon: Stethoscope,
+              show: true,
+              children: [
+                { to: "/staff/clinical", label: "Charts", icon: FileText },
+                { to: "/staff/clinical/cosign", label: "Cosign Queue", icon: FileCheck },
+                { to: "/staff/clinical/safety", label: "Safety & Protocols", icon: ShieldCheck },
+                { to: "/staff/compliance", label: "My Compliance", icon: BookOpen },
+                { to: "/staff/inventory", label: "Inventory & Supplies", icon: Boxes },
+              ],
+            },
+            {
+              key: "admin_services",
+              label: "SERVICES & ADMIN",
+              icon: Tag,
+              show: true,
+              children: [
+                { to: "/staff/services", label: "Services & Pricing", icon: Tag },
+                { to: "/staff/admin", label: "Admin Overview", icon: LayoutDashboard },
+                { to: "/staff/team", label: "Staff Management", icon: Users },
+              ],
+            },
+          ]
+        : []),
     ];
   }, [isMedicalDirector, isPrivacyOfficer, isProvider, isScheduler, isReceptionist, isStaff, isNP, isAdmin, pendingCount, unreadSms]);
 
@@ -398,15 +397,12 @@ export default function StaffLayout() {
             <div key={g.key} className="space-y-0.5">
               {/* Static Group Header */}
               <div
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold select-none ${hasActiveChild
-                    ? "text-primary"
-                    : "text-muted-foreground"
+                className={`w-full flex items-center justify-between px-3 pt-3 pb-1 text-[11px] font-bold tracking-wider uppercase select-none ${hasActiveChild
+                    ? "text-primary font-bold"
+                    : "text-muted-foreground/75"
                   }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <GIcon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{g.label}</span>
-                </div>
+                <span className="truncate">{g.label}</span>
                 {g.badge ? (
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-primary/15 text-primary font-bold">
                     {g.badge}

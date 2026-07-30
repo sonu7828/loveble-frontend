@@ -36,6 +36,12 @@ export default function StaffClients() {
       next.delete("focus");
       setSearchParams(next, { replace: true });
     }
+    if (searchParams.get("new") === "1") {
+      setAddClientOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
   }, [searchParams, setSearchParams]);
   const [accountFilter, setAccountFilter] = useState<"all" | "has" | "missing" | "leads">("all");
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
