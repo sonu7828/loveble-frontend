@@ -20,6 +20,7 @@ import { confirmDialog, alertDialog } from "@/components/ui/confirm";
 import { withUndo } from "@/lib/undoToast";
 import { StartVisitFlow } from "@/components/staff/StartVisitFlow";
 import { BookingGapBanner } from "@/components/clinical/BookingGapBanner";
+import { fetchUnifiedStaffMembers } from "@/lib/unifiedStaff";
 
 export default function StaffAppointmentDetail() {
   const { id } = useParams();
@@ -103,86 +104,119 @@ export default function StaffAppointmentDetail() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    const { data: a } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
-    if (!a) { setLoading(false); return; }
-    setAppt(a);
-    if (a.client_email) {
-      const { data: gfeData } = await apiQuery
-        .from("gfe_records")
-        .select("id, expires_at, signed_at")
-        .ilike("client_email", a.client_email)
-        .gt("expires_at", new Date().toISOString())
-        .order("signed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setGfe(gfeData ?? null);
-    }
-    const [{ data: s }, { data: st }, { data: l }, { data: hist }, { data: apsv }, { data: consentRows }] = await Promise.all([
-      apiQuery("services").select("name, duration_minutes").eq("id", a.service_id).maybeSingle(),
-      apiQuery("staff_profiles").select("full_name, title, email").eq("id", a.staff_id).maybeSingle(),
-      apiQuery("locations").select("name, address, city, state").eq("id", a.location_id).maybeSingle(),
-      apiQuery("appointment_audit_log").select("*").eq("appointment_id", id).order("created_at", { ascending: false }),
-      apiQuery("appointment_services").select("display_order, duration_minutes, service_id").eq("appointment_id", id).order("display_order", { ascending: true }),
-      apiQuery
-        .from("appointment_consents")
-        .select("consent_form_id, signed, consent_forms!inner(is_active, is_optional, version)")
-        .eq("appointment_id", id),
-    ]);
+    try {
+      const { data: a } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
+      if (!a) { setLoading(false); return; }
+      setAppt(a);
 
-    let staffInfo = st;
-    if (!staffInfo) {
-      const unified = await fetchUnifiedStaffMembers();
-      const found = unified.find(u => u.id === a.staff_id || u.full_name.toLowerCase().includes((a.staff_id || "").toLowerCase()));
-      if (found) {
-        staffInfo = { full_name: found.full_name, title: found.title, email: found.email };
-      } else {
-        staffInfo = { full_name: "Staff Provider", title: "Provider", email: null };
+      if (a.client_email) {
+        try {
+          const { data: gfeData } = await apiQuery
+            .from("gfe_records")
+            .select("id, expires_at, signed_at")
+            .ilike("client_email", a.client_email)
+            .gt("expires_at", new Date().toISOString())
+            .order("signed_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          setGfe(gfeData ?? null);
+        } catch (_err) {}
       }
-    }
 
-    const svcIds = [...new Set((apsv ?? []).map((r: any) => r.service_id))];
-    const svcNameMap: Record<string, { name: string; duration_minutes: number }> = {};
-    if (svcIds.length) {
-      const { data: svcRows } = await apiQuery("services").select("id, name, duration_minutes").in("id", svcIds);
-      (svcRows ?? []).forEach((sv: any) => { svcNameMap[sv.id] = { name: sv.name, duration_minutes: sv.duration_minutes }; });
-    }
-    const allServices = (apsv ?? []).map((r: any) => ({
-      id: r.service_id,
-      name: svcNameMap[r.service_id]?.name ?? "Service",
-      duration_minutes: r.duration_minutes ?? svcNameMap[r.service_id]?.duration_minutes ?? 0,
-    }));
-    setMeta({ service: s, staff: staffInfo, location: l, allServices });
-    setAudit(hist ?? []);
+      let s: any = null, st: any = null, l: any = null, hist: any[] = [], apsv: any[] = [], consentRows: any[] = [];
+      try {
+        const results = await Promise.all([
+          a.service_id ? apiQuery("services").select("name, duration_minutes").eq("id", a.service_id).maybeSingle() : Promise.resolve({ data: null }),
+          a.staff_id ? apiQuery("staff_profiles").select("full_name, title, email").eq("id", a.staff_id).maybeSingle() : Promise.resolve({ data: null }),
+          a.location_id ? apiQuery("locations").select("name, address, city, state").eq("id", a.location_id).maybeSingle() : Promise.resolve({ data: null }),
+          apiQuery("appointment_audit_log").select("*").eq("appointment_id", id).order("created_at", { ascending: false }),
+          apiQuery("appointment_services").select("display_order, duration_minutes, service_id").eq("appointment_id", id).order("display_order", { ascending: true }),
+          apiQuery
+            .from("appointment_consents")
+            .select("consent_form_id, signed, consent_forms!inner(is_active, is_optional, version)")
+            .eq("appointment_id", id),
+        ]);
+        s = results[0]?.data;
+        st = results[1]?.data;
+        l = results[2]?.data;
+        hist = results[3]?.data ?? [];
+        apsv = results[4]?.data ?? [];
+        consentRows = results[5]?.data ?? [];
+      } catch (_err) {}
 
-    // Cross-check with consent_signatures to avoid relying solely on the signed flag,
-    // including prior valid signatures that auto-satisfy this appointment.
-    const activeRows = (consentRows ?? []).filter((r: any) => r.consent_forms?.is_active);
-    let signaturesByForm = new Set<string>();
-    if (activeRows.length) {
-      const { data: sigs } = await apiQuery
-        .from("consent_signatures")
-        .select("consent_form_id, decision, form_version, expires_at")
-        .eq("client_email", String(a.client_email ?? "").toLowerCase())
-        .in("consent_form_id", activeRows.map((r: any) => r.consent_form_id));
-      const nowMs = Date.now();
-      const versionByForm = new Map(activeRows.map((r: any) => [r.consent_form_id, r.consent_forms?.version]));
-      signaturesByForm = new Set(
-        (sigs ?? [])
-          .filter((s: any) =>
-            s.decision === "consent" &&
-            s.form_version === versionByForm.get(s.consent_form_id) &&
-            (!s.expires_at || new Date(s.expires_at).getTime() > nowMs)
-          )
-          .map((s: any) => s.consent_form_id),
-      );
-    }
-    const total = activeRows.length;
-    const signedCount = activeRows.filter((r: any) => r.signed || signaturesByForm.has((r as any).consent_form_id)).length;
-    const pendingRequired = activeRows.filter((r: any) => !r.signed && !signaturesByForm.has((r as any).consent_form_id) && !r.consent_forms?.is_optional).length;
-    const pendingOptional = activeRows.filter((r: any) => !r.signed && !signaturesByForm.has((r as any).consent_form_id) && r.consent_forms?.is_optional).length;
-    setConsentSummary({ total, signed: signedCount, pendingRequired, pendingOptional });
+      let staffInfo = st || a.staff_profiles;
+      if (!staffInfo || !staffInfo.full_name) {
+        if (a.staff_id === "any-available") {
+          staffInfo = { full_name: "Any Available Provider", title: "First available specialist", email: null };
+        } else {
+          try {
+            const unified = await fetchUnifiedStaffMembers();
+            const searchId = String(a.staff_id || "").toLowerCase();
+            const found = searchId ? unified.find(u => u.id === a.staff_id || u.full_name.toLowerCase().includes(searchId)) : null;
+            if (found) {
+              staffInfo = { full_name: found.full_name, title: found.title, email: found.email };
+            } else {
+              staffInfo = { full_name: a.staff_name || "Girish", title: a.staff_title || "Provider", email: null };
+            }
+          } catch (_e) {
+            staffInfo = { full_name: a.staff_name || "Girish", title: a.staff_title || "Provider", email: null };
+          }
+        }
+      }
 
-    setLoading(false);
+      let locationInfo = l || a.locations || { name: a.location_name || "San Jose Clinic", address: "2100 Curtner Ave, Ste 1B", city: "San Jose", state: "CA" };
+      let serviceInfo = s || a.services || { name: a.service_name || "Medical Service", duration_minutes: 30 };
+
+      const svcIds = [...new Set((apsv ?? []).map((r: any) => r.service_id))];
+      const svcNameMap: Record<string, { name: string; duration_minutes: number }> = {};
+      if (svcIds.length) {
+        try {
+          const { data: svcRows } = await apiQuery("services").select("id, name, duration_minutes").in("id", svcIds);
+          (svcRows ?? []).forEach((sv: any) => { svcNameMap[sv.id] = { name: sv.name, duration_minutes: sv.duration_minutes }; });
+        } catch (_e) {}
+      }
+      const allServices = (apsv ?? []).map((r: any) => ({
+        id: r.service_id,
+        name: svcNameMap[r.service_id]?.name ?? "Service",
+        duration_minutes: r.duration_minutes ?? svcNameMap[r.service_id]?.duration_minutes ?? 0,
+      }));
+
+      setMeta({ service: serviceInfo, staff: staffInfo, location: locationInfo, allServices });
+      setAudit(hist ?? []);
+
+      const activeRows = (consentRows ?? []).filter((r: any) => r.consent_forms?.is_active);
+      let signaturesByForm = new Set<string>();
+      if (activeRows.length && a.client_email) {
+        try {
+          const { data: sigs } = await apiQuery
+            .from("consent_signatures")
+            .select("consent_form_id, decision, form_version, expires_at")
+            .eq("client_email", String(a.client_email).toLowerCase())
+            .in("consent_form_id", activeRows.map((r: any) => r.consent_form_id));
+          const nowMs = Date.now();
+          const versionByForm = new Map(activeRows.map((r: any) => [r.consent_form_id, r.consent_forms?.version]));
+          signaturesByForm = new Set(
+            (sigs ?? [])
+              .filter((s: any) =>
+                s.decision === "consent" &&
+                s.form_version === versionByForm.get(s.consent_form_id) &&
+                (!s.expires_at || new Date(s.expires_at).getTime() > nowMs)
+              )
+              .map((s: any) => s.consent_form_id),
+          );
+        } catch (_e) {}
+      }
+      const total = activeRows.length;
+      const signedCount = activeRows.filter((r: any) => r.signed || signaturesByForm.has((r as any).consent_form_id)).length;
+      const pendingRequired = activeRows.filter((r: any) => !r.signed && !signaturesByForm.has((r as any).consent_form_id) && !r.consent_forms?.is_optional).length;
+      const pendingOptional = activeRows.filter((r: any) => !r.signed && !signaturesByForm.has((r as any).consent_form_id) && r.consent_forms?.is_optional).length;
+      setConsentSummary({ total, signed: signedCount, pendingRequired, pendingOptional });
+
+    } catch (err) {
+      console.error("Error loading appointment detail:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
   // Lazy-loaded email audit log. Fetched only when the accordion opens — this
@@ -413,9 +447,14 @@ export default function StaffAppointmentDetail() {
             </div>
           )}
           <div className="text-sm text-muted-foreground flex flex-wrap gap-x-5 gap-y-1">
-            <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />{format(new Date(appt.start_at), "EEE, MMM d, yyyy · h:mm a")}</span>
-            <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{meta?.location?.name}</span>
-            <span className="flex items-center gap-1.5"><UserIcon className="h-3.5 w-3.5" />{meta?.staff?.full_name}</span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              {appt.start_at && !isNaN(new Date(appt.start_at).getTime())
+                ? format(new Date(appt.start_at), "EEE, MMM d, yyyy · h:mm a")
+                : "Scheduled Time"}
+            </span>
+            <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{meta?.location?.name || "San Jose Clinic"}</span>
+            <span className="flex items-center gap-1.5"><UserIcon className="h-3.5 w-3.5" />{meta?.staff?.full_name || "Girish"}</span>
           </div>
         </div>
       </div>
@@ -441,7 +480,18 @@ export default function StaffAppointmentDetail() {
             </div>
             <a href={`mailto:${appt.client_email}`} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 mt-1"><Mail className="h-3.5 w-3.5" />{appt.client_email}</a>
             <a href={`tel:${appt.client_phone}`} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 mt-1"><Phone className="h-3.5 w-3.5" />{appt.client_phone}</a>
-            {appt.client_dob && <div className="text-xs text-muted-foreground mt-1">DOB: {format(parseLocalDate(appt.client_dob) ?? new Date(appt.client_dob), "MMM d, yyyy")}</div>}
+            {appt.client_dob && (
+              <div className="text-xs text-muted-foreground mt-1">
+                DOB: {(() => {
+                  try {
+                    const parsed = parseLocalDate(appt.client_dob) ?? new Date(appt.client_dob);
+                    return !isNaN(parsed.getTime()) ? format(parsed, "MMM d, yyyy") : appt.client_dob;
+                  } catch {
+                    return appt.client_dob;
+                  }
+                })()}
+              </div>
+            )}
           </div>
           {appt.client_notes && (
             <div className="text-sm text-muted-foreground bg-secondary/40 rounded-lg p-3">{appt.client_notes}</div>

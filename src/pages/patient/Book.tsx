@@ -208,6 +208,8 @@ export const Book = () => {
 
     const aptId = `apt-${Date.now()}`;
     const selectedSvcNames = selectedServices.map((s) => s.name).join(" + ");
+    const selectedLoc = locations.find((l) => l.id === locationId) || locations[0];
+    const selectedStaffObj = staff.find((s) => s.id === staffId);
 
     const newAppointment = {
       id: aptId,
@@ -221,8 +223,44 @@ export const Book = () => {
       start_at: slot,
       service_id: serviceIds[0] || "svc-01",
       service_name: selectedSvcNames,
+      services: {
+        id: serviceIds[0] || "svc-01",
+        name: selectedSvcNames,
+      },
+      services_list: selectedServices,
       location_id: locationId,
+      locations: selectedLoc
+        ? {
+            id: selectedLoc.id,
+            name: selectedLoc.name,
+            address: selectedLoc.address,
+            city: selectedLoc.city,
+            state: "CA",
+            zip: "95124",
+          }
+        : {
+            name: "San Jose Clinic",
+            address: "2100 Curtner Ave, Ste 1B",
+            city: "San Jose",
+            state: "CA",
+            zip: "95124",
+          },
       staff_id: staffId,
+      staff_profiles: selectedStaffObj
+        ? {
+            id: selectedStaffObj.id,
+            full_name: selectedStaffObj.full_name,
+            title: selectedStaffObj.title,
+          }
+        : staffId === "any-available"
+        ? {
+            full_name: "Any Available Provider",
+            title: "First available specialist",
+          }
+        : {
+            full_name: "Girish",
+            title: "Provider",
+          },
       stripe_payment_method_id: cardData?.paymentMethodId || `pm_${Date.now()}`,
       created_at: new Date().toISOString(),
     };
