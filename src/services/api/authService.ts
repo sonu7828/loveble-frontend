@@ -32,28 +32,57 @@ export interface AuthSession {
 export function getUserProfileByEmail(email: string, password?: string): UserProfile | null {
   const clean = (email || "").trim().toLowerCase();
 
-  // 1. Check deleted staff list for non-system accounts
-  const BUILTIN_EMAILS = [
-    "admin@gmail.com",
-    "staff@gmail.com",
-    "securityofficer@gmail.com",
-    "officer@gmail.com",
-    "medicaldirector@gmail.com",
-    "md@gmail.com",
-    "user@gmail.com",
-  ];
+  // 1. Check deleted staff list
   const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-  if (!BUILTIN_EMAILS.includes(clean) && deletedEmails.includes(clean)) {
+  if (deletedEmails.includes(clean)) {
     return null;
   }
 
-  // 2. Built-in Admin (Never deleted)
+  // 2. Look up actual staff from rka_approved_staff_accounts (synced from AdminTeam / Staff Management)
+  const approvedAccounts: Array<{ id?: string; email: string; role: string; full_name?: string; password?: string }> =
+    JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+  const staffMatch = approvedAccounts.find((a) => a.email?.toLowerCase() === clean);
+
+  if (staffMatch) {
+    // Update password if provided
+    if (password && password !== "••••••••") {
+      staffMatch.password = password;
+      localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
+    }
+
+    const r = (staffMatch.role || "staff").toLowerCase();
+    let roles: AppRole[] = ["staff"];
+    if (r === "admin") roles = ["admin", "staff"];
+    else if (r === "medical_director") roles = ["medical_director", "staff", "nurse_practitioner"];
+    else if (r === "privacy_officer" || r === "security_officer") roles = ["privacy_officer", "staff"];
+    else if (r === "receptionist") roles = ["receptionist", "staff"];
+    else if (r === "scheduler") roles = ["scheduler", "staff"];
+    else if (r === "nurse_practitioner" || r === "provider") roles = ["nurse_practitioner", "staff"];
+
+    const fullName = staffMatch.full_name || "Staff Member";
+    const nameParts = fullName.trim().split(" ");
+    const firstName = nameParts[0] || fullName;
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    return {
+      id: staffMatch.id || `approved-${clean}`,
+      email: staffMatch.email,
+      first_name: firstName,
+      last_name: lastName,
+      roles,
+      staff_id: staffMatch.id || `approved-${clean}`,
+      created_at: new Date().toISOString(),
+      email_confirmed_at: new Date().toISOString(),
+    };
+  }
+
+  // 3. Built-in fallback for admin@gmail.com (always available even before AdminTeam loads)
   if (clean === "admin@gmail.com") {
     return {
       id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       email: "admin@gmail.com",
-      first_name: "Administrator",
-      last_name: "Kiem",
+      first_name: "System",
+      last_name: "Admin",
       roles: ["admin", "staff"],
       staff_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       created_at: new Date().toISOString(),
@@ -61,49 +90,53 @@ export function getUserProfileByEmail(email: string, password?: string): UserPro
     };
   }
 
-  // 3. Built-in Medical Director
-  if (clean === "medicaldirector@gmail.com" || clean === "md@gmail.com") {
+  // 4. Auto-register staff accounts matching common practice email patterns
+  if (
+    !staffMatch &&
+    clean.includes("@") &&
+    !clean.includes("user@") &&
+    (clean.includes("provider") || clean.includes("staff") || clean.includes("doctor") || clean.includes("nurse") || clean.includes("md") || clean.includes("admin") || clean.includes("medical") || clean.includes("security") || clean.includes("officer"))
+  ) {
+    const rawRole = clean.includes("admin")
+      ? "admin"
+      : clean.includes("md") || clean.includes("doctor") || clean.includes("medical")
+      ? "medical_director"
+      : clean.includes("officer") || clean.includes("security")
+      ? "privacy_officer"
+      : "provider";
+
+    const autoName = clean.split("@")[0].replace(/[0-9]/g, "").replace(/^./, (s) => s.toUpperCase()) || "Staff Member";
+    const newAccount = {
+      id: `approved-${clean}`,
+      email: clean,
+      password: password || "12345678",
+      full_name: autoName,
+      role: rawRole,
+    };
+    approvedAccounts.push(newAccount);
+    localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
+
+    const r = rawRole;
+    let roles: AppRole[] = ["staff"];
+    if (r === "admin") roles = ["admin", "staff"];
+    else if (r === "medical_director") roles = ["medical_director", "staff", "nurse_practitioner"];
+    else if (r === "privacy_officer") roles = ["privacy_officer", "staff"];
+    else roles = ["nurse_practitioner", "staff"];
+
+    const nameParts = autoName.trim().split(" ");
     return {
-      id: "md-101-user-id",
-      email: "medicaldirector@gmail.com",
-      first_name: "Dr. Kamaren",
-      last_name: "Manzano",
-      roles: ["medical_director", "staff", "nurse_practitioner"],
-      staff_id: "md-101-user-id",
+      id: newAccount.id,
+      email: clean,
+      first_name: nameParts[0] || autoName,
+      last_name: nameParts.slice(1).join(" ") || "",
+      roles,
+      staff_id: newAccount.id,
       created_at: new Date().toISOString(),
       email_confirmed_at: new Date().toISOString(),
     };
   }
 
-  // 4. Built-in Security Officer
-  if (clean === "securityofficer@gmail.com" || clean === "officer@gmail.com") {
-    return {
-      id: "sec-202-user-id",
-      email: "securityofficer@gmail.com",
-      first_name: "Privacy & Security",
-      last_name: "Officer",
-      roles: ["privacy_officer", "staff"],
-      staff_id: "sec-202-user-id",
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
-  }
-
-  // 5. Built-in Staff
-  if (clean === "staff@gmail.com") {
-    return {
-      id: "stf-303-user-id",
-      email: "staff@gmail.com",
-      first_name: "Sarah",
-      last_name: "Jenkins",
-      roles: ["staff", "scheduler"],
-      staff_id: "stf-303-user-id",
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
-  }
-
-  // 6. Built-in Demo Patient User
+  // 5. Built-in Demo Patient User
   if (clean === "user@gmail.com") {
     return {
       id: "usr-404-user-id",
@@ -112,67 +145,6 @@ export function getUserProfileByEmail(email: string, password?: string): UserPro
       last_name: "Patient",
       roles: [],
       staff_id: "usr-404-user-id",
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
-  }
-
-  // 7. Approved Staff Accounts created via Staff Management (/staff/team)
-  const approvedAccounts: Array<{ id?: string; email: string; role: string; full_name?: string; password?: string }> =
-    JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-  let matchedApproved = approvedAccounts.find((a) => a.email.toLowerCase() === clean);
-
-  // Auto-register created staff/provider accounts matching practice patterns if not yet cached locally
-  if (
-    !matchedApproved &&
-    clean.includes("@") &&
-    !clean.includes("user@") &&
-    (clean.includes("provider") || clean.includes("staff") || clean.includes("doctor") || clean.includes("nurse") || clean.includes("md") || clean.includes("admin"))
-  ) {
-    const rawRole = clean.includes("admin")
-      ? "admin"
-      : clean.includes("md") || clean.includes("doctor")
-      ? "medical_director"
-      : clean.includes("officer") || clean.includes("security")
-      ? "privacy_officer"
-      : "provider";
-    matchedApproved = {
-      id: `approved-${clean}`,
-      email: clean,
-      password: password || "12345678",
-      full_name: clean.split("@")[0].replace(/[0-9]/g, "").replace(/^./, (s) => s.toUpperCase()) || "Staff Member",
-      role: rawRole,
-    };
-    approvedAccounts.push(matchedApproved);
-    localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
-  }
-
-  if (matchedApproved) {
-    if (password) {
-      matchedApproved.password = password;
-      localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
-    }
-    const r = (matchedApproved.role || "staff").toLowerCase();
-    let roles: AppRole[] = ["staff"];
-    if (r === "admin") roles = ["admin", "staff"];
-    else if (r === "medical_director") roles = ["medical_director", "staff"];
-    else if (r === "privacy_officer") roles = ["privacy_officer", "staff"];
-    else if (r === "receptionist") roles = ["receptionist", "staff"];
-    else if (r === "scheduler") roles = ["scheduler", "staff"];
-    else if (r === "nurse_practitioner" || r === "provider") roles = ["nurse_practitioner", "staff"];
-
-    const fullName = matchedApproved.full_name || "Staff Member";
-    const nameParts = fullName.trim().split(" ");
-    const firstName = nameParts[0] || fullName;
-    const lastName = nameParts.slice(1).join(" ") || "";
-
-    return {
-      id: matchedApproved.id || `approved-${clean}`,
-      email: matchedApproved.email,
-      first_name: firstName,
-      last_name: lastName,
-      roles,
-      staff_id: matchedApproved.id || `approved-${clean}`,
       created_at: new Date().toISOString(),
       email_confirmed_at: new Date().toISOString(),
     };

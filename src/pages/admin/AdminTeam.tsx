@@ -138,37 +138,24 @@ export default function AdminTeam() {
 
       setMembers(fetchedMembers);
 
-      // Synchronize all active staff members with approved accounts storage
-      const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-      let updatedApproved = false;
+      // Synchronize: REPLACE approved accounts with current staff list (removes stale entries)
+      const oldApproved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+      const oldByEmail = new Map(oldApproved.map((a) => [a.email?.toLowerCase(), a]));
+      const newApproved: any[] = [];
       fetchedMembers.forEach((m) => {
         if (m.email) {
           const cleanEmail = m.email.toLowerCase();
-          const existing = approvedAccounts.find((a) => a.email?.toLowerCase() === cleanEmail);
-          if (!existing) {
-            approvedAccounts.push({
-              id: m.id,
-              email: cleanEmail,
-              password: "12345678",
-              full_name: m.full_name,
-              role: m.pending_role || "staff",
-            });
-            updatedApproved = true;
-          } else {
-            if (m.full_name && existing.full_name !== m.full_name) {
-              existing.full_name = m.full_name;
-              updatedApproved = true;
-            }
-            if (m.pending_role && existing.role !== m.pending_role) {
-              existing.role = m.pending_role;
-              updatedApproved = true;
-            }
-          }
+          const existing = oldByEmail.get(cleanEmail);
+          newApproved.push({
+            id: m.id,
+            email: cleanEmail,
+            password: existing?.password || "12345678",
+            full_name: m.full_name,
+            role: m.pending_role || existing?.role || "staff",
+          });
         }
       });
-      if (updatedApproved) {
-        localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
-      }
+      localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(newApproved));
 
       const map: Record<string, Role[]> = {};
       dataList.forEach((x: any) => {
