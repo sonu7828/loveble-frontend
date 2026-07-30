@@ -18,7 +18,6 @@ import { SafetyAlertsBanner } from "@/components/clinical/SafetyAlertsBanner";
 import { ChecklistGroup, SingleSelectChips } from "@/components/clinical/ChecklistGroup";
 import { MiniSignaturePad } from "@/components/clinical/MiniSignaturePad";
 import {
-  POST_ASSESSMENT,
   NEUROTOXIN_PRODUCTS, NEUROTOXIN_DILUTIONS, NEUROTOXIN_TECHNIQUE, NEEDLE_GAUGES,
   NEUROTOXIN_ZONES, NEUROTOXIN_ADVERSE, NEUROTOXIN_INVENTORY,
   FILLER_PRODUCTS, FILLER_AREAS, FILLER_TECHNIQUE, FILLER_DELIVERY, FILLER_ANESTHETIC, FILLER_ADVERSE, FILLER_INVENTORY,
@@ -1657,21 +1656,50 @@ export default function ChartNoteEditor() {
       {!gfeValid && !(selectedCategories.length && selectedCategories.every(c => c === "consult")) && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">
           <p className="font-medium text-destructive">Good Faith Exam required</p>
-          <p className="text-muted-foreground mt-1">A current GFE (within 12 months) must be on file before documenting a procedure.</p>
+          <p className="text-muted-foreground mt-1">
+            A current GFE (within 12 months) must be on file before documenting a procedure.
+            {!client.email && (
+              <span className="block mt-1 text-xs text-muted-foreground">
+                Fill in the patient's email above so the GFE can be linked automatically.
+              </span>
+            )}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {(isNP || isAdmin) && client.email && (
-              <Button size="sm" onClick={() => navigate(`/staff/clinical/gfe/new?email=${encodeURIComponent(client.email)}&first=${encodeURIComponent(client.first)}&last=${encodeURIComponent(client.last)}`)}>
+            {(isNP || isAdmin) && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (client.email) params.set("email", client.email);
+                  if (client.first) params.set("first", client.first);
+                  if (client.last) params.set("last", client.last);
+                  const qs = params.toString();
+                  navigate(`/staff/clinical/gfe/new${qs ? `?${qs}` : ""}`);
+                }}
+              >
                 Conduct GFE now
               </Button>
             )}
-            {!isNP && !isAdmin && client.email && (
+            {(isNP || isAdmin) && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const query = client.email || `${client.first} ${client.last}`.trim();
+                  navigate(`/staff/clinical/gfe${query ? `?search=${encodeURIComponent(query)}` : ""}`);
+                }}
+              >
+                Find existing GFE
+              </Button>
+            )}
+            {!isNP && !isAdmin && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={async () => {
                   try {
                     await ApiClient.post("notify-np-gfe-needed", {
-                      body: { clientEmail: client.email, firstName: client.first, lastName: client.last },
+                      body: { clientEmail: client.email || "", firstName: client.first, lastName: client.last },
                     });
                     toast.success("Nurse practitioner notified");
                   } catch {
@@ -2311,7 +2339,6 @@ export default function ChartNoteEditor() {
       )}
 
       {/* ===== Shared footer ===== */}
-      <ChecklistGroup label="Post-procedure assessment" options={POST_ASSESSMENT} value={postAssessment} onChange={setPostAssessment} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
         <label className="flex items-center gap-2 cursor-pointer rounded-md border p-3 h-10">
           <Checkbox checked={postOpReviewed} onCheckedChange={(c) => setPostOpReviewed(!!c)} />
