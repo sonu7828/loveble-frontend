@@ -19,6 +19,7 @@ import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices"
 import { SmsThread } from "@/components/messaging/SmsThread";
 import { fetchIncompleteCharts } from "@/lib/incompleteCharts";
 import { sendNoShowSms } from "@/lib/noShowSms";
+import ProviderDashboard from "./ProviderDashboard";
 
 type Appt = {
   id: string; status: string; start_at: string;
@@ -26,6 +27,8 @@ type Appt = {
   service_id: string; staff_id: string; location_id: string;
   checked_in_at: string | null;
   stripe_payment_method_id: string | null;
+  service_name?: string;
+  staff_name?: string;
 };
 
 const CLINIC_TIME_ZONE = "America/Los_Angeles";
@@ -87,8 +90,9 @@ function MedicalDirectorDashboard() {
     toast.success(`Order ${id} ${action === "approve" ? "approved & e-signed" : "rejected"}`);
   };
 
-  const directorName = user?.user_metadata?.first_name || user?.user_metadata?.last_name
-    ? `${user?.user_metadata?.first_name || ""} ${user?.user_metadata?.last_name || ""}`.trim() + " (Medical Director)"
+  const uMeta = (user as any)?.user_metadata;
+  const directorName = user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
+    ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim() + " (Medical Director)"
     : user?.email || "Medical Director";
 
   return (
@@ -423,8 +427,9 @@ function StandardStaffToday() {
     loadData();
   }, [loadData]);
 
-  const staffName = user?.user_metadata?.first_name || user?.user_metadata?.last_name
-    ? `${user?.user_metadata?.first_name || ""} ${user?.user_metadata?.last_name || ""}`.trim()
+  const uMeta = (user as any)?.user_metadata;
+  const staffName = user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
+    ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim()
     : user?.email || "Clinical Staff";
 
   const toggleStaffTask = (id: number) => {
@@ -718,10 +723,14 @@ function StandardStaffToday() {
 
 /* ── Staff Today Main Dispatcher Component ─────────────────────────────────── */
 export default function StaffToday() {
-  const { isMedicalDirector } = useAuth();
+  const { isMedicalDirector, isProvider } = useAuth();
 
   if (isMedicalDirector) {
     return <MedicalDirectorDashboard />;
+  }
+
+  if (isProvider) {
+    return <ProviderDashboard />;
   }
 
   return <StandardStaffToday />;
