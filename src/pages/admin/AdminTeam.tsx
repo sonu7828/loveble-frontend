@@ -138,6 +138,38 @@ export default function AdminTeam() {
 
       setMembers(fetchedMembers);
 
+      // Synchronize all active staff members with approved accounts storage
+      const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+      let updatedApproved = false;
+      fetchedMembers.forEach((m) => {
+        if (m.email) {
+          const cleanEmail = m.email.toLowerCase();
+          const existing = approvedAccounts.find((a) => a.email?.toLowerCase() === cleanEmail);
+          if (!existing) {
+            approvedAccounts.push({
+              id: m.id,
+              email: cleanEmail,
+              password: "12345678",
+              full_name: m.full_name,
+              role: m.pending_role || "staff",
+            });
+            updatedApproved = true;
+          } else {
+            if (m.full_name && existing.full_name !== m.full_name) {
+              existing.full_name = m.full_name;
+              updatedApproved = true;
+            }
+            if (m.pending_role && existing.role !== m.pending_role) {
+              existing.role = m.pending_role;
+              updatedApproved = true;
+            }
+          }
+        }
+      });
+      if (updatedApproved) {
+        localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
+      }
+
       const map: Record<string, Role[]> = {};
       dataList.forEach((x: any) => {
         const uid = x.userId || x.user_id || x.user?.id;
@@ -231,6 +263,24 @@ export default function AdminTeam() {
       }
     }
 
+    // Sync created / updated account to approved staff accounts cache
+    try {
+      const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+      const filtered = approvedAccounts.filter((a) => a.email?.toLowerCase() !== email);
+      filtered.push({
+        id: draft.id || `approved-${email}`,
+        email,
+        password,
+        full_name: draft.full_name.trim(),
+        role: draft.role,
+      });
+      localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(filtered));
+
+      const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+      const sanitizedDeleted = deletedEmails.filter((e) => e.toLowerCase() !== email);
+      localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitizedDeleted));
+    } catch (_err) {}
+
     setAddBusy(false);
     setAddOpen(false);
     setDraft({ id: "", full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "staff", sendInvite: true });
@@ -296,6 +346,17 @@ export default function AdminTeam() {
     setBusy(m.id);
     try {
       await staffService.deleteStaff(m.id);
+      if (m.email) {
+        const cleanEmail = m.email.toLowerCase();
+        const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+        if (!deletedEmails.includes(cleanEmail)) {
+          deletedEmails.push(cleanEmail);
+          localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(deletedEmails));
+        }
+        const approved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        const filtered = approved.filter((a) => a.email?.toLowerCase() !== cleanEmail);
+        localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(filtered));
+      }
       toast.success(`${m.full_name} deleted`);
     } catch (e: any) {
       toast.error(e?.message || `Failed to delete ${m.full_name}`);

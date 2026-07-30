@@ -383,7 +383,7 @@ function StandardStaffToday() {
       setAppts(fetchedAppts);
 
       const { data: clientRows } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false });
-      
+
       const uniquePatientsMap = new Map<string, any>();
       (clientRows ?? []).forEach((c: any) => {
         const email = (c.email || "").toLowerCase();
