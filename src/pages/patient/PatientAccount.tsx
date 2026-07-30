@@ -603,7 +603,7 @@ export default function PatientAccount() {
               {/* BOOKING WIZARD */}
               <TabsContent value="book" className="mt-0">
                 <div className="pb-8">
-                  <Book />
+                  <Book isEmbedded={true} />
                 </div>
               </TabsContent>
 
