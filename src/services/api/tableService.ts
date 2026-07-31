@@ -344,6 +344,10 @@ export class ApiTableQuery {
   public then(resolve: (res: { data: any; error: any; count: number }) => void, reject?: (reason: any) => void) {
     this.execute().then(resolve, reject);
   }
+
+  public catch(reject: (reason: any) => void) {
+    return this.execute().catch(reject);
+  }
 }
 
 /** Minimal fake realtime channel (no-op since Express backend has no built-in realtime). */

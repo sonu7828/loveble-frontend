@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, X, User, Loader2 } from "lucide-react";
+import { Search, X, User, Loader2, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { searchClients, type ClientHit } from "@/lib/clientSearch";
@@ -23,36 +23,73 @@ interface Props {
 }
 
 /**
- * Canonical client search + picker. Backed by `searchClients()` so every
- * surface (booking, checkout, new appointment, palette) shares one query path.
+ * Unified Combobox: Single input box that works as a Dropdown list and real-time Search.
  */
 export function ClientPicker({
   value,
   onChange,
   className = "",
   label = "Client",
-  placeholder = "Search name, email, or phone…",
+  placeholder = "Search or select client from list…",
   alwaysShowSearch = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ClientHit[]>([]);
+  const [allClients, setAllClients] = useState<ClientHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [picked, setPicked] = useState<boolean>(!!value.email);
+  const [picked, setPicked] = useState<boolean>(!!value.email || !!value.firstName);
+  const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<number | null>(null);
 
+  const refreshClients = async () => {
+    setLoading(true);
+    try {
+      const hits = await searchClients("", 50);
+      setAllClients(hits);
+    } catch {
+      setAllClients([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load existing clients list for dropdown
+  useEffect(() => {
+    refreshClients();
+  }, []);
+
+  // Filter clients on query change
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    if (!query || query.trim().length < 2) { setResults([]); setOpen(false); return; }
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
     debounceRef.current = window.setTimeout(async () => {
       setLoading(true);
-      const hits = await searchClients(query, 8);
-      setResults(hits);
-      setLoading(false);
-      setOpen(true);
-    }, 200);
+      try {
+        const hits = await searchClients(query, 25);
+        setResults(hits);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 150);
     return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
   }, [query]);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const pick = (m: ClientHit) => {
     onChange({
@@ -73,7 +110,10 @@ export function ClientPicker({
     setQuery("");
   };
 
-  if (picked && value.email && !alwaysShowSearch) {
+  // List of clients to display in dropdown (filtered results if typing, otherwise all clients)
+  const displayList = query.trim() ? results : allClients;
+
+  if (picked && (value.email || value.firstName) && !alwaysShowSearch) {
     return (
       <div className={`rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-start justify-between gap-3 ${className}`}>
         <div className="min-w-0">
@@ -84,87 +124,84 @@ export function ClientPicker({
           <div className="text-xs text-muted-foreground mt-1 truncate">{value.email}</div>
           {value.phone && <div className="text-xs text-muted-foreground">{value.phone}</div>}
         </div>
-        <button type="button" onClick={clear} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 shrink-0">
-          <X className="h-3 w-3" /> Change
+        <button
+          type="button"
+          onClick={clear}
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 shrink-0 px-2.5 py-1 rounded-md bg-background border border-border shadow-2xs font-medium transition-colors"
+        >
+          <X className="h-3.5 w-3.5 text-destructive" /> Change client
         </button>
       </div>
     );
   }
 
   return (
-    <div className={`relative ${className}`}>
-      {label && <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>}
-      <div className="relative mt-1.5">
+    <div ref={containerRef} className={`relative ${className}`}>
+      {label && <Label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>}
+      
+      {/* Unified Single Combobox Input */}
+      <div className="relative mt-1.5 cursor-pointer">
         <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <Input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => { setOpen(true); if (allClients.length === 0) refreshClients(); }}
+          onClick={() => { setOpen(true); if (allClients.length === 0) refreshClients(); }}
           placeholder={placeholder}
-          className="pl-9 h-12"
+          className="pl-9 pr-9 h-11 text-sm bg-background"
           autoComplete="off"
         />
-        {loading && <Loader2 className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />}
+        {loading ? (
+          <Loader2 className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setOpen(!open); if (!open && allClients.length === 0) refreshClients(); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+        )}
       </div>
-      {open && results.length > 0 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl border border-border bg-popover shadow-lg overflow-hidden">
-          {results.map((m) => (
-            <button
-              key={`${m.email ?? ""}-${m.phone ?? ""}-${m.first_name ?? ""}`}
-              type="button"
-              onClick={() => pick(m)}
-              className="w-full px-3 py-2.5 text-left hover:bg-accent flex items-center justify-between gap-2 border-b border-border/50 last:border-0"
-            >
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{m.first_name} {m.last_name}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {m.email || "—"}{m.phone ? ` · ${m.phone}` : ""}
+
+      {/* Floating Single Dropdown List (Shows on Click & Filters on Type) */}
+      {open && (
+        <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl border border-border bg-popover shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+          {loading && displayList.length === 0 ? (
+            <div className="p-4 text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading clients…
+            </div>
+          ) : displayList.length > 0 ? (
+            displayList.map((m, idx) => (
+              <button
+                key={`${m.email ?? ""}-${m.phone ?? ""}-${m.first_name ?? ""}-${idx}`}
+                type="button"
+                onClick={() => pick(m)}
+                className="w-full px-3.5 py-2.5 text-left hover:bg-accent flex items-center justify-between gap-2 border-b border-border/50 last:border-0 transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{m.first_name || "Unnamed"} {m.last_name || "Client"}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {m.email || "—"}{m.phone ? ` · ${m.phone}` : ""}
+                  </div>
                 </div>
-              </div>
-              {m.visits > 0 && (
-                <div className="text-[10px] text-muted-foreground shrink-0">{m.visits} visit{m.visits === 1 ? "" : "s"}</div>
-              )}
-            </button>
-          ))}
+                {m.visits > 0 && (
+                  <div className="text-[10px] text-muted-foreground shrink-0">{m.visits} visit{m.visits === 1 ? "" : "s"}</div>
+                )}
+              </button>
+            ))
+          ) : (
+            <div className="p-3 text-xs text-muted-foreground text-center">
+              {query.trim() ? `No matching client found for "${query}".` : "No clients found."}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => { setPicked(false); setOpen(false); }}
-            className="w-full px-3 py-2 text-xs text-primary hover:bg-accent border-t border-border"
+            className="w-full px-3.5 py-2.5 text-xs text-primary hover:bg-accent border-t border-border font-semibold text-center"
           >
-            + New client (enter manually)
-          </button>
-        </div>
-      )}
-      {open && !loading && results.length === 0 && query.length >= 2 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 rounded-xl border border-border bg-popover p-3 text-xs text-muted-foreground space-y-2">
-          <div>No match found for "{query}".</div>
-          <button
-            type="button"
-            onClick={() => {
-              const q = query.trim();
-              const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q);
-              const isPhone = /^[\d\s+()-]{7,}$/.test(q);
-              const next: ClientPick = {
-                firstName: value.firstName,
-                lastName: value.lastName,
-                email: value.email,
-                phone: value.phone,
-                dob: value.dob,
-              };
-              if (isEmail && !next.email) next.email = q.toLowerCase();
-              else if (isPhone && !next.phone) next.phone = q;
-              else if (!next.firstName) {
-                const parts = q.split(/\s+/);
-                next.firstName = parts[0] ?? "";
-                if (parts.length > 1) next.lastName = parts.slice(1).join(" ");
-              }
-              onChange(next);
-              setOpen(false);
-              setQuery("");
-            }}
-            className="w-full rounded-md bg-primary text-primary-foreground px-3 py-2 text-xs font-medium hover:opacity-90"
-          >
-            + Add as new client
+            + Add as new client (enter details below)
           </button>
         </div>
       )}
