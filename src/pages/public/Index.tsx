@@ -134,14 +134,8 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Bottom: Pagination dots + CTA button */}
+              {/* Bottom: CTA button */}
               <div className="flex flex-col items-center gap-5 mt-10">
-                {/* Dots */}
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-primary/25" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-primary/25" />
-                </div>
                 {/* Full-width button */}
                 <Button
                   asChild
