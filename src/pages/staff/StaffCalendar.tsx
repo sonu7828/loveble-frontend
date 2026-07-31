@@ -38,6 +38,8 @@ export default function StaffCalendar() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [filterStaff, setFilterStaff] = useState<string>("");
   const [filterLocation, setFilterLocation] = useState<string>("");
+  const [filterService, setFilterService] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
   const [view, setView] = useState<"week" | "day" | "month">("week");
   const [dayDate, setDayDate] = useState<Date>(() => new Date());
   const [monthDate, setMonthDate] = useState<Date>(() => startOfMonth(new Date()));
@@ -92,7 +94,7 @@ export default function StaffCalendar() {
       const start = startLocal.toISOString();
       const end = endLocal.toISOString();
       const [a, o, sc] = await Promise.all([
-        apiQuery("appointments").select("*").gte("start_at", start).lt("start_at", end).in("status", ["pending", "approved"]),
+        apiQuery("appointments").select("*").gte("start_at", start).lt("start_at", end),
         apiQuery("schedule_overrides").select("*").gte("start_at", start).lt("start_at", end),
         apiQuery("weekly_schedules").select("*").eq("is_active", true),
       ]);
@@ -109,7 +111,7 @@ export default function StaffCalendar() {
         const map: Record<string, string[]> = {};
         const serviceNames = new Map((sv.data ?? []).map((service) => [service.id, service.name]));
         for (const r of (aps ?? []) as any[]) {
-          const nm = serviceNames.get(r.service_id);
+          const nm = serviceNames.get(r.service_id) as string | undefined;
           if (!nm) continue;
           (map[r.appointment_id] ||= []).push(nm);
         }
@@ -125,7 +127,9 @@ export default function StaffCalendar() {
   const effectiveFilter = canSeeAll ? filterStaff : (staffId ?? "");
   const visibleAppts = appts.filter((a) =>
     (!effectiveFilter || a.staff_id === effectiveFilter) &&
-    (!filterLocation || a.location_id === filterLocation)
+    (!filterLocation || a.location_id === filterLocation) &&
+    (!filterService || a.service_id === filterService) &&
+    (!filterStatus || a.status === filterStatus || (filterStatus === "confirmed" && a.status === "approved") || (filterStatus === "arrived" && a.status === "checked_in"))
   );
   const visibleOverrides = overrides.filter((o) => !effectiveFilter || o.staff_id === effectiveFilter);
 
@@ -307,12 +311,35 @@ export default function StaffCalendar() {
             </Select>
           )}
           <Select value={filterLocation || "all"} onValueChange={(value) => setFilterLocation(value === "all" ? "" : value)}>
-            <SelectTrigger aria-label="Filter by location" className="h-9 w-[160px] rounded-full text-xs">
+            <SelectTrigger aria-label="Filter by location" className="h-9 w-[150px] rounded-full text-xs">
               <SelectValue placeholder="All locations" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All locations</SelectItem>
               {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterService || "all"} onValueChange={(value) => setFilterService(value === "all" ? "" : value)}>
+            <SelectTrigger aria-label="Filter by service" className="h-9 w-[150px] rounded-full text-xs">
+              <SelectValue placeholder="All services" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All services</SelectItem>
+              {services.map((sv) => <SelectItem key={sv.id} value={sv.id}>{sv.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus || "all"} onValueChange={(value) => setFilterStatus(value === "all" ? "" : value)}>
+            <SelectTrigger aria-label="Filter by status" className="h-9 w-[150px] rounded-full text-xs">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="arrived">Checked-in</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="no_show">No-show</SelectItem>
             </SelectContent>
           </Select>
           <Button size="sm" variant="outline" className="rounded-full" onClick={goPrev} aria-label="Previous"><ChevronLeft className="h-4 w-4" /></Button>

@@ -553,17 +553,19 @@ function StandardStaffToday() {
           </div>
         </Card>
 
-        {/* KPI 3: Pending Tasks */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-amber-500/30 transition rounded-xl">
+        {/* KPI 3: Today's Check-ins */}
+        <Card className="p-4 border border-border bg-card shadow-xs hover:border-blue-500/30 transition rounded-xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Pending Tasks</span>
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-              <Inbox className="h-4 w-4 text-amber-600" />
+            <span className="font-medium">Today's Check-ins</span>
+            <div className="h-8 w-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+              <CheckSquare className="h-4 w-4 text-blue-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{myTasks.length}</div>
-          <div className="text-[11px] text-amber-600 font-medium mt-1">
-            Administrative tasks
+          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">
+            {appts.filter(a => a.status === "arrived" || a.checked_in_at).length}
+          </div>
+          <div className="text-[11px] text-blue-600 font-medium mt-1">
+            Total check-ins today
           </div>
         </Card>
 
@@ -636,24 +638,11 @@ function StandardStaffToday() {
                           </td>
                           <td className="p-3 text-right">
                             <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              {a.status === "pending" && (
+                              {a.status !== "arrived" && a.status !== "checked_in" && a.status !== "completed" && a.status !== "cancelled" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="h-7 text-xs border-emerald-500 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 gap-1"
-                                  disabled={approvingId === a.id}
-                                  onClick={() => approveAppointment(a.id)}
-                                >
-                                  <Check className="h-3 w-3" />
-                                  {approvingId === a.id ? "Approving…" : "Approve"}
-                                </Button>
-                              )}
-
-                              {(a.status === "approved" || a.status === "confirmed") && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs border-blue-500 text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 gap-1"
                                   onClick={() => checkInAppt(a.id)}
                                 >
                                   <UserCheck className="h-3 w-3" />
@@ -669,9 +658,13 @@ function StandardStaffToday() {
                                   onClick={() => navigate(`/staff/checkout/${a.id}`)}
                                 >
                                   <CreditCard className="h-3 w-3" />
-                                  Checkout (Pay)
+                                  Checkout
                                 </Button>
                               )}
+
+                              <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/calendar`)}>
+                                Reschedule
+                              </Button>
 
                               <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/appointments/${a.id}`)}>
                                 Details

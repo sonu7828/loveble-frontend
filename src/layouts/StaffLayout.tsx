@@ -245,18 +245,16 @@ export default function StaffLayout() {
         show: true,
         children: [
           { to: "/staff/calendar", label: "Calendar", icon: CalIcon },
-          { to: "/staff/today?view=schedule", label: "Today's Schedule", icon: CalIcon },
-          { to: "/staff/my-schedule", label: "My Schedule", icon: UserCircle2 },
         ],
       },
       {
         key: "clients",
-        label: "CLIENTS",
+        label: "PATIENTS",
         icon: Users,
         show: true,
         children: [
-          { to: "/staff/clients", label: "All Clients", icon: Users },
-          { to: "/staff/clients?new=1", label: "New Client", icon: UserPlus },
+          { to: "/staff/clients", label: "Patients", icon: Users },
+          { to: "/staff/clients?new=1", label: "Add Patient", icon: UserPlus },
         ],
       },
       {
@@ -265,8 +263,7 @@ export default function StaffLayout() {
         icon: CreditCard,
         show: true,
         children: [
-          { to: "/staff/checkout", label: "Payments", icon: CreditCard },
-          { to: "/staff/time-clock", label: "Time Clock", icon: Clock },
+          { to: "/staff/checkout", label: "Check-in / Checkout", icon: CreditCard },
         ],
       },
       {
@@ -275,7 +272,7 @@ export default function StaffLayout() {
         icon: Settings,
         show: true,
         children: [
-          { to: "/staff/me", label: "Profile", icon: UserCircle2 },
+          { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
         ],
       },
       ...(isAdmin

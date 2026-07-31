@@ -103,7 +103,8 @@ export default function StaffInbox() {
     });
     setBusyId(null);
     if (error || data?.error) {
-      toast.error(data?.error || error?.message || "Could not update");
+      const errMsg = data?.error || (typeof error === "string" ? error : (error as any)?.message) || "Could not update";
+      toast.error(errMsg);
       return;
     }
     toast.success(action === "approve" ? "Approved" : "Denied");
@@ -298,11 +299,24 @@ function ApptRow(props: {
               </Button>
             </div>
           ) : (
-            <div className="space-y-2">
-              <input ref={props.denyRef} value={props.denyReason} onChange={(e) => props.setDenyReason(e.target.value)} placeholder="Reason (sent to client, optional)"
-                className="w-full text-sm rounded-lg border border-border bg-background px-3 py-2" />
+            <div className="space-y-2.5">
+              <div className="text-xs font-medium text-muted-foreground">Select or type a reason for declining:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {["Provider unavailable", "Service prerequisite not met", "Schedule conflict", "Patient requested cancellation"].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => props.setDenyReason(preset)}
+                    className="text-[11px] px-2.5 py-1 rounded-md border border-border bg-muted/30 hover:bg-primary/10 hover:border-primary/30 transition"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <input ref={props.denyRef} value={props.denyReason} onChange={(e) => props.setDenyReason(e.target.value)} placeholder="Decline reason (optional note to client)"
+                className="w-full text-sm rounded-lg border border-border bg-background px-3 py-2 mt-1" />
               <div className="flex gap-2">
-                <Button onClick={props.onDenyConfirm} disabled={busy} size="sm" variant="destructive" className="rounded-full">Confirm deny</Button>
+                <Button onClick={props.onDenyConfirm} disabled={busy} size="sm" variant="destructive" className="rounded-full">Confirm decline</Button>
                 <Button onClick={props.onDenyCancel} disabled={busy} size="sm" variant="ghost" className="rounded-full">Cancel</Button>
               </div>
             </div>
