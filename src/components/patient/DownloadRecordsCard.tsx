@@ -10,7 +10,7 @@ import { generateMedicalRecordPDF } from "@/lib/pdfMedicalRecordGenerator";
 
 export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string; profile?: any }) {
   const [downloading, setDownloading] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"pdf" | "zip" | "json">("pdf");
+  const [exportFormat, setExportFormat] = useState<"pdf" | "zip">("pdf");
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeConsents, setIncludeConsents] = useState(true);
   const [includeAppts, setIncludeAppts] = useState(true);
@@ -91,7 +91,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
         const doc = generateMedicalRecordPDF(exportData as any);
         doc.save(`medical_records_${email}_${dateStr}.pdf`);
         toast.success("Medical record PDF downloaded!");
-      } else if (exportFormat === "zip") {
+      } else {
         const doc = generateMedicalRecordPDF(exportData as any);
         const pdfBlob = doc.output("blob");
         const jsonStr = JSON.stringify(exportData, null, 2);
@@ -114,18 +114,6 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         toast.success("Medical record ZIP archive downloaded!");
-      } else {
-        const jsonStr = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `medical_records_${email}_${dateStr}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        toast.success("Medical record JSON exported!");
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to generate download file.");
@@ -154,7 +142,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
       {/* Export Format Selection */}
       <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4 text-xs">
         <div className="font-medium text-foreground">Choose Download Format:</div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
           <button
             type="button"
             onClick={() => setExportFormat("pdf")}
@@ -184,22 +172,6 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
             <div>
               <div className="font-semibold text-xs">ZIP Archive</div>
               <div className="text-[10px] text-muted-foreground">PDF + JSON Bundle (.zip)</div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setExportFormat("json")}
-            className={`flex items-center gap-2.5 p-3 rounded-lg border text-left transition ${
-              exportFormat === "json"
-                ? "border-primary bg-primary/10 font-medium text-foreground"
-                : "border-border bg-card hover:bg-muted/50 text-muted-foreground"
-            }`}
-          >
-            <Download className="h-4 w-4 text-blue-600 shrink-0" />
-            <div>
-              <div className="font-semibold text-xs">JSON Data</div>
-              <div className="text-[10px] text-muted-foreground">Raw electronic data (.json)</div>
             </div>
           </button>
         </div>

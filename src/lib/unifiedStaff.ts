@@ -15,7 +15,7 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
     if (Array.isArray(data) && data.length > 0) {
       return data.map((s: any) => {
         const roles = s.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
-        const primaryRole = roles.find((r: string) => r !== "staff") || roles[0] || s.role || "staff";
+        const primaryRole = roles.find((r: string) => r !== "staff" && r !== "patient") || roles[0] || s.role || "front_desk";
         return {
           id: s.id,
           full_name: s.fullName || s.full_name || "Staff Member",

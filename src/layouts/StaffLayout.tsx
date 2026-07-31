@@ -41,7 +41,7 @@ interface Group {
 }
 
 export default function StaffLayout() {
-  const { user, loading, roles, isAdmin, isNP, isStaff, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged, isProvider } = useAuth();
+  const { user, loading, roles, isAdmin, isNP, isStaff, isFrontDesk, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged, isProvider, isRNInjector } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -85,7 +85,7 @@ export default function StaffLayout() {
     });
   }, [user]);
 
-  const pendingCount = usePendingBookings(!!user && (isAdmin || isScheduler || isReceptionist || isStaff));
+  const pendingCount = usePendingBookings(!!user && (isAdmin || isFrontDesk));
   const [unreadSms] = useState(0);
 
   // Medical Director, Security Officer, and Staff navigation groups
@@ -223,8 +223,8 @@ export default function StaffLayout() {
       ];
     }
 
-    // Front Desk Receptionist navigation menu layout
-    const isFrontDesk = !isAdmin && (isReceptionist || isScheduler || isStaff);
+    // Front Desk / Scheduler navigation menu layout
+    const isFrontDeskRole = !isAdmin && isFrontDesk;
 
     return [
       {
@@ -307,7 +307,7 @@ export default function StaffLayout() {
           ]
         : []),
     ];
-  }, [isMedicalDirector, isPrivacyOfficer, isProvider, isScheduler, isReceptionist, isStaff, isNP, isAdmin, pendingCount, unreadSms]);
+  }, [isMedicalDirector, isPrivacyOfficer, isProvider, isFrontDesk, isRNInjector, isNP, isAdmin, pendingCount, unreadSms]);
 
   if (loading || (user && !mfaChecked)) {
     return (
@@ -320,7 +320,7 @@ export default function StaffLayout() {
   if (!user) return <Navigate to="/staff/login" replace />;
   if (isPrivileged && !mfaOk) return <Navigate to="/staff/mfa" replace />;
 
-  const isStaffMember = isAdmin || isScheduler || isReceptionist || isStaff || isNP || isPrivacyOfficer || isMedicalDirector;
+  const isStaffMember = isAdmin || isFrontDesk || isNP || isPrivacyOfficer || isMedicalDirector || isRNInjector;
 
   if (!isStaffMember) {
     return (
@@ -558,8 +558,8 @@ export default function StaffLayout() {
       </div>
 
       <StaffBottomNav
-        canCheckout={isAdmin || isScheduler || isReceptionist || isStaff}
-        canClinical={isAdmin || isNP || isStaff}
+        canCheckout={isAdmin || isFrontDesk}
+        canClinical={isAdmin || isNP || isRNInjector || isMedicalDirector}
         pendingBadge={pendingCount + unreadSms}
       />
 

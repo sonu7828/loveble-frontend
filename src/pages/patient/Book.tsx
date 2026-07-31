@@ -111,9 +111,8 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
 
         const providerStaff = rawStaff.filter(x => {
           const r = x.role;
-          const t = (x.title || "").toLowerCase();
-          const n = (x.full_name || "").toLowerCase();
-          return r === "provider" || r === "nurse_practitioner" || t.includes("provider") || n.includes("girish");
+          // Only show clinical providers eligible for booking
+          return r === "medical_director" || r === "nurse_practitioner" || r === "rn_injector";
         });
 
         setStaff(providerStaff.length > 0 ? providerStaff : rawStaff);
