@@ -38,17 +38,17 @@ export const StepLocationStaff = ({
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-foreground tracking-tight mb-1">
-          Where & with whom?
+          Clinic Location & Specialist
         </h1>
         <p className="text-xs sm:text-sm text-muted-foreground">
-          Select location and provider for your <span className="text-foreground font-semibold">{label}</span> appointment.
+          Your treatment for <span className="text-foreground font-semibold">{label}</span> will take place at our San Jose clinic.
         </p>
       </div>
 
-      {/* Location Selector */}
+      {/* Location Section */}
       <div>
         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2.5 block">
-          Select Location
+          Appointment Location
         </Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           {locations.length > 0 ? (
@@ -70,10 +70,10 @@ export const StepLocationStaff = ({
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="font-serif text-base sm:text-lg font-semibold text-foreground leading-snug">
-                      {l.name}
+                      San Jose Clinic
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      {l.address || "2100 Curtner Ave, Ste 1B, San Jose, CA 95124"}
+                      2100 Curtner Ave, Ste 1B, San Jose, CA 95124
                     </div>
                   </div>
                   {isSelected && <Check className="h-4 w-4 text-primary shrink-0 mt-1" />}
@@ -88,9 +88,13 @@ export const StepLocationStaff = ({
               <span className="p-2.5 rounded-xl bg-primary text-primary-foreground">
                 <MapPin className="h-5 w-5 shrink-0" />
               </span>
-              <div>
-                <div className="font-serif text-base font-semibold text-foreground">San Jose Studio</div>
-                <div className="text-xs text-muted-foreground mt-0.5">2100 Curtner Ave, Ste 1B, San Jose, CA 95124</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-serif text-base sm:text-lg font-semibold text-foreground leading-snug">
+                  San Jose Clinic
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  2100 Curtner Ave, Ste 1B, San Jose, CA 95124
+                </div>
               </div>
             </button>
           )}

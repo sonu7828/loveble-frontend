@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { formatPhone10 } from "@/lib/formatPhone";
 
 
-import { fetchUnifiedStaffMembers } from "@/lib/unifiedStaff";
+import { fetchUnifiedStaffMembers, formatStaffDisplayName, isClinicalProvider } from "@/lib/unifiedStaff";
 
 export default function StaffNewAppointment() {
   const navigate = useNavigate();
@@ -131,9 +131,13 @@ export default function StaffNewAppointment() {
     });
   }, [serviceIds, staffIdSel, locationId, pickedDate, overrideConflict, canOverride]);
 
-  // Valid combos: all staff members created are selectable
+  // Valid combos: only eligible clinical providers (Medical Director, Nurse Practitioner, RN/Injector) are selectable
   const validStaffIds = useMemo(() => {
-    return new Set(staff.map(s => s.id));
+    return new Set(
+      staff
+        .filter(isClinicalProvider)
+        .map((s) => s.id)
+    );
   }, [staff]);
 
   const validLocIds = useMemo(() => {
@@ -205,7 +209,7 @@ export default function StaffNewAppointment() {
             errMsg = body?.error || null;
           }
         } catch { /* ignore */ }
-        errMsg = errMsg || error.message;
+        errMsg = errMsg || (typeof error === "string" ? error : (error as any)?.message || "Failed to create appointment");
       } else if (data?.error) {
         errMsg = data.error;
       }
@@ -274,34 +278,24 @@ export default function StaffNewAppointment() {
             <p className="text-[11px] text-muted-foreground mt-1">Add multiple services to combine into one booking.</p>
           </div>
 
-          {/* Step 2 — Provider & Location */}
+          {/* Step 2 — Provider */}
           <div className={serviceIds.length === 0 ? "opacity-50 pointer-events-none" : ""}>
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-[10px] font-medium">2</span>
-              <Label className="mb-0">Provider & location</Label>
+              <Label className="mb-0">Provider</Label>
               {serviceIds.length === 0 && <span className="text-[11px] text-muted-foreground">— pick a service first</span>}
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <select required value={staffIdSel} onChange={(e) => setStaffIdSel(e.target.value)}
-                  disabled={!canSeeAll || serviceIds.length === 0}
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="">{serviceIds.length === 0 ? "Pick service first" : "Select provider…"}</option>
-                  {staff.filter(s => validStaffIds.has(s.id)).map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-                </select>
-              </div>
-              <div>
-                <select required value={locationId} onChange={(e) => setLocationId(e.target.value)}
-                  disabled={!staffIdSel}
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="">{!staffIdSel ? "Pick provider first" : "Select location…"}</option>
-                  {locations.filter(l => validLocIds.has(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
+            <div>
+              <select required value={staffIdSel} onChange={(e) => setStaffIdSel(e.target.value)}
+                disabled={!canSeeAll || serviceIds.length === 0}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="">{serviceIds.length === 0 ? "Pick service first" : "Select provider…"}</option>
+                {staff.filter(s => validStaffIds.has(s.id)).map(s => <option key={s.id} value={s.id}>{formatStaffDisplayName(s.full_name)}</option>)}
+              </select>
             </div>
           </div>
 
-          {/* Schedule override — admins/schedulers/receptionists only, surfaced above date/time so it pre-loads conflict slots */}
+          {/* Schedule override — admins/schedulers/receptionists only */}
           {canOverride && (
             <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition ${overrideConflict ? "border-primary bg-primary/5" : "border-border bg-background/40 hover:border-primary/40"}`}>
               <Checkbox checked={overrideConflict} onCheckedChange={(v) => setOverrideConflict(!!v)} className="mt-0.5" />
@@ -316,18 +310,18 @@ export default function StaffNewAppointment() {
           )}
 
           {/* Step 3 — Date & Time */}
-          <div className={!locationId ? "opacity-50 pointer-events-none" : ""}>
+          <div className={!staffIdSel ? "opacity-50 pointer-events-none" : ""}>
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-[10px] font-medium">3</span>
               <Label className="mb-0">Date & time <span className="text-muted-foreground font-normal">(Pacific Time)</span></Label>
-              {!locationId && <span className="text-[11px] text-muted-foreground">— pick provider & location first</span>}
+              {!staffIdSel && <span className="text-[11px] text-muted-foreground">— pick provider first</span>}
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="flex gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button type="button" variant="outline"
-                      disabled={!locationId}
+                      disabled={!staffIdSel}
                       className="flex-1 justify-start font-normal">
                       <CalendarIcon className="h-4 w-4 mr-2" />
                       {pickedDate ? format(pickedDate, "EEE, MMM d, yyyy") : "Pick a date…"}
@@ -339,7 +333,7 @@ export default function StaffNewAppointment() {
                   </PopoverContent>
                 </Popover>
                 <Button type="button" variant="ghost" size="sm"
-                  disabled={!locationId}
+                  disabled={!staffIdSel}
                   onClick={() => setPickedDate(new Date())}
                   className="shrink-0">
                   Today

@@ -306,6 +306,13 @@ export default function StaffLayout() {
     ];
   }, [isMedicalDirector, isPrivacyOfficer, isProvider, isFrontDesk, isRNInjector, isNP, isAdmin, pendingCount, unreadSms]);
 
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
   if (loading || (user && !mfaChecked)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -454,7 +461,7 @@ export default function StaffLayout() {
   );
 
   return (
-    <div className="h-screen max-h-screen w-full overflow-hidden bg-background flex flex-col">
+    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-background flex flex-col">
       {/* Top Full-width Portal Header Bar */}
       <header className="w-full border-b border-border bg-card/80 backdrop-blur px-4 md:px-6 py-2.5 flex items-center justify-between z-30 shrink-0">
         {/* Left Corner: Mobile Menu & Company Logo */}

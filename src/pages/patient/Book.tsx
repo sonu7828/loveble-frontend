@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { type CardOnFileHandle } from "@/components/CardOnFile";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { isClinicalProvider, formatStaffDisplayName } from "@/lib/unifiedStaff";
 
 import type { Step, Category, Service, Location, Staff, ProviderRow, ConsentForm } from "../book/types";
 import type { CompactValue } from "@/components/CompactConsentCard";
@@ -103,19 +104,13 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       if (sp.data && Array.isArray(sp.data)) {
         const rawStaff = (sp.data as any[]).map(x => ({
           ...x,
-          full_name: x.full_name || x.fullName || x.name || "Staff Member",
+          full_name: formatStaffDisplayName(x.full_name || x.fullName || x.name || "Staff Member"),
           title: x.title || "Licensed Specialist",
           color: x.color || "#8B6B5D",
           role: (x.role || x.pending_role || "").toLowerCase(),
         }));
 
-        const providerStaff = rawStaff.filter(x => {
-          const r = x.role;
-          // Only show clinical providers eligible for booking
-          return r === "medical_director" || r === "nurse_practitioner" || r === "rn_injector";
-        });
-
-        setStaff(providerStaff.length > 0 ? providerStaff : rawStaff);
+        setStaff(rawStaff.filter(isClinicalProvider));
       }
       if (p.data) setProviders(p.data as any);
 
