@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function StaffHelp() {
   usePageMeta({ title: "Staff Handbook & Guide" });
-  const { isMedicalDirector, isPrivacyOfficer, isAdmin } = useAuth();
+  const { isMedicalDirector, isPrivacyOfficer, isNP, isRNInjector, isProvider, isAdmin } = useAuth();
 
   useEffect(() => {
     try { localStorage.setItem("rka_handbook_read", "1"); } catch {}
@@ -124,6 +124,51 @@ export default function StaffHelp() {
       ];
     }
 
+    if (isNP || isRNInjector || isProvider) {
+      return [
+        {
+          icon: Calendar,
+          title: "1. Today's Schedule & Patient Visits",
+          desc: "View your daily appointment timeline, checked-in patients waiting in lobby, and record SOAP chart notes.",
+          link: "/staff/today",
+          linkText: "View Schedule",
+          color: "text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900",
+        },
+        {
+          icon: Stethoscope,
+          title: "2. Clinical Charting & Medical Records",
+          desc: "Complete Good Faith Examinations (GFEs), record treatment dosage/grid notes, and upload clinical pre/post photos.",
+          link: "/staff/clinical",
+          linkText: "Open Clinical Charts",
+          color: "text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900",
+        },
+        {
+          icon: FileCheck,
+          title: "3. Cosign Queue & Sign-offs",
+          desc: "Track pending chart notes requiring supervising physician co-signature or NP approval.",
+          link: "/staff/clinical/cosign",
+          linkText: "View Cosign Queue",
+          color: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900",
+        },
+        {
+          icon: ShieldAlert,
+          title: "4. Adverse Event & Safety Protocols",
+          desc: "Access vascular occlusion emergency protocols, hyaluronidase dosage steps, and adverse event logging.",
+          link: "/staff/clinical/safety",
+          linkText: "View Safety Protocols",
+          color: "text-red-600 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900",
+        },
+        {
+          icon: Stethoscope,
+          title: "5. Digital Signature & Clinical Credentials",
+          desc: "Manage your CA License number, working hours availability, and saved digital signature for auto-signing chart notes.",
+          link: "/staff/me",
+          linkText: "Edit Profile & Signature",
+          color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900",
+        },
+      ];
+    }
+
     return [
       {
         icon: Calendar,
@@ -150,7 +195,7 @@ export default function StaffHelp() {
         color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900",
       },
     ];
-  }, [isMedicalDirector, isPrivacyOfficer]);
+  }, [isMedicalDirector, isPrivacyOfficer, isNP, isRNInjector, isProvider]);
 
   const FAQS = useMemo(() => {
     if (isMedicalDirector) {

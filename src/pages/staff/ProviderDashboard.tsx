@@ -11,6 +11,8 @@ import {
   Users, Plus, ChevronRight, Stethoscope, Bell, FileText, Activity, CheckCircle2, AlertCircle
 } from "lucide-react";
 
+import { startOfDay, endOfDay } from "date-fns";
+
 interface Appt {
   id: string;
   status: string;
@@ -82,11 +84,15 @@ export function ProviderDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch today's appointments
+      // Fetch today's appointments strictly within today's date bounds
+      const startToday = startOfDay(new Date()).toISOString();
+      const endToday = endOfDay(new Date()).toISOString();
+
       const { data: apptData } = await apiQuery("appointments")
         .select("*")
-        .order("start_at", { ascending: true })
-        .limit(10);
+        .gte("start_at", startToday)
+        .lte("start_at", endToday)
+        .order("start_at", { ascending: true });
       setAppts(Array.isArray(apptData) ? apptData : []);
 
       // Fetch recent patient profiles
@@ -126,7 +132,28 @@ export function ProviderDashboard() {
         setUnreadMessagesCount(0);
       }
 
-      setNotifications([]);
+      // Generate live clinical notifications from checked-in appointments & pending notes
+      const liveAlerts: ClinicalNotification[] = [];
+      const checkedIn = (Array.isArray(apptData) ? apptData : []).filter((a: any) => a.status === "arrived" || a.checked_in_at);
+      for (const c of checkedIn) {
+        liveAlerts.push({
+          id: `ci-${c.id}`,
+          type: "checkin",
+          title: `Patient ${c.client_first_name || ""} ${c.client_last_name || ""} checked-in for ${c.service_name || "Treatment"}`,
+          time: formatClinicTime(c.checked_in_at || c.start_at),
+          urgent: false,
+        });
+      }
+      if (Array.isArray(draftNotes) && draftNotes.length > 0) {
+        liveAlerts.push({
+          id: "draft-notes-alert",
+          type: "note",
+          title: `${draftNotes.length} draft chart note(s) pending signature`,
+          time: "Action required",
+          urgent: true,
+        });
+      }
+      setNotifications(liveAlerts);
     } catch (_e) {
       setAppts([]);
       setRecentPatients([]);
@@ -338,39 +365,6 @@ export function ProviderDashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Patients List */}
-          <Card className="border border-border shadow-xs">
-            <CardHeader className="p-4 border-b border-border bg-muted/30 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-medium">Recent Patients</CardTitle>
-              </div>
-              <Button size="sm" variant="ghost" className="text-xs text-primary px-2" onClick={() => navigate("/staff/clients")}>
-                All Patients
-              </Button>
-            </CardHeader>
-            <CardContent className="p-3 space-y-2">
-              {recentPatients.length === 0 ? (
-                <div className="py-6 text-center text-xs text-muted-foreground">
-                  No recent patients found.
-                </div>
-              ) : (
-                recentPatients.map((p) => (
-                  <div
-                    key={p.id}
-                    className="p-2.5 rounded-xl border border-border hover:bg-muted/30 transition cursor-pointer flex items-center justify-between"
-                    onClick={() => navigate(`/staff/clinical/clients/${encodeURIComponent(p.email)}`)}
-                  >
-                    <div className="space-y-0.5 min-w-0">
-                      <p className="font-semibold text-xs text-foreground truncate">{p.name}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">{p.primaryConcern}</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 ml-2" />
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
