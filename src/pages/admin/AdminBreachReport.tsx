@@ -123,8 +123,7 @@ export default function AdminBreachReport() {
           <ShieldAlert className="h-7 w-7 text-red-600" /> Report a possible breach
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          File a HIPAA breach or incident report (45 CFR §164.400–414). Submissions are timestamped and
-          immutable — only status may be updated by the Privacy Officer.
+          File a security breach or incident report. Submissions are securely logged. Only the Privacy Officer can update the status.
         </p>
       </div>
 
@@ -157,7 +156,7 @@ export default function AdminBreachReport() {
         <div>
           <Label>Systems / vendors involved</Label>
           <Input value={form.systems_involved} onChange={(e) => setForm({ ...form, systems_involved: e.target.value })}
-            placeholder="e.g. laptop, email, Brevo, Twilio" />
+            placeholder="e.g. laptop, email, third-party system" />
         </div>
         <div>
           <Label>Immediate actions taken</Label>

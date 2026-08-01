@@ -271,13 +271,7 @@ function VendorTab() {
       if (!error && data) remoteVendors = (data as any) as Vendor[];
     } catch (e) { }
 
-    const defaultHipaaVendors: Vendor[] = [
-      { id: "v-lovable", name: "Lovable Cloud (Database Host)", category: "Database & Cloud Infrastructure", touches_phi: true, baa_required: true, baa_status: "signed", baa_signed_at: "2025-01-15", baa_renewal_at: "2027-01-15", contact_name: "Compliance Dept", contact_email: "hipaa@lovable.dev", notes: "PostgreSQL & Asset Storage BAA" },
-      { id: "v-twilio", name: "Twilio / GHL (SMS Communications)", category: "SMS Gateway", touches_phi: true, baa_required: true, baa_status: "signed", baa_signed_at: "2025-02-01", baa_renewal_at: "2027-02-01", contact_name: "Healthcare Support", contact_email: "baa@twilio.com", notes: "HIPAA Edition SMS Pipeline BAA" },
-      { id: "v-resend", name: "Resend (Email Gateway)", category: "Email Communications", touches_phi: true, baa_required: true, baa_status: "signed", baa_signed_at: "2025-01-20", baa_renewal_at: "2027-01-20", contact_name: "Security Team", contact_email: "privacy@resend.com", notes: "Encrypted Transactional Email BAA" },
-      { id: "v-stripe", name: "Stripe Healthcare", category: "Payment Gateway", touches_phi: true, baa_required: true, baa_status: "signed", baa_signed_at: "2025-01-10", baa_renewal_at: "2027-01-10", contact_name: "Stripe Legal", contact_email: "privacy@stripe.com", notes: "PCI-DSS Level 1 & HIPAA BAA" },
-      { id: "v-aiscribe", name: "AI Medical Scribe Transcriber", category: "AI Charting & SOAP Generation", touches_phi: true, baa_required: true, baa_status: "signed", baa_signed_at: "2025-03-01", baa_renewal_at: "2026-03-01", contact_name: "AI Security Officer", contact_email: "security@aiscribe.health", notes: "Zero Data Retention BAA for Audio Transcripts" },
-    ];
+    const defaultHipaaVendors: Vendor[] = [];
 
     const localDemoVendors: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
     const deletedVendorIds: string[] = JSON.parse(localStorage.getItem("rka_deleted_vendor_ids") || "[]");
@@ -372,7 +366,7 @@ function VendorTab() {
         <h1 className="font-serif text-3xl mb-1">Vendor Management</h1>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground flex-1">
-            Every vendor that touches PHI must have a signed Business Associate Agreement (45 CFR §164.504(e)).
+            Every vendor that touches PHI must have a signed Business Associate Agreement.
           </p>
           <Button onClick={openNew} className="rounded-full shrink-0">
             <Plus className="h-4 w-4 mr-1.5" /> Add vendor
@@ -431,7 +425,6 @@ function VendorTab() {
                     </td>
                     <td className="p-3.5 text-xs text-muted-foreground">
                       {v.contact_name || "—"}
-                      {v.contact_email && <div className="text-[11px]">{v.contact_email}</div>}
                     </td>
                     <td className="p-3.5 text-right whitespace-nowrap">
                       <Button size="icon" variant="ghost" onClick={() => openEdit(v)} className="h-8 w-8 rounded-full"><Pencil className="h-3.5 w-3.5" /></Button>
@@ -535,18 +528,12 @@ function VendorTab() {
                 <Input type="date" value={form.baa_renewal_at ?? ""} onChange={(e) => setForm({ ...form, baa_renewal_at: e.target.value || null })} className="mt-1" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Contact Name</Label>
-                <Input value={form.contact_name ?? ""} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className="mt-1" />
-              </div>
-              <div>
-                <Label>Contact Email</Label>
-                <Input type="email" value={form.contact_email ?? ""} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} className="mt-1" />
-              </div>
+            <div>
+              <Label>Contact Name</Label>
+              <Input value={form.contact_name ?? ""} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} className="mt-1" />
             </div>
             <div>
-              <Label>Notes & Compliance Details</Label>
+              <Label>Notes</Label>
               <Textarea rows={2} value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1" />
             </div>
           </div>
