@@ -225,19 +225,37 @@ export default function StaffLayout() {
 
     return [
       {
-        key: "today",
-        label: "TODAY",
+        key: "dashboard",
+        label: "Dashboard",
         icon: LayoutDashboard,
         show: true,
         children: [
           { to: "/staff/today", label: "Dashboard", icon: LayoutDashboard },
+        ],
+      },
+      {
+        key: "inbox",
+        label: "Booking Requests",
+        icon: Inbox,
+        show: true,
+        badge: pendingCount,
+        children: [
           { to: "/staff/inbox", label: "Booking Requests", icon: Inbox, badge: pendingCount },
+        ],
+      },
+      {
+        key: "messages",
+        label: "Messages",
+        icon: MessageSquare,
+        show: true,
+        badge: unreadSms,
+        children: [
           { to: "/staff/messages", label: "Messages", icon: MessageSquare, badge: unreadSms },
         ],
       },
       {
         key: "schedule",
-        label: "SCHEDULE",
+        label: "Calendar",
         icon: CalIcon,
         show: true,
         children: [
@@ -246,30 +264,20 @@ export default function StaffLayout() {
       },
       {
         key: "clients",
-        label: "PATIENTS",
+        label: "Patients",
         icon: Users,
         show: true,
         children: [
           { to: "/staff/clients", label: "Patients", icon: Users },
-          { to: "/staff/clients?new=1", label: "Add Patient", icon: UserPlus },
         ],
       },
       {
         key: "operations",
-        label: "OPERATIONS",
+        label: "Check-in / Checkout",
         icon: CreditCard,
         show: true,
         children: [
           { to: "/staff/checkout", label: "Check-in / Checkout", icon: CreditCard },
-        ],
-      },
-      {
-        key: "settings",
-        label: "SETTINGS",
-        icon: Settings,
-        show: true,
-        children: [
-          { to: "/staff/me", label: "My Profile", icon: UserCircle2 },
         ],
       },
       ...(isAdmin
