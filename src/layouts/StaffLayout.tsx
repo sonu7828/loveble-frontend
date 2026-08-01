@@ -107,18 +107,16 @@ export default function StaffLayout() {
           icon: FileCheck,
           show: true,
           children: [
-            { to: "/staff/clinical-reviews?tab=pending", label: "Pending Notes", icon: FileText },
-            { to: "/staff/clinical-reviews?tab=sign", label: "Sign Notes", icon: FileCheck },
+            { to: "/staff/clinical-reviews", label: "Clinical Reviews", icon: FileCheck },
           ],
         },
         {
           key: "orders_prescriptions",
-          label: "Orders & Prescriptions",
-          icon: Stethoscope,
+          label: "Prescriptions",
+          icon: Pill,
           show: true,
           children: [
-            { to: "/staff/orders?tab=rx", label: "Prescription Approvals", icon: Pill },
-            { to: "/staff/orders?tab=labs", label: "Lab & Imaging Orders", icon: Activity },
+            { to: "/staff/orders", label: "Prescription Approvals", icon: Pill },
           ],
         },
         {
@@ -128,7 +126,6 @@ export default function StaffLayout() {
           show: true,
           children: [
             { to: "/staff/team?tab=providers", label: "Providers", icon: Users },
-            { to: "/staff/team?tab=notes", label: "Staff Notes", icon: FileText },
           ],
         },
         {
@@ -346,9 +343,7 @@ export default function StaffLayout() {
   const isSubActive = (targetUrl: string) => {
     const [targetPath, targetQuery] = targetUrl.split("?");
     if (location.pathname !== targetPath) return false;
-    if (!targetQuery) {
-      return !location.search || location.search === "" || location.search === "?";
-    }
+    if (!targetQuery) return true;
     const currentParams = new URLSearchParams(location.search);
     const targetParams = new URLSearchParams(targetQuery);
     for (const [key, val] of targetParams.entries()) {
@@ -365,7 +360,7 @@ export default function StaffLayout() {
           if (visibleChildren.length === 0) return null;
           const GIcon = g.icon;
           const isOpen = openGroups[g.key] !== false; // default true/open
-          const isSingleChild = visibleChildren.length === 1 && visibleChildren[0].label === g.label;
+          const isSingleChild = visibleChildren.length === 1;
 
           if (isSingleChild) {
             const single = visibleChildren[0];

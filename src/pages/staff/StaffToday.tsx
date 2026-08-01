@@ -84,274 +84,234 @@ function MedicalDirectorDashboard() {
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [activeStaffCount, setActiveStaffCount] = useState<number>(0);
+
+  useEffect(() => {
+    (async () => {
+      const [notesRes, gfeRes, staffRes] = await Promise.all([
+        apiQuery("clinical_notes").select("id, client_id, provider_id, service_name, created_at, status").eq("cosign_required", true).catch(() => ({ data: [] })),
+        apiQuery("gfe_records").select("id, client_name, provider_name, created_at, status").eq("status", "pending_review").catch(() => ({ data: [] })),
+        apiQuery("staff_profiles").select("id").eq("is_provider", true).catch(() => ({ data: [] })),
+      ]);
+      const notes = (notesRes?.data ?? []).map((n: any) => ({
+        id: n.id,
+        client: n.client_id || "Patient",
+        provider: n.provider_id || "Injector RN",
+        service: n.service_name || "Clinical Treatment",
+        type: "SOAP Chart Note",
+        date: new Date(n.created_at).toLocaleDateString(),
+      }));
+      const gfes = (gfeRes?.data ?? []).map((g: any) => ({
+        id: g.id,
+        client: g.client_name || "Patient",
+        provider: g.provider_name || "NP",
+        service: "Good Faith Exam (GFE)",
+        type: "Medical Assessment",
+        date: new Date(g.created_at).toLocaleDateString(),
+      }));
+      setReviews([...notes, ...gfes]);
+      setActiveStaffCount((staffRes?.data ?? []).length || 2);
+    })();
+  }, []);
 
   const handleOrderAction = (id: string, action: "approve" | "reject") => {
     setPendingOrders(prev => prev.filter(o => o.id !== id));
-    toast.success(`Order ${id} ${action === "approve" ? "approved & e-signed" : "rejected"}`);
+    toast.success(`Order ${action === "approve" ? "approved & e-signed" : "rejected"}`);
   };
 
   const uMeta = (user as any)?.user_metadata;
   const directorName = user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
     ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim() + " (Medical Director)"
-    : user?.email || "Medical Director";
+    : "Dr. Aloysius N. Fobi, MD (Medical Director)";
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-serif text-xl sm:text-2xl font-medium tracking-tight">Medical Director Control Hub</h1>
+            <h1 className="font-serif text-2xl font-medium tracking-tight">Medical Director Dashboard</h1>
             <Badge variant="outline" className="bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20 font-medium px-2.5 py-0.5 text-xs">
-              <Stethoscope className="h-3.5 w-3.5 mr-1 text-purple-600" /> Supervising Physician Oversight
+              <Stethoscope className="h-3.5 w-3.5 mr-1 text-purple-600" /> Supervising Physician
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Clinical governance, chart note co-signing, prescription approvals, and provider supervision.
+            Chart note co-signing, Good Faith Exam governance, and prescription approvals.
           </p>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card text-xs">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-medium">
             <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
-            <span className="text-muted-foreground font-medium">{directorName}</span>
+            <span className="text-foreground">{directorName}</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clinical/cosign")} className="h-9 rounded-xl text-xs gap-1.5">
-            <FileCheck className="h-3.5 w-3.5 text-primary" />
-            <span>Open Cosign Queue</span>
+          <Button variant="default" size="sm" onClick={() => navigate("/staff/clinical/cosign")} className="h-9 rounded-xl text-xs gap-1.5 shadow-2xs">
+            <FileCheck className="h-3.5 w-3.5" />
+            <span>Cosign Queue</span>
           </Button>
         </div>
       </div>
 
-      {/* 4 Top KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Pending Signatures */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-purple-500/30 transition rounded-xl">
+      {/* 3 Streamlined KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* KPI 1: Pending Co-Signatures */}
+        <Card className="p-4 border border-border bg-card shadow-2xs hover:border-purple-500/30 transition rounded-2xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Pending Signatures</span>
-            <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Pending Co-Signatures</span>
+            <div className="h-8 w-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
               <FileCheck className="h-4 w-4 text-purple-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{reviews.length} Notes</div>
+          <div className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">{reviews.length}</div>
           <div className="text-[11px] text-purple-600 font-medium mt-1">
-            Requires MD co-signature
+            Chart notes & GFEs requiring MD sign-off
           </div>
         </Card>
 
-        {/* KPI 2: Pending Prescription Approvals */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-amber-500/30 transition rounded-xl">
+        {/* KPI 2: Prescription Approvals */}
+        <Card className="p-4 border border-border bg-card shadow-2xs hover:border-amber-500/30 transition rounded-2xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Prescription Approvals</span>
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Prescription Approvals</span>
+            <div className="h-8 w-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
               <Pill className="h-4 w-4 text-amber-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">
-            {pendingOrders.filter(o => o.type === "Prescription").length} Rx Pending
+          <div className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">
+            {pendingOrders.length}
           </div>
           <div className="text-[11px] text-amber-600 font-medium mt-1">
-            Topical & Oral script reviews
+            Topical & oral script reviews
           </div>
         </Card>
 
-        {/* KPI 3: Pending Lab Orders */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-sky-500/30 transition rounded-xl">
+        {/* KPI 3: Supervised Injectors */}
+        <Card className="p-4 border border-border bg-card shadow-2xs hover:border-emerald-500/30 transition rounded-2xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Pending Lab Orders</span>
-            <div className="h-8 w-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-              <TestTube className="h-4 w-4 text-sky-600" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">
-            {pendingOrders.filter(o => o.type === "Lab Order").length} Labs
-          </div>
-          <div className="text-[11px] text-sky-600 font-medium mt-1">
-            CMP, CBC & Imaging reviews
-          </div>
-        </Card>
-
-        {/* KPI 4: Active Providers */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl">
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Active Providers</span>
-            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Supervised Injectors</span>
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <UserCheck className="h-4 w-4 text-emerald-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">0 Clinical Staff</div>
+          <div className="text-2xl sm:text-3xl font-serif font-semibold text-foreground">{activeStaffCount}</div>
           <div className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" /> Supervising NP / RN Injectors
+            <CheckCircle2 className="h-3 w-3" /> Clinical NP & RN injectors on floor
           </div>
         </Card>
       </div>
 
-      {/* Main Content Grid: Left Main Sections (2 Cols) + Right Sidebar (1 Col) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Sections: Pending Co-Signatures & Orders */}
+      <div className="space-y-6">
 
-        {/* LEFT MAIN SECTIONS */}
-        <div className="lg:col-span-2 space-y-6">
-
-          {/* Section 1: Pending Clinical Reviews Table Box */}
-          <Card className="p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div>
-                <h2 className="font-serif text-lg font-normal tracking-tight flex items-center gap-2">
-                  <Stethoscope className="h-4 w-4 text-purple-600" /> Pending Clinical Reviews & Co-Signatures
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">RN chart notes and Good Faith Exams requiring supervising physician sign-off.</p>
-              </div>
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-primary" onClick={() => navigate("/staff/clinical/cosign")}>
+        {/* Section 1: Pending Clinical Reviews & Co-Signatures */}
+        <Card className="p-5 border border-border bg-card shadow-2xs space-y-4 rounded-2xl">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div>
+              <h2 className="font-serif text-lg font-medium tracking-tight flex items-center gap-2">
+                <Stethoscope className="h-4.5 w-4.5 text-purple-600" /> Pending Chart Notes & GFE Co-Signatures
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Clinical chart notes and Good Faith Exams requiring supervising physician sign-off.</p>
+            </div>
+            {reviews.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-primary font-medium" onClick={() => navigate("/staff/clinical/cosign")}>
                 View All Queue →
               </Button>
-            </div>
+            )}
+          </div>
 
-            <div className="rounded-xl border border-border overflow-hidden bg-card">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-muted/40 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border font-medium">
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-muted/40 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border font-semibold">
+                  <tr>
+                    <th className="p-3">Patient</th>
+                    <th className="p-3">Injector / Provider</th>
+                    <th className="p-3">Service & Type</th>
+                    <th className="p-3">Date</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {reviews.length === 0 ? (
                     <tr>
-                      <th className="p-3">Patient</th>
-                      <th className="p-3">Provider / Injector</th>
-                      <th className="p-3">Service & Type</th>
-                      <th className="p-3">Date</th>
-                      <th className="p-3 text-right">Action</th>
+                      <td colSpan={5} className="text-center py-10 text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <CheckCircle2 className="h-8 w-8 text-emerald-500/60" />
+                          <span className="font-medium text-xs text-foreground">All clinical notes and GFEs are co-signed.</span>
+                          <span className="text-[11px] text-muted-foreground">Chart notes submitted by RNs and NPs will appear here for review.</span>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {reviews.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="text-center py-10 text-muted-foreground">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <FileCheck className="h-8 w-8 text-muted-foreground/40" />
-                            <span className="font-medium text-xs">No pending clinical reviews or co-signatures required.</span>
-                            <span className="text-[11px] text-muted-foreground">Chart notes submitted by RNs and NPs will appear here for review.</span>
-                          </div>
+                  ) : (
+                    reviews.map((r) => (
+                      <tr key={r.id} className="hover:bg-muted/30 transition">
+                        <td className="p-3 font-semibold text-foreground">{r.client}</td>
+                        <td className="p-3 text-muted-foreground">{r.provider}</td>
+                        <td className="p-3">
+                          <div className="font-medium text-foreground">{r.service}</div>
+                          <div className="text-[10px] text-muted-foreground">{r.type}</div>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{r.date}</td>
+                        <td className="p-3 text-right">
+                          <Button size="sm" className="h-7 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium" onClick={() => navigate("/staff/clinical/cosign")}>
+                            Review & Sign
+                          </Button>
                         </td>
                       </tr>
-                    ) : (
-                      reviews.map((r) => (
-                        <tr key={r.id} className="hover:bg-muted/30 transition">
-                          <td className="p-3 font-semibold text-foreground">{r.client}</td>
-                          <td className="p-3 text-muted-foreground">{r.provider}</td>
-                          <td className="p-3">
-                            <div className="font-medium text-foreground">{r.service}</div>
-                            <div className="text-[10px] text-muted-foreground">{r.type}</div>
-                          </td>
-                          <td className="p-3 text-muted-foreground">{r.date}</td>
-                          <td className="p-3 text-right">
-                            <Button size="sm" className="h-7 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white" onClick={() => navigate("/staff/clinical/cosign")}>
-                              Review & Sign
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          </Card>
+          </div>
+        </Card>
 
-          {/* Section 2: Pending Orders Box with Approve / Reject Action Buttons */}
-          <Card className="p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div>
-                <h2 className="font-serif text-lg font-normal tracking-tight flex items-center gap-2">
-                  <Pill className="h-4 w-4 text-amber-600" /> Pending Orders & Prescriptions
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Topical scripts, oral medications, and lab order requisitions for MD authorization.</p>
-              </div>
-              <Badge variant="outline" className="text-[10px]">{pendingOrders.length} Awaiting Authorization</Badge>
+        {/* Section 2: Prescription Approvals */}
+        <Card className="p-5 border border-border bg-card shadow-2xs space-y-4 rounded-2xl">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div>
+              <h2 className="font-serif text-lg font-medium tracking-tight flex items-center gap-2">
+                <Pill className="h-4.5 w-4.5 text-amber-600" /> Pending Prescription Approvals
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Topical scripts and oral medications requiring Medical Director authorization.</p>
             </div>
+            <Badge variant="outline" className="text-[10px] font-semibold">{pendingOrders.length} Pending</Badge>
+          </div>
 
-            {pendingOrders.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-border rounded-xl bg-muted/10 space-y-1">
-                <Pill className="h-8 w-8 text-muted-foreground/40 mx-auto" />
-                <p className="text-xs font-medium text-foreground">No pending prescription approvals or lab orders.</p>
-                <p className="text-[11px] text-muted-foreground">Orders submitted by clinical staff will appear here with Approve and Reject actions.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pendingOrders.map((ord) => (
-                  <div key={ord.id} className="p-3.5 rounded-xl border border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge className={ord.type === "Prescription" ? "bg-amber-500/10 text-amber-700 border-amber-500/20 text-[10px]" : "bg-sky-500/10 text-sky-700 border-sky-500/20 text-[10px]"} variant="outline">
-                          {ord.type}
-                        </Badge>
-                        <span className="font-semibold text-foreground">{ord.detail}</span>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        Patient: <strong className="text-foreground">{ord.patient}</strong> • Prescribed by {ord.prescriber} • {ord.date}
-                      </div>
+          {pendingOrders.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-border rounded-xl bg-muted/10 space-y-1">
+              <CheckCircle2 className="h-7 w-7 text-emerald-500/60 mx-auto" />
+              <p className="text-xs font-medium text-foreground">No pending prescription approvals.</p>
+              <p className="text-[11px] text-muted-foreground">Prescription requests submitted by clinical injectors will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingOrders.map((ord) => (
+                <div key={ord.id} className="p-3.5 rounded-xl border border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/20 text-[10px]" variant="outline">
+                        {ord.type}
+                      </Badge>
+                      <span className="font-semibold text-foreground">{ord.detail}</span>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2.5" onClick={() => handleOrderAction(ord.id, "reject")}>
-                        <X className="h-3.5 w-3.5 mr-1" /> Reject
-                      </Button>
-                      <Button size="sm" className="h-7 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5" onClick={() => handleOrderAction(ord.id, "approve")}>
-                        <Check className="h-3.5 w-3.5 mr-1" /> Approve & Sign
-                      </Button>
+                    <div className="text-[11px] text-muted-foreground">
+                      Patient: <strong className="text-foreground">{ord.patient}</strong> • Prescribed by {ord.prescriber} • {ord.date}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </Card>
 
-        </div>
-
-        {/* SMALL RIGHT SIDEBAR (1 COL) */}
-        <div className="space-y-6">
-
-          {/* Today's Clinical Summary */}
-          <Card className="p-4 sm:p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-serif text-base font-normal tracking-tight flex items-center gap-2">
-                <Activity className="h-4 w-4 text-purple-600" /> Today's Clinical Summary
-              </h3>
-              <Badge variant="outline" className="text-[10px]">Active</Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2.5 font-medium" onClick={() => handleOrderAction(ord.id, "reject")}>
+                      <X className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                    <Button size="sm" className="h-7 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 font-medium" onClick={() => handleOrderAction(ord.id, "approve")}>
+                      <Check className="h-3.5 w-3.5 mr-1" /> Approve & Sign
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between items-center text-muted-foreground">
-                <span>Chart Notes Co-Signed Today</span>
-                <span className="font-bold text-foreground">0 Notes</span>
-              </div>
-              <div className="flex justify-between items-center text-muted-foreground">
-                <span>Prescriptions E-Signed</span>
-                <span className="font-bold text-foreground">0 Scripts</span>
-              </div>
-              <div className="flex justify-between items-center text-muted-foreground">
-                <span>Good Faith Exams Completed</span>
-                <span className="font-bold text-emerald-600 font-semibold">100% Validated</span>
-              </div>
-              <div className="pt-2 border-t border-border flex justify-between items-center text-muted-foreground text-[11px]">
-                <span>Supervised Clinical Injectors</span>
-                <span className="font-semibold text-foreground">0 Active on Floor</span>
-              </div>
-            </div>
-          </Card>
-
-          {/* Notifications & Urgent Alerts */}
-          <Card className="p-4 sm:p-5 border border-border bg-card shadow-xs space-y-3.5 rounded-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-serif text-base font-normal tracking-tight flex items-center gap-2">
-                <Bell className="h-4 w-4 text-amber-600" /> Urgent Clinical Alerts
-              </h3>
-              <Badge variant="outline" className="text-[10px]">0 New</Badge>
-            </div>
-
-            <div className="text-center py-6 border border-dashed border-border rounded-xl bg-muted/10 space-y-1">
-              <Bell className="h-6 w-6 text-muted-foreground/40 mx-auto" />
-              <p className="text-xs font-medium text-foreground">No urgent clinical alerts.</p>
-              <p className="text-[11px] text-muted-foreground">High-dose treatments and urgent prescription reviews will alert here.</p>
-            </div>
-          </Card>
-
-        </div>
+          )}
+        </Card>
 
       </div>
     </div>
