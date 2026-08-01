@@ -40,7 +40,7 @@ export default function SafetyHub() {
       const { data: ps } = await apiQuery
         .from("clinical_protocols")
         .select("id, slug, title, current_version_id")
-        .like("slug", "complication-%")
+        .ilike("slug", "complication-%")
         .order("title");
       const versionIds = (ps ?? []).map((p: any) => p.current_version_id).filter(Boolean);
       const { data: vs } = versionIds.length
