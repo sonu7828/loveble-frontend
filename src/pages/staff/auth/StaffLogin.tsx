@@ -436,14 +436,15 @@ export default function StaffLogin() {
                     );
                   }
                   const roleEmoji: Record<string, string> = {
-                    admin: "👑", medical_director: "🩺", privacy_officer: "🛡️", security_officer: "🛡️",
-                    provider: "💉", nurse_practitioner: "💊", scheduler: "📅", receptionist: "🏥", staff: "👤",
+                    admin: "👑", medical_director: "🩺", privacy_officer: "🛡️",
+                    nurse_practitioner: "💊", rn_injector: "💉", front_desk: "🏥",
                   };
                   const roleColor: Record<string, string> = {
                     medical_director: "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-900 dark:text-purple-300",
                     privacy_officer: "border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300",
-                    security_officer: "border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300",
-                    provider: "border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-300",
+                    nurse_practitioner: "border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-300",
+                    rn_injector: "border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300",
+                    front_desk: "border-border bg-muted/50 hover:bg-muted text-foreground",
                   };
                   const cols = staffList.length <= 2 ? `grid-cols-1 sm:grid-cols-${staffList.length}` : "grid-cols-1 sm:grid-cols-3";
                   return (

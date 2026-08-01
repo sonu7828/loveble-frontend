@@ -9,19 +9,39 @@ export interface AuthState {
   roles: AppRole[];
   staffId: string | null;
   loading: boolean;
+  /** Full platform access */
   isAdmin: boolean;
-  isScheduler: boolean;
-  isReceptionist: boolean;
-  isStaff: boolean;
+  /** Front Desk / Scheduler — booking, check-in, calendar, POS */
+  isFrontDesk: boolean;
+  /** Nurse Practitioner — clinical provider */
   isNP: boolean;
+  /** Medical Director — supervising physician, cosign */
   isMedicalDirector: boolean;
+  /** Privacy & Security Officer — HIPAA compliance */
   isPrivacyOfficer: boolean;
+  /** RN / Injector — clinical notes, treatments, cosign submission */
+  isRNInjector: boolean;
+  /** True for any clinical provider who can be booked (MD, NP, RN/Injector) */
   isProvider: boolean;
+  /** True for any role with access to clinical charts */
   isClinicalStaff: boolean;
+  /** True for any privileged role */
   isPrivileged: boolean;
+  /** Can view all appointments / clients (not scoped to own) */
   canSeeAll: boolean;
+  /** Can override scheduling conflicts */
   canOverride: boolean;
+
+  // ── Backwards-compatible aliases ──
+  // These map to the new role structure so existing code doesn't break.
+  /** @deprecated Use isFrontDesk */
+  isScheduler: boolean;
+  /** @deprecated Use isFrontDesk */
+  isReceptionist: boolean;
+  /** @deprecated Use isAdmin || isFrontDesk */
+  isStaff: boolean;
 }
+
 export function setDemoAuthSession(email: string, roles: AppRole[], staffId?: string) {
   const user = getUserProfileByEmail(email);
   if (roles && roles.length > 0) {
@@ -52,7 +72,7 @@ export function useAuth(): AuthState {
 
       if (session && session.user && !deletedEmails.includes(userEmail)) {
         setUser(session.user);
-        setRoles(session.user.roles || ["admin", "staff"]);
+        setRoles(session.user.roles || ["admin"]);
         setStaffId(session.user.staff_id || session.user.id);
       } else {
         if (session && session.user && deletedEmails.includes(userEmail)) {
@@ -77,18 +97,31 @@ export function useAuth(): AuthState {
     };
   }, []);
 
+  // ── Core role flags ──
   const isAdmin = roles.includes("admin");
-  const isScheduler = roles.includes("scheduler") || isAdmin;
-  const isReceptionist = roles.includes("receptionist") || isAdmin;
-  const isStaff = roles.includes("staff") || isAdmin;
+  const isFrontDesk = roles.includes("front_desk") || isAdmin;
   const isNP = roles.includes("nurse_practitioner") || isAdmin;
   const isMedicalDirector = roles.includes("medical_director");
   const isPrivacyOfficer = roles.includes("privacy_officer");
-  const isProvider = (roles.includes("nurse_practitioner") || roles.includes("provider") || (roles.includes("staff") && !isAdmin)) && !isMedicalDirector && !isPrivacyOfficer && !isAdmin;
-  const isClinicalStaff = isAdmin || isStaff || isScheduler || isNP || isMedicalDirector;
-  const isPrivileged = isAdmin || isStaff || isNP || isMedicalDirector || isPrivacyOfficer;
-  const canOverride = isAdmin || isScheduler || isReceptionist || isNP || isMedicalDirector;
-  const canSeeAll = canOverride || isNP || isMedicalDirector;
+  const isRNInjector = roles.includes("rn_injector");
+
+  // Provider = any clinical role that can perform and be booked for appointments
+  const isProvider = isMedicalDirector || isNP || isRNInjector;
+
+  // Clinical staff = any role that can access clinical charts
+  const isClinicalStaff = isAdmin || isNP || isMedicalDirector || isRNInjector;
+
+  // Privileged = any authenticated staff role
+  const isPrivileged = isAdmin || isNP || isMedicalDirector || isPrivacyOfficer || isRNInjector || isFrontDesk;
+
+  // Can override scheduling conflicts or view all appointments
+  const canOverride = isAdmin || isFrontDesk || isNP || isMedicalDirector;
+  const canSeeAll = canOverride;
+
+  // ── Backwards-compatible aliases ──
+  const isScheduler = isFrontDesk;
+  const isReceptionist = isFrontDesk;
+  const isStaff = isAdmin || isFrontDesk;
 
   return {
     session: user ? { user } : null,
@@ -97,12 +130,14 @@ export function useAuth(): AuthState {
     staffId,
     loading,
     isAdmin,
+    isFrontDesk,
     isScheduler,
     isReceptionist,
     isStaff,
     isNP,
     isMedicalDirector,
     isPrivacyOfficer,
+    isRNInjector,
     isProvider,
     isClinicalStaff,
     isPrivileged,

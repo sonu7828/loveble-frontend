@@ -43,11 +43,8 @@ const TABS = [
   "records",
   "consents",
   "billing",
-  "download",
-  "amendment",
-  "notifications",
+  "messages",
   "profile",
-  "privacy",
   "support",
   "book",
 ] as const;
@@ -60,11 +57,8 @@ const NAV_ITEMS: Array<{ key: TabKey; label: string; icon: any }> = [
   { key: "records", label: "Medical Records", icon: FileText },
   { key: "consents", label: "Consent Forms", icon: FileCheck2 },
   { key: "billing", label: "Billing & Payments", icon: CreditCard },
-  { key: "download", label: "Download Records", icon: Download },
-  { key: "amendment", label: "Request Amendment", icon: FileEdit },
-  { key: "notifications", label: "Notifications", icon: Bell },
+  { key: "messages", label: "Messages", icon: MessageSquare },
   { key: "profile", label: "My Profile", icon: User },
-  { key: "privacy", label: "Privacy & Security", icon: Lock },
   { key: "support", label: "Help & Support", icon: HelpCircle },
 ];
 
@@ -102,8 +96,15 @@ export default function PatientAccount() {
   const [updatingPass, setUpdatingPass] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const tabParam = (searchParams.get("tab") ?? "dashboard") as TabKey;
-  const activeTab: TabKey = (TABS as readonly string[]).includes(tabParam) ? tabParam : "dashboard";
+  const rawTab = searchParams.get("tab") ?? "dashboard";
+  const tabMap: Record<string, TabKey> = {
+    download: "records",
+    amendment: "records",
+    notifications: "messages",
+    privacy: "profile",
+  };
+  const resolvedTab = tabMap[rawTab] || (rawTab as TabKey);
+  const activeTab: TabKey = (TABS as readonly string[]).includes(resolvedTab) ? resolvedTab : "dashboard";
 
   const onTabChange = (v: string) => {
     const next = new URLSearchParams(searchParams);
@@ -550,6 +551,8 @@ export default function PatientAccount() {
               <TabsContent value="records" className="mt-0 space-y-6">
                 <MyChartTimelineCard />
                 <MyTreatmentPlansCard />
+                <DownloadRecordsCard userEmail={user?.email || ""} profile={profile} />
+                <PatientAmendmentModal userEmail={user?.email || ""} />
               </TabsContent>
 
               {/* 4. CONSENT FORMS */}
@@ -590,16 +593,6 @@ export default function PatientAccount() {
                 <MyReceiptsCard />
               </TabsContent>
 
-              {/* 6. DOWNLOAD MEDICAL RECORDS */}
-              <TabsContent value="download" className="mt-0 space-y-6">
-                <DownloadRecordsCard userEmail={user?.email || ""} profile={profile} />
-              </TabsContent>
-
-              {/* 7. REQUEST RECORD AMENDMENT */}
-              <TabsContent value="amendment" className="mt-0 space-y-6">
-                <PatientAmendmentModal userEmail={user?.email || ""} />
-              </TabsContent>
-
               {/* BOOKING WIZARD */}
               <TabsContent value="book" className="mt-0">
                 <div className="pb-8">
@@ -607,21 +600,21 @@ export default function PatientAccount() {
                 </div>
               </TabsContent>
 
-              {/* 8. NOTIFICATIONS & MESSAGES */}
-              <TabsContent value="notifications" className="mt-0 space-y-6">
+              {/* 6. MESSAGES */}
+              <TabsContent value="messages" className="mt-0 space-y-6">
                 <div className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-serif text-xl">Message Support &amp; Alerts</h3>
+                      <h3 className="font-serif text-xl">Patient Communications</h3>
                       <p className="text-xs text-muted-foreground">Direct SMS communications with our clinical staff.</p>
                     </div>
-                    <Bell className="h-6 w-6 text-primary shrink-0" />
+                    <MessageSquare className="h-6 w-6 text-primary shrink-0" />
                   </div>
                   <SmsThread clientEmail={user?.email || ""} viewerRole="client" />
                 </div>
               </TabsContent>
 
-              {/* 9. MY PROFILE */}
+              {/* 7. MY PROFILE */}
               <TabsContent value="profile" className="mt-0 space-y-6">
                 <div className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-6">
                   <div className="flex items-center justify-between">
@@ -683,31 +676,30 @@ export default function PatientAccount() {
                       </div>
                     </div>
                   )}
-                </div>
-              </TabsContent>
 
-              {/* 10. PRIVACY & SECURITY */}
-              <TabsContent value="privacy" className="mt-0 space-y-6">
-                <div className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-6">
-                  <div>
-                    <h3 className="font-serif text-xl">Account Security &amp; Password</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Update your password to keep your patient account secure.</p>
+                  {/* ACCOUNT SECURITY & PASSWORD */}
+                  <div className="pt-6 border-t border-border space-y-4">
+                    <div>
+                      <h4 className="font-serif text-lg">Account Security &amp; Password</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">Update your password to keep your patient account secure.</p>
+                    </div>
+
+                    <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
+                      <div>
+                        <Label htmlFor="np" className="text-xs">New Password</Label>
+                        <Input id="np" type="password" required value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="mt-1 text-xs" />
+                      </div>
+                      <div>
+                        <Label htmlFor="cp" className="text-xs">Confirm New Password</Label>
+                        <Input id="cp" type="password" required value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="mt-1 text-xs" />
+                      </div>
+                      <Button type="submit" disabled={updatingPass} size="sm" className="rounded-full">
+                        {updatingPass ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
+                      </Button>
+                    </form>
                   </div>
 
-                  <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
-                    <div>
-                      <Label htmlFor="np" className="text-xs">New Password</Label>
-                      <Input id="np" type="password" required value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} className="mt-1 text-xs" />
-                    </div>
-                    <div>
-                      <Label htmlFor="cp" className="text-xs">Confirm New Password</Label>
-                      <Input id="cp" type="password" required value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} className="mt-1 text-xs" />
-                    </div>
-                    <Button type="submit" disabled={updatingPass} size="sm" className="rounded-full">
-                      {updatingPass ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
-                    </Button>
-                  </form>
-
+                  {/* HIPAA PRIVACY NOTICE */}
                   <div className="pt-4 border-t border-border space-y-2">
                     <div className="flex items-center gap-2 font-semibold text-xs">
                       <ShieldCheck className="h-4 w-4 text-emerald-600" /> HIPAA Privacy Notice (NPP)
@@ -719,7 +711,7 @@ export default function PatientAccount() {
                 </div>
               </TabsContent>
 
-              {/* 11. HELP & SUPPORT */}
+              {/* 8. HELP & SUPPORT */}
               <TabsContent value="support" className="mt-0 space-y-6">
                 <div className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-6">
                   <div>

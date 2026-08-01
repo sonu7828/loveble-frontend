@@ -62,7 +62,7 @@ export default function StaffClientDetail() {
   const { email = "" } = useParams();
   const decodedEmail = decodeURIComponent(email).toLowerCase();
   const navigate = useNavigate();
-  const { isNP, isAdmin } = useAuth();
+  const { isNP, isAdmin, isClinicalStaff } = useAuth();
   const [recentNote, setRecentNote] = useState<{ id: string; status: string; created_at: string; service_name: string | null; category: string | null } | null>(null);
   const [noteCount, setNoteCount] = useState(0);
 
@@ -148,7 +148,7 @@ export default function StaffClientDetail() {
 
       const { data: noteRows, count: nc } = await apiQuery
         .from("clinical_notes")
-        .select("id, status, created_at, service_name, category", { count: "exact" })
+        .select("id, status, created_at, service_name, category")
         .ilike("client_email", decodedEmail)
         .order("created_at", { ascending: false })
         .limit(1);
@@ -494,96 +494,61 @@ export default function StaffClientDetail() {
         />
       )}
 
-
-      {/* Chart panel — primary entry point for clinical documentation */}
-      <div className="rounded-2xl border border-border bg-card p-5 mb-6">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground inline-flex items-center gap-1.5">
-            <Stethoscope className="h-3 w-3" /> Clinical chart
-          </div>
-          <Button asChild size="sm" variant="outline" className="rounded-full gap-1.5">
-            <Link to={`/staff/clinical/clients/${encodeURIComponent(decodedEmail)}`}>
-              Open chart{noteCount > 0 ? ` · ${noteCount} note${noteCount === 1 ? "" : "s"}` : ""} <ChevronRight className="h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
-
-        {/* GFE status line in plain English */}
-        <div className="flex items-start gap-2 text-sm mb-4">
-          {gfe && new Date(gfe.expires_at) > new Date() ? (
-            <>
-              <ShieldCheck className="h-4 w-4 text-success-soft-foreground mt-0.5 shrink-0" />
-              <span className="text-muted-foreground">
-                GFE on file · valid for {differenceInDays(new Date(gfe.expires_at), new Date())} more day{differenceInDays(new Date(gfe.expires_at), new Date()) === 1 ? "" : "s"}
-                {" — "}
-                <Link to={`/staff/clinical/gfe/${gfe.id}`} className="text-foreground underline-offset-2 hover:underline">view</Link>
-              </span>
-            </>
-          ) : gfe ? (
-            <>
-              <ShieldAlert className="h-4 w-4 text-warning-soft-foreground mt-0.5 shrink-0" />
-              <span className="text-warning-soft-foreground">GFE expired {formatDistanceToNow(new Date(gfe.expires_at))} ago. {isNP || isAdmin ? "Renew before next procedure." : "An NP must renew before next procedure."}</span>
-            </>
-          ) : (
-            <>
-              <ShieldAlert className="h-4 w-4 text-warning-soft-foreground mt-0.5 shrink-0" />
-              <span className="text-warning-soft-foreground">No GFE on file. {isNP || isAdmin ? "Required before any injectable procedure." : "An NP must conduct one before any procedure."}</span>
-            </>
-          )}
-        </div>
-
-        {/* Most recent chart note (if any) */}
-        {recentNote && (
-          <Link to={`/staff/clinical/notes/${recentNote.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 mb-4 hover:bg-secondary/40 transition">
-            <div className="flex items-center gap-2 min-w-0">
-              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">Last note: {recentNote.service_name ?? recentNote.category ?? "Chart note"}</div>
-                <div className="text-xs text-muted-foreground">{format(new Date(recentNote.created_at), "MMM d, yyyy")} · <span className="capitalize">{recentNote.status}</span></div>
-              </div>
+      {/* Chart panel — primary entry point for clinical documentation (Clinical roles only) */}
+      {isClinicalStaff && (
+        <div className="rounded-2xl border border-border bg-card p-5 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground inline-flex items-center gap-1.5">
+              <Stethoscope className="h-3 w-3" /> Clinical chart
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-          </Link>
-        )}
-
-        {/* Primary action buttons */}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            className="rounded-full gap-1.5"
-            onClick={() => {
-              const f = display?.client_first_name ?? display?.first_name ?? "";
-              const l = display?.client_last_name ?? display?.last_name ?? "";
-              const p = display?.client_phone ?? display?.phone ?? "";
-              const loc = appts[0]?.location_id ?? "";
-              const qs = new URLSearchParams({
-                first: f, last: l, email: decodedEmail,
-                ...(p ? { phone: p } : {}),
-                ...(loc ? { locationId: loc } : {}),
-              }).toString();
-              navigate(`/staff/checkout?${qs}`);
-            }}
-          >
-            <ShoppingCart className="h-4 w-4" /> New sale
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-full gap-1.5"
-            onClick={() => navigate(`/staff/clinical/notes/new?email=${encodeURIComponent(decodedEmail)}&first=${encodeURIComponent(display?.client_first_name ?? display?.first_name ?? "")}&last=${encodeURIComponent(display?.client_last_name ?? display?.last_name ?? "")}`)}
-          >
-            <FilePlus className="h-4 w-4" /> New chart note
-          </Button>
-          {(isNP || isAdmin) && (!gfe || new Date(gfe.expires_at) <= new Date()) && (
-            <Button
-              variant="outline"
-              className="rounded-full gap-1.5"
-              onClick={() => navigate(`/staff/clinical/gfe/new?email=${encodeURIComponent(decodedEmail)}&first=${encodeURIComponent(display?.client_first_name ?? display?.first_name ?? "")}&last=${encodeURIComponent(display?.client_last_name ?? display?.last_name ?? "")}`)}
-            >
-              <ShieldCheck className="h-4 w-4" /> Conduct GFE
+            <Button asChild size="sm" variant="outline" className="rounded-full gap-1.5">
+              <Link to={`/staff/clinical/clients/${encodeURIComponent(decodedEmail)}`}>
+                Open chart{noteCount > 0 ? ` · ${noteCount} note${noteCount === 1 ? "" : "s"}` : ""} <ChevronRight className="h-3 w-3" />
+              </Link>
             </Button>
+          </div>
+
+          {/* GFE status line in plain English */}
+          <div className="flex items-start gap-2 text-sm mb-4">
+            {gfe && new Date(gfe.expires_at) > new Date() ? (
+              <>
+                <ShieldCheck className="h-4 w-4 text-success-soft-foreground mt-0.5 shrink-0" />
+                <span className="text-muted-foreground">
+                  GFE on file · valid for {differenceInDays(new Date(gfe.expires_at), new Date())} more day{differenceInDays(new Date(gfe.expires_at), new Date()) === 1 ? "" : "s"}
+                  {" — "}
+                  <Link to={`/staff/clinical/gfe/${gfe.id}`} className="text-foreground underline-offset-2 hover:underline">view</Link>
+                </span>
+              </>
+            ) : gfe ? (
+              <>
+                <ShieldAlert className="h-4 w-4 text-warning-soft-foreground mt-0.5 shrink-0" />
+                <span className="text-warning-soft-foreground">GFE expired {formatDistanceToNow(new Date(gfe.expires_at))} ago. {isNP || isAdmin ? "Renew before next procedure." : "An NP must renew before next procedure."}</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="h-4 w-4 text-warning-soft-foreground mt-0.5 shrink-0" />
+                <span className="text-warning-soft-foreground">No GFE on file. {isNP || isAdmin ? "Required before any injectable procedure." : "An NP must conduct one before any procedure."}</span>
+              </>
+            )}
+          </div>
+
+          {/* Most recent chart note (if any) */}
+          {recentNote && (
+            <Link to={`/staff/clinical/notes/${recentNote.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 mb-4 hover:bg-secondary/40 transition">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">Last note: {recentNote.service_name ?? recentNote.category ?? "Chart note"}</div>
+                  <div className="text-xs text-muted-foreground">{format(new Date(recentNote.created_at), "MMM d, yyyy")} · <span className="capitalize">{recentNote.status}</span></div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </Link>
           )}
-          {(isNP || isAdmin) && (
+
+          {/* Primary action buttons */}
+          <div className="flex flex-wrap gap-2">
             <Button
-              variant="outline"
               className="rounded-full gap-1.5"
               onClick={() => {
                 const f = display?.client_first_name ?? display?.first_name ?? "";
@@ -594,9 +559,9 @@ export default function StaffClientDetail() {
             >
               <FileText className="h-4 w-4" /> Start protocol visit
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
 
 
@@ -633,7 +598,7 @@ export default function StaffClientDetail() {
           <TabsTrigger value="history" className="rounded-full">History ({stats.total})</TabsTrigger>
           <TabsTrigger value="consents" className="rounded-full">Consents ({signed.length})</TabsTrigger>
           <TabsTrigger value="billing" className="rounded-full">Billing ({receipts.length})</TabsTrigger>
-          <TabsTrigger value="notes" className="rounded-full">Notes</TabsTrigger>
+          {isClinicalStaff && <TabsTrigger value="notes" className="rounded-full">Notes</TabsTrigger>}
           <TabsTrigger value="disclosures" className="rounded-full">HIPAA Disclosures</TabsTrigger>
         </TabsList>
 

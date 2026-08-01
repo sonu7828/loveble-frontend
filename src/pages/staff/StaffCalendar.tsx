@@ -8,7 +8,7 @@ import { Loader2, ChevronLeft, ChevronRight, MapPin, Plus, Calendar as CalendarI
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { fetchUnifiedStaffMembers } from "@/lib/unifiedStaff";
+import { fetchUnifiedStaffMembers, isClinicalProvider } from "@/lib/unifiedStaff";
 
 interface Appt {
   id: string; status: string; start_at: string; end_at: string;
@@ -24,6 +24,50 @@ interface Schedule {
 }
 interface StaffP { id: string; full_name: string; color?: string; }
 
+function getStatusBadgeStyle(status: string) {
+  const s = (status || "").toLowerCase();
+  if (s === "pending") {
+    return {
+      bg: "#fef3c7", // Soft Amber
+      badgeClass: "bg-amber-500/20 text-amber-900 border border-amber-500/30",
+      label: "Pending",
+    };
+  }
+  if (s === "confirmed" || s === "approved") {
+    return {
+      bg: "#e0f2fe", // Soft Sky Blue
+      badgeClass: "bg-sky-500/20 text-sky-900 border border-sky-500/30",
+      label: "Confirmed",
+    };
+  }
+  if (s === "arrived" || s === "checked_in") {
+    return {
+      bg: "#ccfbf1", // Soft Teal
+      badgeClass: "bg-teal-500/20 text-teal-900 border border-teal-500/30",
+      label: "Checked-in",
+    };
+  }
+  if (s === "completed") {
+    return {
+      bg: "#dcfce7", // Soft Emerald Green
+      badgeClass: "bg-emerald-500/20 text-emerald-900 border border-emerald-500/30",
+      label: "Completed",
+    };
+  }
+  if (s === "cancelled" || s === "no_show" || s === "denied") {
+    return {
+      bg: "#ffe4e6", // Soft Rose Red
+      badgeClass: "bg-rose-500/20 text-rose-900 border border-rose-500/30",
+      label: s === "no_show" ? "No-show" : "Cancelled",
+    };
+  }
+  return {
+    bg: "#f3f4f6",
+    badgeClass: "bg-secondary text-foreground",
+    label: status,
+  };
+}
+
 export default function StaffCalendar() {
   const navigate = useNavigate();
   const { canSeeAll, staffId } = useAuth();
@@ -38,6 +82,8 @@ export default function StaffCalendar() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [filterStaff, setFilterStaff] = useState<string>("");
   const [filterLocation, setFilterLocation] = useState<string>("");
+  const [filterService, setFilterService] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
   const [view, setView] = useState<"week" | "day" | "month">("week");
   const [dayDate, setDayDate] = useState<Date>(() => new Date());
   const [monthDate, setMonthDate] = useState<Date>(() => startOfMonth(new Date()));
@@ -92,7 +138,7 @@ export default function StaffCalendar() {
       const start = startLocal.toISOString();
       const end = endLocal.toISOString();
       const [a, o, sc] = await Promise.all([
-        apiQuery("appointments").select("*").gte("start_at", start).lt("start_at", end).in("status", ["pending", "approved"]),
+        apiQuery("appointments").select("*").gte("start_at", start).lt("start_at", end),
         apiQuery("schedule_overrides").select("*").gte("start_at", start).lt("start_at", end),
         apiQuery("weekly_schedules").select("*").eq("is_active", true),
       ]);
@@ -109,7 +155,7 @@ export default function StaffCalendar() {
         const map: Record<string, string[]> = {};
         const serviceNames = new Map((sv.data ?? []).map((service) => [service.id, service.name]));
         for (const r of (aps ?? []) as any[]) {
-          const nm = serviceNames.get(r.service_id);
+          const nm = serviceNames.get(r.service_id) as string | undefined;
           if (!nm) continue;
           (map[r.appointment_id] ||= []).push(nm);
         }
@@ -123,10 +169,20 @@ export default function StaffCalendar() {
 
   // If user is staff-only (not admin/scheduler), force filter to self
   const effectiveFilter = canSeeAll ? filterStaff : (staffId ?? "");
-  const visibleAppts = appts.filter((a) =>
-    (!effectiveFilter || a.staff_id === effectiveFilter) &&
-    (!filterLocation || a.location_id === filterLocation)
-  );
+  const visibleAppts = appts.filter((a) => {
+    if (effectiveFilter && a.staff_id !== effectiveFilter) return false;
+    if (filterLocation && a.location_id !== filterLocation) return false;
+    if (filterService && a.service_id !== filterService) return false;
+    if (filterStatus) {
+      const st = (a.status || "").toLowerCase();
+      if (filterStatus === "pending") return st === "pending";
+      if (filterStatus === "confirmed") return st === "confirmed" || st === "approved";
+      if (filterStatus === "arrived") return st === "arrived" || st === "checked_in";
+      if (filterStatus === "completed") return st === "completed";
+      if (filterStatus === "cancelled") return st === "cancelled" || st === "canceled" || st === "no_show" || st === "denied";
+    }
+    return true;
+  });
   const visibleOverrides = overrides.filter((o) => !effectiveFilter || o.staff_id === effectiveFilter);
 
   const headerRange = view === "week"
@@ -150,6 +206,14 @@ export default function StaffCalendar() {
     setWeekStart(startOfWeek(t, { weekStartsOn: 0 }));
     setDayDate(t);
     setMonthDate(startOfMonth(t));
+  };
+
+  const handleDatePick = (dStr: string) => {
+    if (!dStr) return;
+    const picked = new Date(dStr + "T12:00:00");
+    setDayDate(picked);
+    setWeekStart(startOfWeek(picked, { weekStartsOn: 0 }));
+    setMonthDate(startOfMonth(picked));
   };
 
   // ---- Mobile: "Today list" ----------------------------------------------
@@ -195,19 +259,21 @@ export default function StaffCalendar() {
         {canSeeAll && (
           <div className="grid grid-cols-2 gap-2 mb-3">
             <Select value={filterStaff || "all"} onValueChange={(v) => setFilterStaff(v === "all" ? "" : v)}>
-              <SelectTrigger aria-label="Filter by staff" className="h-9 text-xs"><SelectValue placeholder="All staff" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by provider" className="h-9 text-xs"><SelectValue placeholder="All providers" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All staff</SelectItem>
-                {staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}
+                <SelectItem value="all">All providers</SelectItem>
+                {staff.filter(isClinicalProvider).map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={filterLocation || "all"} onValueChange={(v) => setFilterLocation(v === "all" ? "" : v)}>
-              <SelectTrigger aria-label="Filter by location" className="h-9 text-xs"><SelectValue placeholder="All locations" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All locations</SelectItem>
-                {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {locations.length > 1 && (
+              <Select value={filterLocation || "all"} onValueChange={(v) => setFilterLocation(v === "all" ? "" : v)}>
+                <SelectTrigger aria-label="Filter by location" className="h-9 text-xs"><SelectValue placeholder="All locations" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All locations</SelectItem>
+                  {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )}
 
@@ -236,7 +302,7 @@ export default function StaffCalendar() {
               const label = names && names.length > 0
                 ? names.join(" + ")
                 : (services.find((s) => s.id === a.service_id)?.name ?? "");
-              const isPending = a.status === "pending";
+              const style = getStatusBadgeStyle(a.status);
               return (
                 <li key={a.id}>
                   <button
@@ -251,8 +317,8 @@ export default function StaffCalendar() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full ${isPending ? "bg-warning-soft text-warning-soft-foreground" : "bg-success-soft text-success-soft-foreground"}`}>
-                          {a.status}
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${style.badgeClass}`}>
+                          {style.label}
                         </span>
                         {loc && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
@@ -284,48 +350,152 @@ export default function StaffCalendar() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      {/* Top Header Bar */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
           <h1 className="font-serif text-3xl">Calendar</h1>
           <p className="text-xs text-muted-foreground mt-1">{headerRange}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex rounded-full border border-border overflow-hidden text-xs" role="group" aria-label="Calendar view">
-            <button onClick={() => setView("day")} aria-pressed={view === "day"} className={`px-3 py-1.5 ${view === "day" ? "bg-foreground text-background" : "bg-background"}`}>Day</button>
-            <button onClick={() => setView("week")} aria-pressed={view === "week"} className={`px-3 py-1.5 ${view === "week" ? "bg-foreground text-background" : "bg-background"}`}>Week</button>
-            <button onClick={() => setView("month")} aria-pressed={view === "month"} className={`px-3 py-1.5 ${view === "month" ? "bg-foreground text-background" : "bg-background"}`}>Month</button>
+            <button onClick={() => setView("day")} aria-pressed={view === "day"} className={`px-3 py-1.5 ${view === "day" ? "bg-foreground text-background font-medium" : "bg-background"}`}>Day</button>
+            <button onClick={() => setView("week")} aria-pressed={view === "week"} className={`px-3 py-1.5 ${view === "week" ? "bg-foreground text-background font-medium" : "bg-background"}`}>Week</button>
+            <button onClick={() => setView("month")} aria-pressed={view === "month"} className={`px-3 py-1.5 ${view === "month" ? "bg-foreground text-background font-medium" : "bg-background"}`}>Month</button>
           </div>
           {canSeeAll && (
             <Select value={filterStaff || "all"} onValueChange={(value) => setFilterStaff(value === "all" ? "" : value)}>
-              <SelectTrigger aria-label="Filter by staff" className="h-9 w-[150px] rounded-full text-xs">
-                <SelectValue placeholder="All staff" />
+              <SelectTrigger aria-label="Filter by provider" className="h-9 w-[160px] rounded-full text-xs">
+                <SelectValue placeholder="All providers" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All staff</SelectItem>
-                {staff.map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}
+                <SelectItem value="all">All providers</SelectItem>
+                {staff.filter(isClinicalProvider).map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
-          <Select value={filterLocation || "all"} onValueChange={(value) => setFilterLocation(value === "all" ? "" : value)}>
-            <SelectTrigger aria-label="Filter by location" className="h-9 w-[160px] rounded-full text-xs">
-              <SelectValue placeholder="All locations" />
+          {locations.length > 1 && (
+            <Select value={filterLocation || "all"} onValueChange={(value) => setFilterLocation(value === "all" ? "" : value)}>
+              <SelectTrigger aria-label="Filter by location" className="h-9 w-[150px] rounded-full text-xs">
+                <SelectValue placeholder="All locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All locations</SelectItem>
+                {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={filterService || "all"} onValueChange={(value) => setFilterService(value === "all" ? "" : value)}>
+            <SelectTrigger aria-label="Filter by service" className="h-9 w-[150px] rounded-full text-xs">
+              <SelectValue placeholder="All services" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All locations</SelectItem>
-              {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+              <SelectItem value="all">All services</SelectItem>
+              {services.map((sv) => <SelectItem key={sv.id} value={sv.id}>{sv.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button size="sm" variant="outline" className="rounded-full" onClick={goPrev} aria-label="Previous"><ChevronLeft className="h-4 w-4" /></Button>
           <Button size="sm" variant="outline" className="rounded-full" onClick={goToday}>Today</Button>
+          <div className="relative inline-flex items-center">
+            <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="date"
+              value={format(view === "week" ? weekStart : view === "month" ? monthDate : dayDate, "yyyy-MM-dd")}
+              onChange={(e) => handleDatePick(e.target.value)}
+              className="h-9 pl-8 pr-2.5 rounded-full border border-input bg-background text-xs font-medium cursor-pointer hover:border-primary/50 transition-colors shadow-2xs"
+              title="Select specific date"
+            />
+          </div>
           <Button size="sm" variant="outline" className="rounded-full" onClick={goNext} aria-label="Next"><ChevronRight className="h-4 w-4" /></Button>
         </div>
+      </div>
+
+      {/* Main Interactive Status Pill Filter Bar */}
+      <div className="mb-6 flex flex-wrap items-center gap-2.5 bg-card border border-border/80 rounded-xl p-3 shadow-xs">
+        <span className="text-[11px] font-bold text-foreground/70 uppercase tracking-wider px-1">Status Filter:</span>
+        
+        <button
+          type="button"
+          onClick={() => setFilterStatus("")}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold transition-all border ${
+            !filterStatus
+              ? "bg-primary text-primary-foreground border-primary shadow-xs"
+              : "bg-secondary/60 text-foreground border-border hover:bg-secondary"
+          }`}
+        >
+          All
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterStatus("pending")}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+            filterStatus === "pending"
+              ? "bg-amber-600 text-white border-amber-700 shadow-xs"
+              : "bg-amber-500/15 text-amber-950 border-amber-500/30 hover:bg-amber-500/25"
+          }`}
+        >
+          <span className={`h-2.5 w-2.5 rounded-full ${filterStatus === "pending" ? "bg-white" : "bg-amber-500"}`} />
+          Pending
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterStatus("confirmed")}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+            filterStatus === "confirmed"
+              ? "bg-sky-600 text-white border-sky-700 shadow-xs"
+              : "bg-sky-500/15 text-sky-950 border-sky-500/30 hover:bg-sky-500/25"
+          }`}
+        >
+          <span className={`h-2.5 w-2.5 rounded-full ${filterStatus === "confirmed" ? "bg-white" : "bg-sky-500"}`} />
+          Confirmed
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterStatus("arrived")}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+            filterStatus === "arrived"
+              ? "bg-teal-600 text-white border-teal-700 shadow-xs"
+              : "bg-teal-500/15 text-teal-950 border-teal-500/30 hover:bg-teal-500/25"
+          }`}
+        >
+          <span className={`h-2.5 w-2.5 rounded-full ${filterStatus === "arrived" ? "bg-white" : "bg-teal-500"}`} />
+          Checked-in
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterStatus("completed")}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+            filterStatus === "completed"
+              ? "bg-emerald-600 text-white border-emerald-700 shadow-xs"
+              : "bg-emerald-500/15 text-emerald-950 border-emerald-500/30 hover:bg-emerald-500/25"
+          }`}
+        >
+          <span className={`h-2.5 w-2.5 rounded-full ${filterStatus === "completed" ? "bg-white" : "bg-emerald-500"}`} />
+          Completed
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterStatus("cancelled")}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+            filterStatus === "cancelled"
+              ? "bg-rose-600 text-white border-rose-700 shadow-xs"
+              : "bg-rose-500/15 text-rose-950 border-rose-500/30 hover:bg-rose-500/25"
+          }`}
+        >
+          <span className={`h-2.5 w-2.5 rounded-full ${filterStatus === "cancelled" ? "bg-white" : "bg-rose-500"}`} />
+          Cancelled / No-show
+        </button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-5 w-5 animate-spin" /></div>
       ) : view === "month" ? (
         <div className="space-y-2">
-          <div className="grid grid-cols-7 gap-2 text-[10px] uppercase tracking-widest text-muted-foreground px-1">
+          <div className="grid grid-cols-7 gap-2 text-[10px] uppercase tracking-widest text-muted-foreground px-1 font-semibold">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
               <div key={d}>{d}</div>
             ))}
@@ -347,7 +517,7 @@ export default function StaffCalendar() {
                     onClick={() => { setDayDate(day); setView("day"); }}
                     className="flex items-center justify-between text-[11px] hover:text-primary text-left"
                   >
-                    <span className={`font-medium ${isToday ? "text-primary" : ""}`}>{format(day, "d")}</span>
+                    <span className={`font-medium ${isToday ? "text-primary font-bold" : ""}`}>{format(day, "d")}</span>
                     {(dayAppts.length > 0 || dayOver.length > 0) && (
                       <span className="text-[10px] text-muted-foreground">{dayAppts.length || ""}{dayOver.length > 0 ? " ⛔" : ""}</span>
                     )}
@@ -355,14 +525,15 @@ export default function StaffCalendar() {
                   <div className="space-y-0.5 overflow-hidden">
                     {dayAppts.slice(0, 3).map((a) => {
                       const sp = staff.find((s) => s.id === a.staff_id);
+                      const style = getStatusBadgeStyle(a.status);
                       return (
                         <button
                           key={a.id}
                           type="button"
                           onClick={() => navigate(`/staff/appointments/${a.id}`)}
-                          className="w-full text-left text-[10px] rounded px-1 py-0.5 border-l-2 truncate"
-                          style={{ borderLeftColor: sp?.color ?? "#c97c5d", background: a.status === "pending" ? "#fef3c7" : "#f0fdf4" }}
-                          title={`${format(new Date(a.start_at), "h:mm a")} ${a.client_first_name} ${a.client_last_name}`}
+                          className="w-full text-left text-[10px] font-medium rounded px-1.5 py-0.5 border-l-2 truncate transition-all"
+                          style={{ borderLeftColor: sp?.color ?? "#c97c5d", background: style.bg }}
+                          title={`${format(new Date(a.start_at), "h:mm a")} ${a.client_first_name} ${a.client_last_name} (${style.label})`}
                         >
                           {format(new Date(a.start_at), "h:mma")} {a.client_first_name}
                         </button>
@@ -372,7 +543,7 @@ export default function StaffCalendar() {
                       <button
                         type="button"
                         onClick={() => { setDayDate(day); setView("day"); }}
-                        className="text-[10px] text-muted-foreground hover:text-foreground"
+                        className="text-[10px] text-muted-foreground hover:text-foreground font-medium"
                       >
                         +{dayAppts.length - 3} more
                       </button>
@@ -407,10 +578,10 @@ export default function StaffCalendar() {
                   title="Book an appointment on this day"
                   className="w-full px-3 py-2 border-b border-border flex items-center justify-between hover:bg-accent/40 transition-colors text-left"
                 >
-                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{format(day, view === "week" ? "EEE" : "EEEE")}</div>
+                  <div className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">{format(day, view === "week" ? "EEE" : "EEEE")}</div>
                   <div className="flex items-center gap-1.5">
                     <Plus className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-                    <span className={`text-sm font-serif ${isSameDay(day, new Date()) ? "text-primary" : ""}`}>{format(day, "MMM d")}</span>
+                    <span className={`text-sm font-serif ${isSameDay(day, new Date()) ? "text-primary font-bold" : ""}`}>{format(day, "MMM d")}</span>
                   </div>
                 </button>
                 <div className="p-2 space-y-1.5">
@@ -426,20 +597,23 @@ export default function StaffCalendar() {
                     const label = names && names.length > 0
                       ? names.join(" + ")
                       : (services.find((s) => s.id === a.service_id)?.name ?? "");
+                    const style = getStatusBadgeStyle(a.status);
                     return (
                       <button
                         key={a.id}
                         type="button"
                         onClick={() => navigate(`/staff/appointments/${a.id}`)}
-                        className="w-full text-left text-[11px] rounded-md p-1.5 border-l-2 hover:ring-1 hover:ring-foreground/20 transition-all"
-                        style={{ borderLeftColor: sp?.color ?? "#c97c5d", background: a.status === "pending" ? "#fef3c7" : "#f0fdf4" }}
+                        className="w-full text-left text-[11px] rounded-lg p-2 border-l-3 hover:ring-1 hover:ring-foreground/20 transition-all shadow-2xs"
+                        style={{ borderLeftColor: sp?.color ?? "#c97c5d", background: style.bg }}
                       >
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="font-medium">{format(new Date(a.start_at), "h:mm a")}</div>
-                          {loc && <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground"><MapPin className="h-2.5 w-2.5" />{loc.name.split(" ")[0]}</span>}
+                        <div className="flex items-center justify-between gap-1 mb-0.5">
+                          <div className="font-semibold text-foreground text-[11px]">{format(new Date(a.start_at), "h:mm a")}</div>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${style.badgeClass}`}>
+                            {style.label}
+                          </span>
                         </div>
-                        <div className="truncate" title={label}>{label}</div>
-                        <div className="truncate text-muted-foreground">{a.client_first_name} {a.client_last_name?.[0] ?? ""}.</div>
+                        <div className="truncate font-medium text-[11px]" title={label}>{label}</div>
+                        <div className="truncate text-muted-foreground text-[10px]">{a.client_first_name} {a.client_last_name?.[0] ?? ""}.</div>
                       </button>
                     );
                   })}
@@ -458,13 +632,6 @@ export default function StaffCalendar() {
           })}
         </div>
       )}
-
-      <div className="mt-6 flex flex-wrap gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-sm bg-warning-soft" /> Pending</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-sm bg-success-soft" /> Approved</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-sm bg-destructive-soft" /> Time off</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-sm bg-success-soft" /> Extra availability</span>
-      </div>
     </div>
   );
 }

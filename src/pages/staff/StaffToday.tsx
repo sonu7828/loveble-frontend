@@ -378,6 +378,7 @@ function StandardStaffToday() {
   const [recentPatients, setRecentPatients] = useState<any[]>([]);
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -427,6 +428,52 @@ function StandardStaffToday() {
     loadData();
   }, [loadData]);
 
+  const approveAppointment = async (apptId: string) => {
+    setApprovingId(apptId);
+    try {
+      const { error } = await apiQuery("appointments")
+        .update({ status: "approved" })
+        .eq("id", apptId);
+      if (error) throw error;
+      setAppts((prev) =>
+        prev.map((a) => (a.id === apptId ? { ...a, status: "approved" } : a))
+      );
+      toast.success("Appointment approved!");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to approve appointment");
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const pendingRequestsCount = appts.filter(a => a.status === "pending").length;
+  const waitingPatientsCount = appts.filter(a => a.status === "arrived" || a.checked_in_at).length;
+
+  const resolveStaffName = (staffId?: string, staffName?: string) => {
+    if (staffName && staffName.trim() && !staffName.includes("-") && staffName.length < 35) return staffName;
+    try {
+      const approved: Array<{ id?: string; email: string; full_name?: string }> =
+        JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+      const match = approved.find((s) => s.id === staffId || (staffId && s.email?.toLowerCase().includes(staffId.toLowerCase())));
+      if (match?.full_name) return match.full_name;
+    } catch {}
+    return "Girish (Provider)";
+  };
+
+  const checkInAppt = async (apptId: string) => {
+    try {
+      const { error } = await apiQuery("appointments")
+        .update({ status: "arrived", checked_in_at: new Date().toISOString() })
+        .eq("id", apptId);
+      if (error) throw error;
+      setAppts((prev) =>
+        prev.map((a) => (a.id === apptId ? { ...a, status: "arrived", checked_in_at: new Date().toISOString() } : a))
+      );
+      toast.success("Patient checked in!");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to check in");
+    }
+  };
   const uMeta = (user as any)?.user_metadata;
   // Resolve staff name from approved accounts (real staff data) rather than hardcoded auth names
   const staffName = (() => {
@@ -441,7 +488,7 @@ function StandardStaffToday() {
     }
     return user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
       ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim()
-      : user?.email || "Clinical Staff";
+      : user?.email || "Front Desk Staff";
   })();
 
   const toggleStaffTask = (id: number) => {
@@ -456,13 +503,13 @@ function StandardStaffToday() {
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-semibold uppercase tracking-wider text-[10px]">
-              <Stethoscope className="h-3.5 w-3.5 mr-1" /> Clinical Staff Portal
+              <UserCheck className="h-3.5 w-3.5 mr-1" /> Front Desk Receptionist Portal
             </Badge>
             <span className="text-xs text-muted-foreground">• {formatClinicDate()}</span>
           </div>
           <h1 className="font-serif text-xl sm:text-2xl font-medium">Welcome back, {staffName}</h1>
           <p className="text-xs text-muted-foreground">
-            Overview of today's patient visits, clinical documentation tasks, and messaging queue.
+            Overview of today's patient visits, front-desk check-ins, and booking requests.
           </p>
         </div>
 
@@ -500,37 +547,39 @@ function StandardStaffToday() {
               <UserCheck className="h-4 w-4 text-emerald-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">0</div>
+          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{waitingPatientsCount}</div>
           <div className="text-[11px] text-emerald-600 font-medium mt-1">
             Checked in & in building
           </div>
         </Card>
 
-        {/* KPI 3: Pending Tasks */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-amber-500/30 transition rounded-xl">
+        {/* KPI 3: Today's Check-ins */}
+        <Card className="p-4 border border-border bg-card shadow-xs hover:border-blue-500/30 transition rounded-xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Pending Tasks</span>
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-              <Inbox className="h-4 w-4 text-amber-600" />
+            <span className="font-medium">Today's Check-ins</span>
+            <div className="h-8 w-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+              <CheckSquare className="h-4 w-4 text-blue-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{myTasks.length}</div>
-          <div className="text-[11px] text-amber-600 font-medium mt-1">
-            Clinical & administrative
+          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">
+            {appts.filter(a => a.status === "arrived" || a.checked_in_at).length}
+          </div>
+          <div className="text-[11px] text-blue-600 font-medium mt-1">
+            Total check-ins today
           </div>
         </Card>
 
-        {/* KPI 4: Unsigned Notes */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-rose-500/30 transition rounded-xl">
+        {/* KPI 4: Booking Requests */}
+        <Card className="p-4 border border-border bg-card shadow-xs hover:border-purple-500/30 transition rounded-xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Unsigned Notes</span>
-            <div className="h-8 w-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-rose-600" />
+            <span className="font-medium">Booking Requests</span>
+            <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+              <Inbox className="h-4 w-4 text-purple-600" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">0</div>
-          <div className="text-[11px] text-muted-foreground mt-1">
-            Awaiting completion
+          <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{pendingRequestsCount}</div>
+          <div className="text-[11px] text-purple-600 font-medium mt-1">
+            Pending front desk review
           </div>
         </Card>
       </div>
@@ -583,14 +632,44 @@ function StandardStaffToday() {
                           <td className="p-3 font-mono text-muted-foreground">{formatClinicTime(a.start_at)}</td>
                           <td className="p-3 font-semibold text-foreground">{a.client_first_name} {a.client_last_name}</td>
                           <td className="p-3 text-muted-foreground">{a.service_name || a.service_id || "Aesthetic Treatment"}</td>
-                          <td className="p-3 text-muted-foreground">{a.staff_name || a.staff_id || "Provider"}</td>
+                          <td className="p-3 text-muted-foreground font-medium">{resolveStaffName(a.staff_id, a.staff_name)}</td>
                           <td className="p-3">
                             <Badge variant="outline" className="text-[10px] uppercase">{a.status}</Badge>
                           </td>
                           <td className="p-3 text-right">
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate(`/staff/appointments/${a.id}`)}>
-                              View Chart
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              {a.status !== "arrived" && a.status !== "checked_in" && a.status !== "completed" && a.status !== "cancelled" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs border-emerald-500 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 gap-1"
+                                  onClick={() => checkInAppt(a.id)}
+                                >
+                                  <UserCheck className="h-3 w-3" />
+                                  Check In
+                                </Button>
+                              )}
+
+                              {(a.status === "arrived" || a.status === "checked_in" || a.status === "completed") && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="h-7 text-xs bg-primary text-primary-foreground gap-1"
+                                  onClick={() => navigate(`/staff/checkout/${a.id}`)}
+                                >
+                                  <CreditCard className="h-3 w-3" />
+                                  Checkout
+                                </Button>
+                              )}
+
+                              <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/calendar`)}>
+                                Reschedule
+                              </Button>
+
+                              <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/appointments/${a.id}`)}>
+                                Details
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -608,7 +687,7 @@ function StandardStaffToday() {
                 <h2 className="font-serif text-lg font-normal tracking-tight flex items-center gap-2">
                   <UserCircle2 className="h-4 w-4 text-primary" /> Recent Patients
                 </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Recently accessed patient charts and intake submissions.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Recently accessed patient profiles.</p>
               </div>
               <Button variant="ghost" size="sm" className="h-7 text-xs text-primary gap-1" onClick={() => navigate("/staff/clients")}>
                 View All Patients <ChevronRight className="h-3 w-3" />
@@ -623,7 +702,7 @@ function StandardStaffToday() {
                       <th className="p-3">Patient Name</th>
                       <th className="p-3">Contact</th>
                       <th className="p-3">Last Visit</th>
-                      <th className="p-3">Chart Status</th>
+                      <th className="p-3">Profile Status</th>
                       <th className="p-3 text-right">Action</th>
                     </tr>
                   </thead>
@@ -634,7 +713,7 @@ function StandardStaffToday() {
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Users className="h-8 w-8 text-muted-foreground/40" />
                             <span className="font-medium text-xs text-foreground">No recent patient interactions recorded today.</span>
-                            <span className="text-[11px] text-muted-foreground">Access patient profiles in the Patients directory to open medical charts.</span>
+                            <span className="text-[11px] text-muted-foreground">Access patient profiles in the Patients directory.</span>
                           </div>
                         </td>
                       </tr>
@@ -648,8 +727,8 @@ function StandardStaffToday() {
                             <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/20">Active</Badge>
                           </td>
                           <td className="p-3 text-right">
-                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate(`/staff/clients/${p.id}`)}>
-                              Open Chart →
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate(`/staff/clients`)}>
+                              View Profile →
                             </Button>
                           </td>
                         </tr>

@@ -6,12 +6,40 @@ import { ApiClient } from "./client";
 
 export type AppRole =
   | "admin"
-  | "staff"
-  | "scheduler"
   | "nurse_practitioner"
   | "medical_director"
-  | "receptionist"
-  | "privacy_officer";
+  | "rn_injector"
+  | "privacy_officer"
+  | "front_desk";
+
+/** Roles that represent bookable clinical providers */
+export const CLINICAL_PROVIDER_ROLES: AppRole[] = [
+  "medical_director",
+  "nurse_practitioner",
+  "rn_injector",
+];
+
+/** Check if a role string represents a clinical provider eligible for booking */
+export function isClinicalProviderRole(role: string): boolean {
+  const r = (role || "").toLowerCase();
+  return r === "medical_director" || r === "nurse_practitioner" || r === "rn_injector";
+}
+
+/**
+ * Normalize legacy role strings to the finalized 6-role set.
+ * 'staff' | 'receptionist' | 'scheduler' → 'front_desk'
+ * 'provider' | 'injector' → 'rn_injector'
+ */
+export function normalizeRole(role: string): AppRole {
+  const r = (role || "").toLowerCase();
+  if (r === "admin") return "admin";
+  if (r === "medical_director") return "medical_director";
+  if (r === "nurse_practitioner") return "nurse_practitioner";
+  if (r === "rn_injector" || r === "provider" || r === "injector") return "rn_injector";
+  if (r === "privacy_officer" || r === "security_officer") return "privacy_officer";
+  if (r === "front_desk" || r === "receptionist" || r === "scheduler" || r === "staff") return "front_desk";
+  return "front_desk"; // safe default for unknown
+}
 
 export interface UserProfile {
   id: string;
@@ -50,14 +78,14 @@ export function getUserProfileByEmail(email: string, password?: string): UserPro
       localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
     }
 
-    const r = (staffMatch.role || "staff").toLowerCase();
-    let roles: AppRole[] = ["staff"];
-    if (r === "admin") roles = ["admin", "staff"];
-    else if (r === "medical_director") roles = ["medical_director", "staff", "nurse_practitioner"];
-    else if (r === "privacy_officer" || r === "security_officer") roles = ["privacy_officer", "staff"];
-    else if (r === "receptionist") roles = ["receptionist", "staff"];
-    else if (r === "scheduler") roles = ["scheduler", "staff"];
-    else if (r === "nurse_practitioner" || r === "provider") roles = ["nurse_practitioner", "staff"];
+    const r = normalizeRole(staffMatch.role || "front_desk");
+    let roles: AppRole[] = [r];
+    if (r === "admin") roles = ["admin"];
+    else if (r === "medical_director") roles = ["medical_director", "nurse_practitioner"];
+    else if (r === "privacy_officer") roles = ["privacy_officer"];
+    else if (r === "nurse_practitioner") roles = ["nurse_practitioner"];
+    else if (r === "rn_injector") roles = ["rn_injector"];
+    else if (r === "front_desk") roles = ["front_desk"];
 
     const fullName = staffMatch.full_name || "Staff Member";
     const nameParts = fullName.trim().split(" ");
@@ -83,7 +111,7 @@ export function getUserProfileByEmail(email: string, password?: string): UserPro
       email: "admin@gmail.com",
       first_name: "System",
       last_name: "Admin",
-      roles: ["admin", "staff"],
+      roles: ["admin"],
       staff_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
       created_at: new Date().toISOString(),
       email_confirmed_at: new Date().toISOString(),
@@ -95,15 +123,21 @@ export function getUserProfileByEmail(email: string, password?: string): UserPro
     !staffMatch &&
     clean.includes("@") &&
     !clean.includes("user@") &&
-    (clean.includes("provider") || clean.includes("staff") || clean.includes("doctor") || clean.includes("nurse") || clean.includes("md") || clean.includes("admin") || clean.includes("medical") || clean.includes("security") || clean.includes("officer"))
+    (clean.includes("provider") || clean.includes("staff") || clean.includes("doctor") || clean.includes("nurse") || clean.includes("md") || clean.includes("admin") || clean.includes("medical") || clean.includes("security") || clean.includes("officer") || clean.includes("injector") || clean.includes("frontdesk") || clean.includes("front_desk"))
   ) {
-    const rawRole = clean.includes("admin")
+    const rawRole: AppRole = clean.includes("admin")
       ? "admin"
       : clean.includes("md") || clean.includes("doctor") || clean.includes("medical")
       ? "medical_director"
       : clean.includes("officer") || clean.includes("security")
       ? "privacy_officer"
-      : "provider";
+      : clean.includes("nurse")
+      ? "nurse_practitioner"
+      : clean.includes("injector")
+      ? "rn_injector"
+      : clean.includes("frontdesk") || clean.includes("front_desk") || clean.includes("staff")
+      ? "front_desk"
+      : "rn_injector";
 
     const autoName = clean.split("@")[0].replace(/[0-9]/g, "").replace(/^./, (s) => s.toUpperCase()) || "Staff Member";
     const newAccount = {
@@ -116,12 +150,9 @@ export function getUserProfileByEmail(email: string, password?: string): UserPro
     approvedAccounts.push(newAccount);
     localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
 
-    const r = rawRole;
-    let roles: AppRole[] = ["staff"];
-    if (r === "admin") roles = ["admin", "staff"];
-    else if (r === "medical_director") roles = ["medical_director", "staff", "nurse_practitioner"];
-    else if (r === "privacy_officer") roles = ["privacy_officer", "staff"];
-    else roles = ["nurse_practitioner", "staff"];
+    let roles: AppRole[] = [rawRole];
+    if (rawRole === "admin") roles = ["admin"];
+    else if (rawRole === "medical_director") roles = ["medical_director", "nurse_practitioner"];
 
     const nameParts = autoName.trim().split(" ");
     return {
@@ -218,6 +249,30 @@ export const authService = {
     };
   },
 
+  async updatePassword(newPassword: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      await ApiClient.post("/auth/update-password", { password: newPassword });
+      return { success: true };
+    } catch (_e) { }
+
+    try {
+      const stored = sessionStorage.getItem("user_profile") || localStorage.getItem("user_profile");
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u.email) {
+          const approved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+          const match = approved.find((a) => a.email?.toLowerCase() === u.email.toLowerCase());
+          if (match) {
+            match.password = newPassword;
+            localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approved));
+          }
+        }
+      }
+    } catch (_e) {}
+
+    return { success: true };
+  },
+
   async signUp(params: { email: string; password?: string; options?: any }) {
     const clean = (params.email || "").trim().toLowerCase();
 
@@ -312,6 +367,10 @@ export const authService = {
     localStorage.removeItem("user_profile");
     localStorage.removeItem("rka_demo_session");
     window.dispatchEvent(new Event("rka_demo_auth_change"));
+  },
+
+  async signOut(): Promise<void> {
+    return this.logout();
   },
 
   async getAuthenticatorAssuranceLevel() {

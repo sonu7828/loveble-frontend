@@ -10,10 +10,10 @@ const MOCK_FALLBACKS: Record<string, any[]> = {
       id: "st-girish",
       full_name: "Girish",
       fullName: "Girish",
-      title: "Provider",
+      title: "Nurse Practitioner",
       color: "#8B6B5D",
       is_active: true,
-      role: "provider",
+      role: "nurse_practitioner",
     },
   ],
   staff_profiles: [
@@ -21,10 +21,10 @@ const MOCK_FALLBACKS: Record<string, any[]> = {
       id: "st-girish",
       full_name: "Girish",
       fullName: "Girish",
-      title: "Provider",
+      title: "Nurse Practitioner",
       color: "#8B6B5D",
       is_active: true,
-      role: "provider",
+      role: "nurse_practitioner",
     },
   ],
   locations: [
@@ -84,6 +84,11 @@ export class ApiTableQuery {
 
   public gte(column: string, value: any): this {
     this.filters.push({ col: column, op: "gte", val: value });
+    return this;
+  }
+
+  public lte(column: string, value: any): this {
+    this.filters.push({ col: column, op: "lte", val: value });
     return this;
   }
 
@@ -229,6 +234,56 @@ export class ApiTableQuery {
       }
     }
 
+    // If update action, apply the payload changes to matching local storage records
+    if (this.action === "update" && this.payload) {
+      try {
+        const storeKey = `rka_demo_${this.tableName}`;
+        const existing: any[] = JSON.parse(localStorage.getItem(storeKey) || "[]");
+        let matchFound = false;
+        const updated = existing.map((row) => {
+          const matches = this.filters.every((f) => {
+            const v = row[f.col];
+            if (f.op === "eq") return String(v) === String(f.val);
+            return true;
+          });
+          if (matches) matchFound = true;
+          return matches ? { ...row, ...this.payload } : row;
+        });
+        if (!matchFound) {
+          // No local record exists (appointment came from API) —
+          // create a stub so the override is applied on next SELECT merge.
+          const stub: any = { ...this.payload };
+          for (const f of this.filters) {
+            if (f.op === "eq") stub[f.col] = f.val;
+          }
+          updated.push(stub);
+        }
+        localStorage.setItem(storeKey, JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Failed to update local demo table data", e);
+      }
+    }
+
+    // If delete action, remove matching records from local storage
+    if (this.action === "delete") {
+      try {
+        const storeKey = `rka_demo_${this.tableName}`;
+        const existing: any[] = JSON.parse(localStorage.getItem(storeKey) || "[]");
+        if (existing.length > 0) {
+          const remaining = existing.filter((row) =>
+            !this.filters.every((f) => {
+              const v = row[f.col];
+              if (f.op === "eq") return String(v) === String(f.val);
+              return true;
+            })
+          );
+          localStorage.setItem(storeKey, JSON.stringify(remaining));
+        }
+      } catch (e) {
+        console.warn("Failed to delete from local demo table data", e);
+      }
+    }
+
     let data = res?.data;
     if (data && typeof data === "object" && !Array.isArray(data) && "data" in data) {
       data = data.data;
@@ -243,9 +298,25 @@ export class ApiTableQuery {
         const storeKey = `rka_demo_${this.tableName}`;
         const localItems: any[] = JSON.parse(localStorage.getItem(storeKey) || "[]");
         if (localItems.length > 0) {
-          const existingIds = new Set(data.map((x: any) => x.id).filter(Boolean));
+          // Build a map from local storage for fast lookup
+          const localMap = new Map<string, any>();
           for (const item of localItems) {
-            if (item && item.id && !existingIds.has(item.id)) {
+            if (item?.id) localMap.set(String(item.id), item);
+          }
+          // Merge: update existing rows with local overrides, then add any local-only rows
+          const existingIds = new Set<string>();
+          data = data.map((row: any) => {
+            if (row?.id) {
+              existingIds.add(String(row.id));
+              const localVersion = localMap.get(String(row.id));
+              // Local storage wins for fields that differ (tracks our mutations)
+              return localVersion ? { ...row, ...localVersion } : row;
+            }
+            return row;
+          });
+          // Add local-only items (not returned by API) 
+          for (const item of localItems) {
+            if (item?.id && !existingIds.has(String(item.id))) {
               data.unshift(item);
             }
           }
@@ -272,6 +343,10 @@ export class ApiTableQuery {
 
   public then(resolve: (res: { data: any; error: any; count: number }) => void, reject?: (reason: any) => void) {
     this.execute().then(resolve, reject);
+  }
+
+  public catch(reject: (reason: any) => void) {
+    return this.execute().catch(reject);
   }
 }
 

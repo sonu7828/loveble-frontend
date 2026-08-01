@@ -91,7 +91,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
         const doc = generateMedicalRecordPDF(exportData as any);
         doc.save(`medical_records_${email}_${dateStr}.pdf`);
         toast.success("Medical record PDF downloaded!");
-      } else if (exportFormat === "zip") {
+      } else {
         const doc = generateMedicalRecordPDF(exportData as any);
         const pdfBlob = doc.output("blob");
         const jsonStr = JSON.stringify(exportData, null, 2);
@@ -114,8 +114,11 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         toast.success("Medical record ZIP archive downloaded!");
+<<<<<<< HEAD
         URL.revokeObjectURL(url);
         toast.success("Medical record ZIP archive downloaded!");
+=======
+>>>>>>> f3fb40df330e181dc58217fe216447f0230acdc7
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to generate download file.");

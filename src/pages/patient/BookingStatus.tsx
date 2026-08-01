@@ -106,7 +106,7 @@ const BookingStatus = () => {
   }, [data?.id, data?.status]);
 
 
-  const canManage = data && ["pending", "approved"].includes(data.status);
+  const canManage = data && ["pending", "approved", "confirmed"].includes(data.status);
   const canRebook = data && ["completed", "cancelled", "denied", "no_show"].includes(data.status);
   const hoursUntil = data ? (new Date(data.start_at).getTime() - Date.now()) / 3600000 : 0;
   const within48 = hoursUntil < 48;
@@ -160,7 +160,7 @@ const BookingStatus = () => {
                 </p>
               </div>
             )}
-            {isNew && data.status === "approved" && (
+            {isNew && (data.status === "approved" || data.status === "confirmed") && (
               <div className="text-center mb-10">
                 <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-primary/10 mb-4">
                   <CheckCircle2 className="h-10 w-10 text-primary" />
@@ -543,6 +543,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, { label: string; cls: string; icon: any }> = {
     pending: { label: "Pending approval", cls: "bg-warning/15 text-warning-foreground border-warning/30", icon: Clock },
     approved: { label: "Confirmed", cls: "bg-success/15 text-success border-success/30", icon: CheckCircle2 },
+    confirmed: { label: "Confirmed", cls: "bg-success/15 text-success border-success/30", icon: CheckCircle2 },
     denied: { label: "Declined", cls: "bg-destructive/15 text-destructive border-destructive/30", icon: XCircle },
     cancelled: { label: "Cancelled", cls: "bg-muted text-muted-foreground border-border", icon: XCircle },
     completed: { label: "Completed", cls: "bg-success/15 text-success border-success/30", icon: CheckCircle2 },

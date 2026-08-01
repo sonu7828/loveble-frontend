@@ -23,16 +23,14 @@ interface Member {
   pending_role?: Role;
 }
 
-type Role = "admin" | "provider" | "nurse_practitioner" | "medical_director" | "receptionist" | "scheduler" | "staff" | "privacy_officer";
+type Role = "admin" | "nurse_practitioner" | "medical_director" | "rn_injector" | "privacy_officer" | "front_desk";
 const ROLE_LABELS: Record<Role, string> = {
-  admin: "Admin (full access)",
-  privacy_officer: "Privacy & Security Officer (HIPAA Policy Approval & Security)",
+  admin: "Admin (full system access)",
+  privacy_officer: "Privacy & Security Officer (HIPAA policies, audit, compliance)",
   medical_director: "Medical Director (supervising physician — sign & co-sign notes)",
-  provider: "Provider (clinical provider)",
-  nurse_practitioner: "Nurse Practitioner (GFE + clinical co-sign)",
-  receptionist: "Front Desk Receptionist (book, check in, schedule)",
-  scheduler: "Scheduler (manage appointments & schedule)",
-  staff: "Staff (own bookings only)",
+  nurse_practitioner: "Nurse Practitioner (clinical provider — GFE, SOAP, prescriptions)",
+  rn_injector: "RN / Injector (treatments, clinical notes, submit for cosign)",
+  front_desk: "Front Desk / Scheduler (booking, check-in, calendar)",
 };
 
 interface PendingRequest {
@@ -66,7 +64,7 @@ export default function AdminTeam() {
   const canAccessTeam = isAdmin || isMedicalDirector || isPrivacyOfficer || isStaff || isNP || isPrivileged;
   const [sp, setSp] = useSearchParams();
   const isMDOnly = !isAdmin && isMedicalDirector;
-  const roleFilter = isMDOnly ? "provider" : (sp.get("role") || (sp.get("tab") === "providers" ? "provider" : "all"));
+  const roleFilter = isMDOnly ? "clinical" : (sp.get("role") || (sp.get("tab") === "providers" ? "clinical" : "all"));
   const currentTab = sp.get("tab");
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -80,7 +78,7 @@ export default function AdminTeam() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
-  const [draft, setDraft] = useState({ id: "" as string | null, full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "staff" as Role, sendInvite: true });
+  const [draft, setDraft] = useState({ id: "" as string | null, full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "" as Role, sendInvite: true });
 
   const openAdd = () => {
     setDraft({
@@ -90,7 +88,7 @@ export default function AdminTeam() {
       email: "",
       password: "",
       color: PALETTE[0],
-      role: "staff",
+      role: "" as Role,
       sendInvite: true,
     });
     setAddOpen(true);
@@ -201,6 +199,10 @@ export default function AdminTeam() {
       toast.error("Name and email are required");
       return;
     }
+    if (!draft.role) {
+      toast.error("Please select a role for the team member");
+      return;
+    }
     setAddBusy(true);
 
     const email = draft.email.trim().toLowerCase();
@@ -270,7 +272,7 @@ export default function AdminTeam() {
 
     setAddBusy(false);
     setAddOpen(false);
-    setDraft({ id: "", full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "staff", sendInvite: true });
+    setDraft({ id: "", full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "" as Role, sendInvite: true });
     ApiClient.clearCache("/staff");
     load();
   };
@@ -293,7 +295,7 @@ export default function AdminTeam() {
     const { error: delErr } = await apiQuery("user_roles").delete().eq("user_id", m.user_id);
     if (delErr) { setBusy(null); toast.error(delErr.message); return; }
     const toInsert: { user_id: string; role: Role }[] = [{ user_id: m.user_id, role: newRole }];
-    if (newRole === "admin" || newRole === "provider" || newRole === "scheduler" || newRole === "receptionist" || newRole === "nurse_practitioner" || newRole === "medical_director") toInsert.push({ user_id: m.user_id, role: "staff" });
+    if (newRole === "admin" || newRole === "nurse_practitioner" || newRole === "medical_director" || newRole === "rn_injector" || newRole === "privacy_officer" || newRole === "front_desk") toInsert.push({ user_id: m.user_id, role: newRole });
     const { error: insErr } = await apiQuery("user_roles").insert(toInsert);
     setBusy(null);
     if (insErr) { toast.error(insErr.message); return; }
@@ -365,31 +367,33 @@ export default function AdminTeam() {
         ? "admin"
         : memberRoles.includes("medical_director")
           ? "medical_director"
-          : memberRoles.includes("provider")
-            ? "provider"
-            : memberRoles.includes("nurse_practitioner")
-              ? "nurse_practitioner"
+          : memberRoles.includes("nurse_practitioner")
+            ? "nurse_practitioner"
+            : memberRoles.includes("rn_injector")
+              ? "rn_injector"
               : memberRoles.includes("privacy_officer")
                 ? "privacy_officer"
-                : memberRoles.includes("scheduler")
-                  ? "scheduler"
-                  : memberRoles.includes("receptionist")
-                    ? "receptionist"
-                    : memberRoles.includes("staff")
-                      ? "staff"
-                      : null);
+                : memberRoles.includes("front_desk")
+                  ? "front_desk"
+                  : null);
 
-    if (explicitRole) return explicitRole as Role;
+    if (explicitRole) {
+      // Normalize any legacy role strings
+      const r = (explicitRole as string).toLowerCase();
+      if (r === "provider" || r === "injector") return "rn_injector";
+      if (r === "receptionist" || r === "scheduler" || r === "staff") return "front_desk";
+      if (r === "security_officer") return "privacy_officer";
+      return explicitRole as Role;
+    }
 
     const titleLower = (m.title || "").toLowerCase();
     if (titleLower.includes("medical director") || titleLower.includes("supervising physician")) return "medical_director";
     if (titleLower.includes("nurse practitioner") || titleLower.includes("np")) return "nurse_practitioner";
-    if (titleLower.includes("physician") || titleLower.includes("practitioner") || titleLower.includes("provider") || titleLower.includes("injector")) return "provider";
-    if (titleLower.includes("security") || titleLower.includes("privacy")) return "privacy_officer";
-    if (titleLower.includes("receptionist")) return "receptionist";
-    if (titleLower.includes("scheduler")) return "scheduler";
+    if (titleLower.includes("injector") || titleLower.includes("rn")) return "rn_injector";
+    if (titleLower.includes("security") || titleLower.includes("privacy") || titleLower.includes("compliance")) return "privacy_officer";
+    if (titleLower.includes("front desk") || titleLower.includes("receptionist") || titleLower.includes("scheduler")) return "front_desk";
 
-    return "staff";
+    return "front_desk";
   };
 
   const getRoleBadge = (role: Role) => {
@@ -398,18 +402,16 @@ export default function AdminTeam() {
         return <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/20 text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Medical Director</Badge>;
       case "nurse_practitioner":
         return <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Nurse Practitioner</Badge>;
-      case "provider":
-        return <Badge variant="outline" className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20 text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Provider</Badge>;
+      case "rn_injector":
+        return <Badge variant="outline" className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20 text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">RN / Injector</Badge>;
       case "admin":
         return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Admin</Badge>;
       case "privacy_officer":
         return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Security Officer</Badge>;
-      case "receptionist":
-        return <Badge variant="outline" className="bg-secondary text-foreground border-border text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Receptionist</Badge>;
-      case "scheduler":
-        return <Badge variant="outline" className="bg-secondary text-foreground border-border text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Scheduler</Badge>;
+      case "front_desk":
+        return <Badge variant="outline" className="bg-secondary text-foreground border-border text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Front Desk</Badge>;
       default:
-        return <Badge variant="outline" className="bg-secondary text-foreground border-border text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Staff</Badge>;
+        return <Badge variant="outline" className="bg-secondary text-foreground border-border text-xs font-semibold px-2.5 py-1 uppercase tracking-wider">Front Desk</Badge>;
     }
   };
 
@@ -420,10 +422,10 @@ export default function AdminTeam() {
       if (filter === "all") return true;
       const r = resolveMemberRole(m);
       if (filter === "admin") return r === "admin";
-      if (filter === "provider") return r === "provider";
+      if (filter === "clinical") return r === "nurse_practitioner" || r === "rn_injector";
       if (filter === "md") return r === "medical_director";
       if (filter === "np") return r === "nurse_practitioner";
-      if (filter === "staff") return r === "staff" || r === "receptionist" || r === "scheduler";
+      if (filter === "front_desk") return r === "front_desk";
       return true;
     }).length;
   };
@@ -435,9 +437,9 @@ export default function AdminTeam() {
 
       if (roleFilter === "admin") return primaryRole === "admin";
       if (roleFilter === "md") return primaryRole === "medical_director";
-      if (roleFilter === "provider") return primaryRole === "provider";
+      if (roleFilter === "clinical") return primaryRole === "nurse_practitioner" || primaryRole === "rn_injector";
       if (roleFilter === "np") return primaryRole === "nurse_practitioner";
-      if (roleFilter === "staff") return primaryRole === "staff" || primaryRole === "receptionist" || primaryRole === "scheduler";
+      if (roleFilter === "front_desk") return primaryRole === "front_desk";
       return true;
     })
     .sort((a, b) => {
@@ -556,10 +558,10 @@ export default function AdminTeam() {
                     <td className="p-3.5 text-right text-emerald-600 font-medium">Owner / Admin</td>
                   </tr>
                   <tr>
-                    <td className="p-3.5 font-semibold text-foreground">Provider</td>
-                    <td className="p-3.5 text-muted-foreground">Clinical & Patient Treatments</td>
+                    <td className="p-3.5 font-semibold text-foreground">Privacy & Security Officer</td>
+                    <td className="p-3.5 text-muted-foreground">HIPAA Policies, Audit Logs, Breach Reports</td>
                     <td className="p-3.5"><Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Enforced AAL2</Badge></td>
-                    <td className="p-3.5 text-muted-foreground">Assigned Clients</td>
+                    <td className="p-3.5 text-muted-foreground">Audit Only</td>
                     <td className="p-3.5 text-right text-emerald-600 font-medium">Admin Approval</td>
                   </tr>
                   <tr>
@@ -571,14 +573,21 @@ export default function AdminTeam() {
                   </tr>
                   <tr>
                     <td className="p-3.5 font-semibold text-foreground">Nurse Practitioner</td>
-                    <td className="p-3.5 text-muted-foreground">GFE Assessments & Co-Sign</td>
+                    <td className="p-3.5 text-muted-foreground">Clinical Provider — GFE, SOAP, Prescriptions</td>
                     <td className="p-3.5"><Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Enforced AAL2</Badge></td>
                     <td className="p-3.5 text-muted-foreground">GFE & Protocols</td>
                     <td className="p-3.5 text-right text-emerald-600 font-medium">Admin Approval</td>
                   </tr>
                   <tr>
-                    <td className="p-3.5 font-semibold text-foreground">Staff / Receptionist</td>
-                    <td className="p-3.5 text-muted-foreground">Bookings & Checkout</td>
+                    <td className="p-3.5 font-semibold text-foreground">RN / Injector</td>
+                    <td className="p-3.5 text-muted-foreground">Treatments, Clinical Notes, Submit for Cosign</td>
+                    <td className="p-3.5"><Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Enforced AAL2</Badge></td>
+                    <td className="p-3.5 text-muted-foreground">Assigned Clients</td>
+                    <td className="p-3.5 text-right text-emerald-600 font-medium">Admin Approval</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3.5 font-semibold text-foreground">Front Desk / Scheduler</td>
+                    <td className="p-3.5 text-muted-foreground">Booking, Check-in, Calendar, POS</td>
                     <td className="p-3.5"><Badge variant="outline">Optional / Recommended</Badge></td>
                     <td className="p-3.5 text-muted-foreground">View Only</td>
                     <td className="p-3.5 text-right text-emerald-600 font-medium">Admin Approval</td>
@@ -640,10 +649,10 @@ export default function AdminTeam() {
             All Staff ({members.length})
           </button>
           <button
-            onClick={() => setSp({ role: "provider" })}
-            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "provider" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setSp({ role: "clinical" })}
+            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "clinical" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Providers
+            Clinical Providers
           </button>
           <button
             onClick={() => setSp({ role: "md" })}
@@ -652,16 +661,10 @@ export default function AdminTeam() {
             Medical Directors
           </button>
           <button
-            onClick={() => setSp({ role: "np" })}
-            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "np" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setSp({ role: "front_desk" })}
+            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "front_desk" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Nurse Practitioners
-          </button>
-          <button
-            onClick={() => setSp({ role: "staff" })}
-            className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "staff" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            Staff & Receptionists
+            Front Desk
           </button>
         </div>
       )}
@@ -756,6 +759,7 @@ export default function AdminTeam() {
                     onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}
                     className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                   >
+                    <option value="" disabled>Select Role...</option>
                     {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
                       <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                     ))}

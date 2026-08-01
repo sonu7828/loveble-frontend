@@ -44,7 +44,7 @@ export default function StaffInventory() {
   const load = useCallback(async () => {
     setLoading(true);
     const data = await inventoryService.getLots();
-    setLots(data as Lot[]);
+    setLots(Array.isArray(data) ? data as Lot[] : []);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);

@@ -38,7 +38,29 @@ const MOCK_LOTS: ProductLot[] = [
 export const inventoryService = {
   async getLots(): Promise<ProductLot[]> {
     const res = await ApiClient.get<ProductLot[]>("/inventory/lots");
-    return res.data || MOCK_LOTS;
+    // Unwrap nested { data: [...] } if present
+    let data = res.data;
+    if (data && typeof data === "object" && !Array.isArray(data) && "data" in (data as any)) {
+      data = (data as any).data;
+    }
+    const apiLots: ProductLot[] = Array.isArray(data) && data.length > 0 ? data : [...MOCK_LOTS];
+
+    // Merge locally saved lots (survive page reloads when API isn't persisting)
+    try {
+      const localLots: ProductLot[] = JSON.parse(localStorage.getItem("rka_demo_inventory_lots") || "[]");
+      if (localLots.length > 0) {
+        const apiIds = new Set(apiLots.map((l) => l.id));
+        for (const lot of localLots) {
+          if (lot?.id && !apiIds.has(lot.id)) {
+            apiLots.unshift(lot);
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return apiLots;
   },
 
   async adjustLot(lotId: string, newQuantity: number, reason: string, notes?: string): Promise<boolean> {
