@@ -416,7 +416,7 @@ function StandardStaffToday() {
         JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
       const match = approved.find((s) => s.id === staffId || (staffId && s.email?.toLowerCase().includes(staffId.toLowerCase())));
       if (match?.full_name) return match.full_name;
-    } catch {}
+    } catch { }
     return "Girish (Provider)";
   };
 
@@ -444,7 +444,7 @@ function StandardStaffToday() {
           JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
         const match = approved.find((a) => a.email?.toLowerCase() === userEmail);
         if (match?.full_name) return match.full_name;
-      } catch {}
+      } catch { }
     }
     return user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
       ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim()
@@ -775,7 +775,7 @@ function StandardStaffToday() {
 /* ── Security Officer Dashboard View ───────────────────────────────────────── */
 function SecurityOfficerDashboard() {
   const { user } = useAuth();
-  
+
   const officerName = (user?.first_name || user?.last_name)
     ? `${user?.first_name || ""} ${user?.last_name || ""}`.trim()
     : "Kiem Vukadinovic, NP";
