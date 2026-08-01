@@ -332,7 +332,7 @@ function Kpi({ label, value, tone }: { label: string; value: string | number; to
 
 function StandardStaffToday() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isMedicalDirector, isPrivacyOfficer, isNP, isRNInjector, isFrontDesk, isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [appts, setAppts] = useState<Appt[]>([]);
   const [recentPatients, setRecentPatients] = useState<any[]>([]);
@@ -456,6 +456,20 @@ function StandardStaffToday() {
     toast.success("Task updated");
   };
 
+  const portalTitle = isMedicalDirector
+    ? "Medical Director Portal"
+    : isPrivacyOfficer
+      ? "Privacy & Security Officer Portal"
+      : isNP
+        ? "Nurse Practitioner Portal"
+        : isRNInjector
+          ? "RN Injector Portal"
+          : isFrontDesk
+            ? "Front Desk Receptionist Portal"
+            : isAdmin
+              ? "Admin & Practice Portal"
+              : "Staff Portal";
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
       {/* ── Executive Staff Header ────────────────────────────────────────────── */}
@@ -463,7 +477,7 @@ function StandardStaffToday() {
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-semibold uppercase tracking-wider text-[10px]">
-              <UserCheck className="h-3.5 w-3.5 mr-1" /> Front Desk Receptionist Portal
+              <UserCheck className="h-3.5 w-3.5 mr-1" /> {portalTitle}
             </Badge>
             <span className="text-xs text-muted-foreground">• {formatClinicDate()}</span>
           </div>
