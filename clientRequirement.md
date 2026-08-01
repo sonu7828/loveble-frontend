@@ -1,4 +1,69 @@
-Vendor Hosting & Data Map
+My Profile & Clinical Credentials
+Manage your personal details, professional credentials, clinical availability, digital signature, and Google Calendar sync.
+
+Personal & Professional Info
+Full name
+Kiem Vukadinovic, NP
+Title
+Administrator
+Email
+admin@gmail.com
+Updates sign-in email. You'll get a confirmation link.
+
+Phone
+(408) 555-0199
+CA license # (NP/RN/MD)
+NP-F 950210 (CA BRN)
+Auto-fills on GFE and chart note signatures.
+
+Clinical Availability Hours
+San Jose Studio Schedule
+
+Monday
+09:00
+-
+17:00
+
+Tuesday
+09:00
+-
+17:00
+
+Wednesday
+09:00
+-
+17:00
+
+Thursday
+09:00
+-
+17:00
+
+Friday
+09:00
+-
+17:00
+
+Saturday
+09:00
+-
+15:00
+Save changes & Availability
+Google Calendar
+Connect your Google Calendar so events on it automatically block booking slots.
+
+Connect Google Calendar
+Saved provider signature
+Save your signature once and it will auto-fill every chart note you sign. You can always redraw it on the note if you want. Last updated August 1st, 2026.
+
+Full legal name (as it should appear on notes)
+Front Desk Receptionist
+Draw your signature
+Clear
+Sign with your finger or Apple Pencil. Tap Clear to redo.
+
+Save signature
+Remove saved signatureVendor Hosting & Data Map
 Radiantilyk Aesthetic — San Jose, CA
 Prepared July 04, 2026 · Confidential — internal compliance reference
 Purpose

@@ -179,24 +179,39 @@ export default function StaffLayout() {
           ],
         },
         {
-          key: "prov_clinical",
-          label: "Clinical Workspace",
-          icon: Stethoscope,
+          key: "prov_charts",
+          label: "Charts",
+          icon: FileText,
           show: true,
           children: [
             { to: "/staff/clinical", label: "Charts", icon: FileText },
+          ],
+        },
+        {
+          key: "prov_cosign",
+          label: "Cosign Queue",
+          icon: FileCheck,
+          show: true,
+          children: [
             { to: "/staff/clinical/cosign", label: "Cosign Queue", icon: FileCheck },
+          ],
+        },
+        {
+          key: "prov_safety",
+          label: "Safety & Protocols",
+          icon: ShieldCheck,
+          show: true,
+          children: [
             { to: "/staff/clinical/safety", label: "Safety & Protocols", icon: ShieldCheck },
           ],
         },
         {
-          key: "prov_schedule",
-          label: "Schedule",
+          key: "prov_calendar",
+          label: "Calendar",
           icon: CalIcon,
           show: true,
           children: [
             { to: "/staff/calendar", label: "Calendar", icon: CalIcon },
-            { to: "/staff/my-schedule", label: "My Schedule", icon: UserCircle2 },
           ],
         },
         {

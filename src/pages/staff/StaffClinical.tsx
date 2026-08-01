@@ -143,7 +143,7 @@ export default function StaffClinical() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            const v = lookup.trim().toLowerCase();
+            const v = lookup.trim();
             if (v) navigate(`/staff/clinical/clients/${encodeURIComponent(v)}`);
           }}
           className="flex gap-2"
@@ -153,8 +153,8 @@ export default function StaffClinical() {
             <Input
               value={lookup}
               onChange={(e) => setLookup(e.target.value)}
-              placeholder="Patient email…"
-              type="email"
+              placeholder="Search patient by Name, Phone, or Email…"
+              type="text"
               className="pl-8"
             />
           </div>
@@ -165,11 +165,11 @@ export default function StaffClinical() {
             <Link to="/staff/today"><CalIcon className="h-4 w-4 mr-2" />Today's schedule</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link to="/staff/clients"><Search className="h-4 w-4 mr-2" />Browse all clients</Link>
+            <Link to="/staff/clients"><Search className="h-4 w-4 mr-2" />Browse all patients</Link>
           </Button>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Tip: every appointment has <span className="font-medium">Conduct GFE</span> and <span className="font-medium">Add chart note</span> buttons at the top — both save into the patient's chart.
+          Tip: every patient chart contains <span className="font-medium">Good Faith Examinations (GFEs)</span>, <span className="font-medium">SOAP chart notes</span>, <span className="font-medium">Pre/Post photos</span>, and <span className="font-medium">consents</span>.
           {isNP && <> NPs can sign a GFE anytime — it stays valid for 12 months.</>}
         </p>
       </div>

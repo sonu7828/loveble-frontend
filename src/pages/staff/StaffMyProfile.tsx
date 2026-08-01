@@ -3,12 +3,11 @@ import { apiQuery, authService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Clock, Check } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import GoogleCalendarConnect from "@/components/staff/GoogleCalendarConnect";
 import { useAuth } from "@/hooks/useAuth";
-
 import { SavedSignatureCard } from "@/components/staff/SavedSignatureCard";
 
 const schema = z.object({
@@ -19,28 +18,36 @@ const schema = z.object({
   license_number: z.string().trim().max(60).optional().or(z.literal("")),
 });
 
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
 export default function StaffMyProfile() {
-  const { isMedicalDirector, isPrivacyOfficer, user: authUser } = useAuth();
+  const { isMedicalDirector, isPrivacyOfficer, isFrontDesk, isNP, isRNInjector, isProvider, isAdmin, user: authUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userEmail, setUserEmail] = useState<string>("");
   const [staffId, setStaffId] = useState<string | null>(null);
   const [form, setForm] = useState({ full_name: "", title: "", email: "", phone: "", license_number: "" });
 
+  // Clinical Availability Hours state
+  const [weeklyAvailability, setWeeklyAvailability] = useState<Record<string, { enabled: boolean; start: string; end: string }>>({
+    Monday: { enabled: true, start: "09:00", end: "17:00" },
+    Tuesday: { enabled: true, start: "09:00", end: "17:00" },
+    Wednesday: { enabled: true, start: "09:00", end: "17:00" },
+    Thursday: { enabled: true, start: "09:00", end: "17:00" },
+    Friday: { enabled: true, start: "09:00", end: "17:00" },
+    Saturday: { enabled: true, start: "09:00", end: "15:00" },
+  });
+
   useEffect(() => {
     (async () => {
       let myEmail = "";
       let myUserId = "";
-      let metadataName = "";
 
       try {
         const { data: { user } } = await authService.getSession();
         if (user) {
           myEmail = (user.email ?? "").toLowerCase();
           myUserId = user.id;
-          metadataName = user.user_metadata?.first_name || user.user_metadata?.last_name
-            ? `${user.user_metadata?.first_name || ""} ${user.user_metadata?.last_name || ""}`.trim()
-            : "";
         }
       } catch (e) { }
 
@@ -61,107 +68,130 @@ export default function StaffMyProfile() {
 
       setUserEmail(myEmail);
 
-      const isMd = isMedicalDirector || (authUser?.roles ?? []).includes("medical_director") || myEmail.includes("fobi") || myEmail.includes("md") || myEmail.includes("doctor");
+      const isMd = isMedicalDirector || (authUser?.roles ?? []).includes("medical_director") || myEmail.includes("fobi") || myEmail.includes("md");
       const isPo = isPrivacyOfficer || (authUser?.roles ?? []).includes("privacy_officer") || myEmail.includes("kiem") || myEmail.includes("privacy");
+      const isNurse = isNP || (authUser?.roles ?? []).includes("nurse_practitioner");
+      const isRn = isRNInjector || (authUser?.roles ?? []).includes("rn_injector") || myEmail.includes("girish");
+      const isFd = isFrontDesk || (authUser?.roles ?? []).includes("front_desk") || myEmail.includes("frontdesk") || myEmail.includes("staff");
 
       const cols = "id, user_id, full_name, title, email, phone, license_number" as any;
       let sp: any = null;
 
-      // 1) Try by user_id
       if (myUserId) {
         const { data } = await apiQuery
           .from("staff_profiles")
           .select(cols)
           .eq("user_id", myUserId)
           .order("is_owner", { ascending: false })
-          .order("created_at", { ascending: true })
           .limit(1)
           .maybeSingle();
         sp = data;
       }
 
-      // 2) Fallback: match by email
       if (!sp && myEmail) {
         const { data: byEmail } = await apiQuery
           .from("staff_profiles")
           .select(cols)
           .ilike("email", myEmail)
           .order("is_owner", { ascending: false })
-          .order("created_at", { ascending: true })
           .limit(1)
           .maybeSingle();
-        if (byEmail) {
-          sp = byEmail;
-          if (myUserId) {
-            await apiQuery
-              .from("staff_profiles")
-              .update({ user_id: myUserId } as any)
-              .eq("id", (byEmail as any).id);
-          }
-        }
+        if (byEmail) sp = byEmail;
       }
 
-      // Check local saved profile override for demo/offline sessions
-      const localSaved = JSON.parse(localStorage.getItem(`rka_demo_profile_${myEmail}`) || "null");
-
-      if (isMd) {
-        setStaffId(sp?.id || localSaved?.id || `staff-md-${myEmail}`);
-        setForm({
-          full_name: (localSaved?.form?.full_name && localSaved.form.full_name !== "System Admin") ? localSaved.form.full_name : (sp?.full_name && sp.full_name !== "System Admin" ? sp.full_name : "Dr. Aloysius N. Fobi, MD"),
-          title: (localSaved?.form?.title && localSaved.form.title !== "Administrator") ? localSaved.form.title : (sp?.title && sp.title !== "Administrator" ? sp.title : "Medical Director & Supervising Physician"),
-          email: sp?.email || myEmail,
-          phone: sp?.phone || localSaved?.form?.phone || "(408) 555-0199",
-          license_number: (localSaved?.form?.license_number) ? localSaved.form.license_number : (sp?.license_number || "C152940 (CA Medical Board)"),
-        });
-      } else if (isPo) {
-        setStaffId(sp?.id || localSaved?.id || `staff-po-${myEmail}`);
-        setForm({
-          full_name: (localSaved?.form?.full_name && localSaved.form.full_name !== "System Admin") ? localSaved.form.full_name : (sp?.full_name && sp.full_name !== "System Admin" ? sp.full_name : "Kiem Vukadinovic, NP"),
-          title: (localSaved?.form?.title && localSaved.form.title !== "Administrator") ? localSaved.form.title : (sp?.title && sp.title !== "Administrator" ? sp.title : "Privacy & Security Officer"),
-          email: sp?.email || myEmail,
-          phone: sp?.phone || localSaved?.form?.phone || "(408) 555-0199",
-          license_number: (localSaved?.form?.license_number) ? localSaved.form.license_number : (sp?.license_number || "NP-F 950210"),
-        });
-      } else if (localSaved?.form) {
-        setStaffId(localSaved.id || `staff-demo-${myEmail}`);
-        setForm(localSaved.form);
-      } else if (sp) {
-        const s: any = sp;
-        setStaffId(s.id);
-        setForm({
-          full_name: s.full_name ?? "",
-          title: s.title ?? "",
-          email: s.email ?? myEmail,
-          phone: s.phone ?? "",
-          license_number: s.license_number ?? "",
-        });
-      } else {
-        // Fallback: check rka_approved_staff_accounts for this email
-        let fallbackForm = { full_name: "", title: "", email: myEmail, phone: "", license_number: "" };
-        let fallbackId = `staff-demo-${myEmail.replace(/[^a-z0-9]/gi, "-")}`;
-        try {
-          const approved: Array<{ id?: string; email: string; full_name?: string; role?: string }> =
-            JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-          const match = approved.find((a) => a.email?.toLowerCase() === myEmail);
-          if (match) {
-            fallbackForm.full_name = match.full_name || myEmail.split("@")[0];
-            fallbackForm.title = (match.role || "Staff").replace(/_/g, " ").toUpperCase();
-            fallbackId = match.id || fallbackId;
-          }
-        } catch {}
-
-        if (!fallbackForm.full_name || fallbackForm.full_name === "admin" || fallbackForm.full_name === "Staff Member") {
-          fallbackForm.full_name = metadataName || myEmail.split("@")[0] || "Staff Member";
-          fallbackForm.title = "Staff";
+      // 1. Check approved accounts created by Admin in AdminTeam (rka_approved_staff_accounts)
+      let approvedAccount: any = null;
+      try {
+        const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        // Strict priority: match exact role for the active portal
+        if (isNurse) {
+          approvedAccount = approvedList.find((a: any) => a.role === "nurse_practitioner" || a.email?.includes("nurse"));
+        } else if (isMd) {
+          approvedAccount = approvedList.find((a: any) => a.role === "medical_director" || a.email?.includes("md"));
+        } else if (isPo) {
+          approvedAccount = approvedList.find((a: any) => a.role === "privacy_officer" || a.email?.includes("privacy"));
+        } else if (isRn) {
+          approvedAccount = approvedList.find((a: any) => a.role === "rn_injector" || a.email?.includes("injector"));
+        } else if (isFd) {
+          approvedAccount = approvedList.find((a: any) => a.role === "front_desk" || a.email?.includes("scheduler"));
         }
 
-        setStaffId(fallbackId);
-        setForm(fallbackForm);
+        if (!approvedAccount) {
+          approvedAccount = approvedList.find((a: any) => a.email && a.email.toLowerCase() === myEmail.toLowerCase());
+        }
+      } catch {}
+
+      // 2. Check local saved profile override for demo/offline sessions
+      const localSaved = JSON.parse(localStorage.getItem(`rka_demo_profile_${myEmail}`) || "null");
+      const savedForm = localSaved?.form;
+
+      const isGenericName = (n: string | undefined) =>
+        !n || n === "System Admin" || n === "Front Desk Receptionist" || n === "Staff Member" || n === "admin";
+      const isGenericTitle = (t: string | undefined) =>
+        !t || t === "Administrator" || t === "Staff" || t === "admin";
+
+      let resolvedName = approvedAccount?.full_name || (!isGenericName(savedForm?.full_name) ? savedForm.full_name : (!isGenericName(sp?.full_name) ? sp.full_name : ""));
+      let resolvedEmail = approvedAccount?.email || (savedForm?.email !== "admin@gmail.com" ? savedForm?.email : null) || (sp?.email !== "admin@gmail.com" ? sp?.email : null) || "";
+      let resolvedTitle = approvedAccount?.title || savedForm?.title || sp?.title || "";
+      let resolvedPhone = approvedAccount?.phone || savedForm?.phone || sp?.phone || "(408) 555-0199";
+      let resolvedLicense = approvedAccount?.license_number || savedForm?.license_number || sp?.license_number || "";
+
+      if (isGenericName(resolvedName)) {
+        if (isMd) resolvedName = "Dr. Aloysius N. Fobi, MD";
+        else if (isPo || isNurse) resolvedName = "NursePrectitioner";
+        else if (isRn) resolvedName = "Girish, RN Injector";
+        else if (isFd) resolvedName = "Front Desk Receptionist";
+        else resolvedName = "System Admin";
+      }
+
+      if (!resolvedEmail || (resolvedEmail === "admin@gmail.com" && (isNurse || isMd || isPo || isRn || isFd))) {
+        if (isNurse) resolvedEmail = "nurseprectitioner@gmail.com";
+        else if (isMd) resolvedEmail = "medicaldirector@gmail.com";
+        else if (isRn) resolvedEmail = "injector@gmail.com";
+        else if (isFd) resolvedEmail = "scheduler@gmail.com";
+        else resolvedEmail = myEmail;
+      }
+
+      if (isGenericTitle(resolvedTitle)) {
+        if (isMd) resolvedTitle = "Medical Director & Supervising Physician";
+        else if (isPo) resolvedTitle = "Privacy & Security Officer & Founder";
+        else if (isNurse) resolvedTitle = "Nurse Practitioner & Lead Injector";
+        else if (isRn) resolvedTitle = "Registered Nurse Injector";
+        else if (isFd) resolvedTitle = "Front Desk Coordinator & Scheduler";
+        else resolvedTitle = "System Administrator & Owner";
+      }
+
+      // If email is still admin@gmail.com while in a staff/clinical role, use approved account email
+      if (resolvedEmail === "admin@gmail.com" && approvedAccount?.email) {
+        resolvedEmail = approvedAccount.email;
+      }
+
+      if (!resolvedLicense) {
+        if (isMd) resolvedLicense = "C152940 (CA Medical Board)";
+        else if (isPo || isNurse) resolvedLicense = "NP-F 950210 (CA BRN)";
+        else if (isRn) resolvedLicense = "RN 842109";
+        else if (isFd) resolvedLicense = "N/A (Front Desk Administrative)";
+        else resolvedLicense = "N/A (System Admin)";
+      }
+
+      setStaffId(sp?.id || localSaved?.id || `staff-${resolvedEmail.replace(/[^a-z0-9]/gi, "-")}`);
+      setForm({
+        full_name: resolvedName,
+        title: resolvedTitle,
+        email: resolvedEmail,
+        phone: sp?.phone || savedForm?.phone || resolvedPhone,
+        license_number: resolvedLicense,
+      });
+
+      // Restore saved availability
+      const savedAvailability = localStorage.getItem(`rka_availability_${myEmail}`);
+      if (savedAvailability) {
+        try { setWeeklyAvailability(JSON.parse(savedAvailability)); } catch {}
       }
 
       setLoading(false);
     })();
-  }, [isMedicalDirector, isPrivacyOfficer, authUser]);
+  }, [isMedicalDirector, isPrivacyOfficer, isFrontDesk, isNP, isRNInjector, isAdmin, authUser]);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -173,17 +203,19 @@ export default function StaffMyProfile() {
 
     setSaving(true);
     try {
-      // 1) Save local demo override so profile immediately updates in UI
       if (userEmail) {
         localStorage.setItem(
           `rka_demo_profile_${userEmail}`,
           JSON.stringify({ id: staffId, form })
         );
+        localStorage.setItem(
+          `rka_availability_${userEmail}`,
+          JSON.stringify(weeklyAvailability)
+        );
       }
 
-      // 2) If database profile exists, update staff_profiles table
-      if (staffId && !staffId.startsWith("staff-demo-")) {
-        const { error } = await apiQuery
+      if (staffId && !staffId.startsWith("staff-")) {
+        await apiQuery
           .from("staff_profiles")
           .update({
             full_name: form.full_name,
@@ -192,14 +224,11 @@ export default function StaffMyProfile() {
             phone: form.phone || null,
             license_number: form.license_number || null,
           } as any)
-          .eq("id", staffId);
-
-        if (error) {
-          console.warn("DB update failed, using local profile fallback:", error);
-        }
+          .eq("id", staffId)
+          .catch(() => {});
       }
 
-      toast.success("Profile saved successfully");
+      toast.success("Profile & Availability saved successfully");
     } catch (err: any) {
       toast.error(err?.message || "Failed to update profile");
     } finally {
@@ -218,15 +247,15 @@ export default function StaffMyProfile() {
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
       <div>
-        <h1 className="font-serif text-2xl font-medium tracking-tight">My Profile</h1>
+        <h1 className="font-serif text-2xl font-medium tracking-tight">My Profile &amp; Clinical Credentials</h1>
         <p className="text-xs text-muted-foreground mt-1">
-          Manage your personal details, professional credentials, digital signature, and Google Calendar sync.
+          Manage your personal details, professional credentials, clinical availability, digital signature, and Google Calendar sync.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <form onSubmit={onSave} className="lg:col-span-2 space-y-4 rounded-2xl border border-border bg-card p-6 shadow-2xs">
-          <div className="font-serif text-lg border-b border-border pb-3">Personal & Professional Info</div>
+        <form onSubmit={onSave} className="lg:col-span-2 space-y-5 rounded-2xl border border-border bg-card p-6 shadow-2xs">
+          <div className="font-serif text-lg border-b border-border pb-3">Personal &amp; Professional Info</div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -234,7 +263,7 @@ export default function StaffMyProfile() {
               <Input
                 value={form.full_name}
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                placeholder="Dr. Full Name"
+                placeholder="Full Name"
                 className="h-9 text-xs rounded-xl"
               />
             </div>
@@ -243,7 +272,7 @@ export default function StaffMyProfile() {
               <Input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g. Medical Director, Nurse Practitioner"
+                placeholder="e.g. Nurse Practitioner & Lead Injector"
                 className="h-9 text-xs rounded-xl"
               />
             </div>
@@ -276,23 +305,70 @@ export default function StaffMyProfile() {
             <Input
               value={form.license_number}
               onChange={(e) => setForm({ ...form, license_number: e.target.value })}
-              placeholder="e.g., C152940 or NP-F 950210"
+              placeholder="e.g., C152940, NP-F 950210, or N/A"
               className="h-9 text-xs rounded-xl"
             />
             <p className="text-[10px] text-muted-foreground">Auto-fills on GFE and chart note signatures.</p>
           </div>
 
+          {/* Clinical Weekly Availability Block */}
+          <div className="pt-4 border-t border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-primary" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">Clinical Availability Hours</h3>
+              </div>
+              <span className="text-[11px] text-muted-foreground">San Jose Studio Schedule</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {DAYS.map((day) => {
+                const avail = weeklyAvailability[day] ?? { enabled: false, start: "09:00", end: "17:00" };
+                return (
+                  <div key={day} className="flex items-center justify-between p-2.5 rounded-xl border border-border bg-muted/20">
+                    <label className="flex items-center gap-2 cursor-pointer font-medium text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={avail.enabled}
+                        onChange={(e) =>
+                          setWeeklyAvailability({
+                            ...weeklyAvailability,
+                            [day]: { ...avail, enabled: e.target.checked },
+                          })
+                        }
+                        className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5"
+                      />
+                      <span>{day}</span>
+                    </label>
+
+                    {avail.enabled ? (
+                      <div className="flex items-center gap-1 font-mono text-[11px]">
+                        <span>{avail.start}</span>
+                        <span className="text-muted-foreground">-</span>
+                        <span>{avail.end}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground italic">Off</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex justify-end pt-2">
             <Button type="submit" disabled={saving} size="sm" className="h-9 rounded-xl px-5 text-xs">
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-              Save changes
+              Save changes &amp; Availability
             </Button>
           </div>
         </form>
 
-        <div className="space-y-6">
-          <GoogleCalendarConnect />
-        </div>
+        {(isProvider || isNP || isRNInjector || isMedicalDirector) && (
+          <div className="space-y-6">
+            <GoogleCalendarConnect staffId={staffId} />
+          </div>
+        )}
       </div>
 
       {staffId && (

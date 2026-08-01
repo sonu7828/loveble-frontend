@@ -31,8 +31,12 @@ export function SavedSignatureCard({ staffId, defaultName = "" }: Props) {
       if (cancel) return;
       if (data) {
         setPng(data.saved_signature_png ?? "");
-        setName(data.saved_signature_name ?? defaultName);
+        const rawName = data.saved_signature_name ?? "";
+        const isGeneric = !rawName || rawName === "Front Desk Receptionist" || rawName === "System Admin";
+        setName(isGeneric && defaultName ? defaultName : (rawName || defaultName));
         setSavedAt(data.signature_saved_at ?? null);
+      } else {
+        setName(defaultName);
       }
       setLoading(false);
     })();

@@ -126,8 +126,7 @@ ${protocols.map(p => `
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" asChild><Link to="/staff/clinical/adverse-events"><FileText className="h-4 w-4 mr-1.5" />AE log</Link></Button>
-          <Button onClick={printBinder}><Printer className="h-4 w-4 mr-1.5" />Print safety binder</Button>
+          <Button variant="outline" asChild><Link to="/staff/clinical/adverse-events"><FileText className="h-4 w-4 mr-1.5" />Adverse Event Log</Link></Button>
         </div>
       </header>
 
