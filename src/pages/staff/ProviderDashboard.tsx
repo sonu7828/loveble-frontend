@@ -56,7 +56,7 @@ function formatClinicTime(iso: string) {
 
 export function ProviderDashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isNP, isRNInjector, isMedicalDirector, isAdmin } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [appts, setAppts] = useState<Appt[]>([]);
@@ -171,6 +171,14 @@ export function ProviderDashboard() {
 
   const waitingPatientsCount = appts.filter(a => a.status === "arrived" || a.checked_in_at).length;
 
+  const providerRoleBadge = isNP
+    ? "Nurse Practitioner & Lead Injector"
+    : isRNInjector
+      ? "RN Injector"
+      : isMedicalDirector
+        ? "Medical Director & Supervising Physician"
+        : "Clinical Provider";
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
       {/* Provider Header Banner */}
@@ -181,7 +189,7 @@ export function ProviderDashboard() {
               Welcome back, {providerName}
             </h1>
             <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30 px-2.5 py-0.5 text-xs font-medium">
-              <Stethoscope className="h-3.5 w-3.5 mr-1 text-blue-600" /> Medical Provider
+              <Stethoscope className="h-3.5 w-3.5 mr-1 text-blue-600" /> {providerRoleBadge}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">

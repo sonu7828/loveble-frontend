@@ -531,8 +531,14 @@ export default function StaffLayout() {
               {roles.includes("medical_director")
                 ? "Medical Director Portal"
                 : roles.includes("privacy_officer")
-                  ? "Security Officer Portal"
-                  : "Staff Portal"}
+                  ? "Privacy & Security Officer Portal"
+                  : roles.includes("nurse_practitioner")
+                    ? "Nurse Practitioner Portal"
+                    : roles.includes("rn_injector")
+                      ? "RN Injector Portal"
+                      : roles.includes("front_desk")
+                        ? "Front Desk Receptionist Portal"
+                        : "Staff Portal"}
             </span>
           </div>
         </div>

@@ -21,13 +21,13 @@ type Note = {
 };
 
 export default function StaffCosignQueue() {
-  const { isAdmin, isNP, isMedicalDirector, loading } = useAuth();
+  const { isAdmin, isNP, isMedicalDirector, isRNInjector, loading } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [busy, setBusy] = useState(true);
 
   useEffect(() => {
     if (loading) return;
-    if (!isAdmin && !isNP && !isMedicalDirector) { setBusy(false); return; }
+    if (!isAdmin && !isNP && !isMedicalDirector && !isRNInjector) { setBusy(false); return; }
     let cancel = false;
     (async () => {
       const { data, error } = await apiQuery
@@ -42,10 +42,10 @@ export default function StaffCosignQueue() {
       setBusy(false);
     })();
     return () => { cancel = true; };
-  }, [loading, isAdmin, isNP, isMedicalDirector]);
+  }, [loading, isAdmin, isNP, isMedicalDirector, isRNInjector]);
 
   if (loading) return <div className="p-8"><Loader2 className="h-4 w-4 animate-spin" /></div>;
-  if (!isAdmin && !isNP && !isMedicalDirector) return <Navigate to="/staff/today" replace />;
+  if (!isAdmin && !isNP && !isMedicalDirector && !isRNInjector) return <Navigate to="/staff/today" replace />;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
