@@ -164,15 +164,6 @@ export default function StaffLayout() {
             { to: "/staff/vendors", label: "BAA & Vendors", icon: Building2 },
           ],
         },
-        {
-          key: "sec_messages",
-          label: "Messages",
-          icon: MessageSquare,
-          show: true,
-          children: [
-            { to: "/staff/messages", label: "Messages", icon: MessageSquare, badge: unreadSms },
-          ],
-        },
       ];
     }
 

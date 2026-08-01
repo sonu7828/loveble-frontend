@@ -787,7 +787,7 @@ ${approved.map(policyToHtml).join("<hr/>")}
             </span>
           </div>
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-            Review, edit, approve, and download policy documents for HIPAA §164.308 / §164.312 & California CMIA compliance.
+            Review, edit, approve, and manage HIPAA policy documents.
           </p>
         </div>
 
@@ -901,12 +901,6 @@ ${approved.map(policyToHtml).join("<hr/>")}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)} className="h-8 text-xs gap-1">
                     <History className="h-3.5 w-3.5" /> {showHistory ? "Hide Audit Log" : "Audit Log"}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => downloadCurrent("md")} className="h-8 text-xs gap-1">
-                    <Download className="h-3.5 w-3.5" /> .md
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => downloadCurrent("html")} className="h-8 text-xs gap-1">
-                    <FileText className="h-3.5 w-3.5" /> .html
                   </Button>
                 </div>
               </div>
@@ -1024,7 +1018,7 @@ ${approved.map(policyToHtml).join("<hr/>")}
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground">Body (Markdown)</label>
+                <label className="text-xs text-muted-foreground">Policy Content</label>
                 <Textarea
                   value={draft.body_markdown}
                   onChange={(e) => setDraft({ ...draft, body_markdown: e.target.value })}
@@ -1036,7 +1030,7 @@ ${approved.map(policyToHtml).join("<hr/>")}
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button onClick={save} disabled={saving || (!isPrivacyOfficer && draft.status === "approved")} variant="outline" size="sm" className="h-9 text-xs">
                     <Save className="h-3.5 w-3.5 mr-1.5" />
-                    {draft.status === "approved" ? "Save New Revision Draft" : "Save draft"}
+                    Save
                   </Button>
 
                   {draft.status === "draft" && (
@@ -1048,7 +1042,7 @@ ${approved.map(policyToHtml).join("<hr/>")}
                   {isPrivacyOfficer ? (
                     <>
                       <Button onClick={approve} disabled={saving} size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700">
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Approve as v{draft.version + 1}
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Approve
                       </Button>
                       <Button onClick={reject} disabled={saving} size="sm" variant="destructive" className="h-9 text-xs">
                         <XCircle className="h-3.5 w-3.5 mr-1.5" />Reject Policy
@@ -1060,15 +1054,6 @@ ${approved.map(policyToHtml).join("<hr/>")}
                     </Button>
                   )}
                 </div>
-                {draft.status !== "archived" ? (
-                  <Button onClick={archive} variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground hover:text-destructive">
-                    <Archive className="h-3.5 w-3.5 mr-1.5" />Archive
-                  </Button>
-                ) : (
-                  <Button onClick={reactivate} variant="outline" size="sm" className="h-9 text-xs">
-                    Reactivate
-                  </Button>
-                )}
               </div>
 
               {showHistory && (
@@ -1160,9 +1145,6 @@ ${approved.map(policyToHtml).join("<hr/>")}
                             <div className="font-medium text-foreground">v{v.version} — {v.title}</div>
                             <div className="text-muted-foreground mt-0.5">Approved {new Date(v.approved_at).toLocaleString()}{v.effective_date ? ` • Effective ${v.effective_date}` : ""}</div>
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => downloadFile(`${draft.slug}-v${v.version}.md`, v.body_markdown, "text/markdown")}>
-                            <Download className="h-3 w-3 mr-1" /> .md
-                          </Button>
                         </div>
                       ))
                     )}

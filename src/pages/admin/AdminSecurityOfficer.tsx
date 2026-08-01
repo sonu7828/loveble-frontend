@@ -25,7 +25,7 @@ export default function AdminSecurityOfficer() {
     {
       to: "/staff/audit-report",
       label: "PHI Audit Trail Logs",
-      desc: "Immutable audit history for chart views, exports & patient record access",
+      desc: "Audit history for chart views, exports & patient record access",
       icon: HistoryIcon,
       color: "text-purple-700 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900/60",
     },
@@ -39,19 +39,13 @@ export default function AdminSecurityOfficer() {
     {
       to: "/staff/breach-report",
       label: "Incident & Breach Response",
-      desc: "File security incident reports, CMIA 15-day SLA tracker & OCR notifications",
+      desc: "File security incident reports & manage notifications",
       icon: ShieldAlert,
       color: "text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60",
     },
   ];
 
-  const SAFEGUARDS = [
-    { name: "Multi-Factor Authentication (MFA)", rule: "45 CFR §164.312(a)(2)(d)", status: "Enforced", detail: "Required for all staff & provider logins" },
-    { name: "15-Min Workstation Auto-Logout", rule: "45 CFR §164.312(a)(2)(iii)", status: "Active", detail: "Inactivity session termination hook active" },
-    { name: "Row-Level Security & Access Control", rule: "45 CFR §164.308(a)(4)", status: "Active", detail: "Database RLS enforced across PHI tables" },
-    { name: "AES-256 Encryption (Rest & Transit)", rule: "45 CFR §164.312(a)(2)(iv)", status: "Active", detail: "TLS 1.3 in transit & AES-256 at rest" },
-    { name: "Immutable Audit Access Logging", rule: "45 CFR §164.312(b)", status: "Active", detail: "PHI access log RPC appended on all chart views" },
-  ];
+
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
@@ -89,12 +83,12 @@ export default function AdminSecurityOfficer() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 border border-border/80 bg-card shadow-2xs rounded-2xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Compliance Grade</span>
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Compliance Status</span>
             <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
               <ShieldCheck className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-2xl font-serif font-bold text-foreground mt-2">98% <span className="text-xs text-emerald-600 font-sans font-medium">(Grade A)</span></div>
+          <div className="text-2xl font-serif font-bold text-foreground mt-2">Active</div>
           <p className="text-[11px] text-muted-foreground mt-0.5">Audit-Ready Safeguards</p>
         </Card>
 
@@ -111,13 +105,13 @@ export default function AdminSecurityOfficer() {
 
         <Card className="p-4 border border-border/80 bg-card shadow-2xs rounded-2xl">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Vendor BAAs</span>
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Vendor Compliance</span>
             <div className="h-8 w-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
               <Building2 className="h-4 w-4" />
             </div>
           </div>
           <div className="text-2xl font-serif font-bold text-foreground mt-2">Verified</div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">DB, Stripe, GHL & Twilio BAAs</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Business Associate Agreements Active</p>
         </Card>
 
         <Card className="p-4 border border-border/80 bg-card shadow-2xs rounded-2xl">
@@ -162,37 +156,7 @@ export default function AdminSecurityOfficer() {
         </div>
       </div>
 
-      {/* Mandatory Technical & Administrative Safeguards Checklist */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-serif text-lg font-semibold text-foreground">Mandatory Safeguards (§164.308 / §164.312)</h2>
-          <Badge variant="outline" className="text-[11px] font-normal">
-            5 / 5 Safeguards Active
-          </Badge>
-        </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-2xs divide-y divide-border/60">
-          {SAFEGUARDS.map((sg) => (
-            <div key={sg.name} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-muted/30 transition">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-semibold text-foreground">{sg.name}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">{sg.detail}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 sm:text-right shrink-0">
-                <span className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded-md">
-                  {sg.rule}
-                </span>
-                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-medium text-[11px] px-2 py-0.5">
-                  {sg.status}
-                </Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
     </div>
   );

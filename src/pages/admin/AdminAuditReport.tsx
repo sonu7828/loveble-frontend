@@ -438,26 +438,14 @@ export default function AdminAuditReport() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight">HIPAA Audit Trail & Governance</h1>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" /> §164.312(b) Active
-            </span>
           </div>
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" />
-            Immutable security log of PHI access, chart mutations, patient consents, and appointment updates.
+            Audit log of PHI access, patient consents, and appointment updates.
           </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            onClick={exportCsv}
-            disabled={filteredEvents.length === 0 || loading}
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-          >
-            <Download className="h-3.5 w-3.5" /> Export CSV ({filteredEvents.length})
-          </Button>
           <Button
             onClick={generatePdfReport}
             disabled={filteredEvents.length === 0 || loading}
@@ -528,7 +516,7 @@ export default function AdminAuditReport() {
               placeholder="Search actor name, patient email, or action detail..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8.5 h-9 text-xs rounded-xl bg-background border-border/80"
+              className="pl-9 h-9 text-xs rounded-xl bg-background border-border/80"
             />
           </div>
 
@@ -671,13 +659,6 @@ export default function AdminAuditReport() {
         )}
       </div>
 
-      {/* Compliance Legal Footer */}
-      <div className="pt-2 text-center text-[11px] text-muted-foreground space-y-1">
-        <p>Radiantilyk Aesthetic HIPAA Governance & Security Control</p>
-        <p className="text-[10px] text-muted-foreground/70">
-          Confidential Evidence Record — HIPAA §164.308(a)(1)(ii)(D) & §164.312(b)
-        </p>
-      </div>
     </div>
   );
 }

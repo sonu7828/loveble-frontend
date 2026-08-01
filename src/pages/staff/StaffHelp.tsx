@@ -98,25 +98,25 @@ export default function StaffHelp() {
           color: "text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900",
         },
         {
-          icon: Laptop,
-          title: "4. IT Devices & Hardware",
-          desc: "Manage clinic iPads, workstations, full-disk encryption, and screen lock policies.",
-          link: "/staff/vendors?tab=devices",
-          linkText: "View IT Devices",
-          color: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900",
-        },
-        {
           icon: ShieldAlert,
-          title: "5. Breach Incident Logs",
-          desc: "Review security incident reports and 15-day CMIA notification timers.",
+          title: "4. Breach Incident Logs",
+          desc: "Review security incident reports and manage breach responses.",
           link: "/staff/breach-report",
           linkText: "Incidents Log",
           color: "text-red-600 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900",
         },
         {
-          icon: Stethoscope,
-          title: "6. Digital Signature & Profile",
-          desc: "Set up your credentials, license details, and digital signature.",
+          icon: FileCheck,
+          title: "5. PHI Access Audit",
+          desc: "Monitor and audit staff access to Protected Health Information (PHI) and patient records.",
+          link: "/staff/audit-report",
+          linkText: "View Audit Log",
+          color: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900",
+        },
+        {
+          icon: UserCheck,
+          title: "6. Security Officer Profile",
+          desc: "Manage your Security Officer profile and security settings.",
           link: "/staff/me",
           linkText: "Edit Profile",
           color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900",
@@ -219,22 +219,35 @@ export default function StaffHelp() {
       ];
     }
 
+    if (isPrivacyOfficer) {
+      return [
+        {
+          q: "What should I do if a privacy breach happens?",
+          a: "Go to Breach Reports (/staff/breach-report) -> Review the incident report, conduct a risk assessment, and update the status.",
+        },
+        {
+          q: "How does the 15-minute auto-logout work?",
+          a: "For HIPAA compliance, if a screen is left idle for 15 minutes without activity, the system automatically signs out to protect patient data.",
+        },
+        {
+          q: "How do I audit PHI access?",
+          a: "Go to PHI Access Audit (/staff/audit-report) -> Review the logs to track which staff members accessed patient records and charts.",
+        },
+        {
+          q: "How do I track vendor BAAs?",
+          a: "Go to Vendor Management (/staff/vendors) -> You can add vendors, update their BAA signed dates, and track upcoming renewals.",
+        }
+      ];
+    }
+
     return [
       {
-        q: "How do I sign chart notes and GFEs?",
-        a: "Go to My Profile (/staff/me) -> Draw your signature on the pad and click 'Save signature'. Your signature will auto-fill whenever you sign a chart note or GFE.",
-      },
-      {
-        q: "What should I do if a device is lost or a privacy breach happens?",
+        q: "What should I do if a privacy breach happens?",
         a: "Go to Breach Reports (/staff/breach-report) -> Fill the description field and submit. The Privacy & Security Officer will be notified immediately to handle investigation.",
       },
       {
         q: "How does the 15-minute auto-logout work?",
         a: "For HIPAA compliance, if your screen is left idle for 15 minutes without activity, the system automatically signs out to protect patient data.",
-      },
-      {
-        q: "Where do I find active services and pricing?",
-        a: "Go to Services & Pricing in the sidebar menu to review all active treatment categories, appointment durations, and pricing.",
       },
     ];
   }, [isMedicalDirector]);

@@ -786,9 +786,113 @@ function StandardStaffToday() {
   );
 }
 
+/* ── Security Officer Dashboard View ───────────────────────────────────────── */
+function SecurityOfficerDashboard() {
+  const { user } = useAuth();
+  
+  const officerName = (user?.first_name || user?.last_name)
+    ? `${user?.first_name || ""} ${user?.last_name || ""}`.trim()
+    : "Kiem Vukadinovic, NP";
+
+  return (
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border pb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-foreground">
+              Security Officer Portal
+            </h1>
+            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+              <ShieldAlert className="h-3 w-3 mr-1" /> HIPAA Officer
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Welcome back, {officerName}. Monitor HIPAA compliance, audits, and security alerts.
+          </p>
+        </div>
+      </div>
+
+      {/* Security-focused widgets */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4 border border-border bg-card shadow-xs rounded-2xl">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Open Breach Incidents</span>
+            <div className="h-8 w-8 rounded-xl bg-destructive-soft text-destructive-soft-foreground flex items-center justify-center">
+              <ShieldAlert className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-serif font-bold text-foreground mt-2">0</div>
+          <p className="text-[11px] text-emerald-600 font-medium mt-0.5">No active incidents</p>
+        </Card>
+
+        <Card className="p-4 border border-border bg-card shadow-xs rounded-2xl">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Pending PHI Access Reviews</span>
+            <div className="h-8 w-8 rounded-xl bg-warning-soft text-warning-soft-foreground flex items-center justify-center">
+              <FileCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-serif font-bold text-foreground mt-2">3</div>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Requires your approval</p>
+        </Card>
+
+        <Card className="p-4 border border-border bg-card shadow-xs rounded-2xl">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Security Alerts</span>
+            <div className="h-8 w-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+              <Bell className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-serif font-bold text-foreground mt-2">1</div>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Unusual login detected</p>
+        </Card>
+
+        <Card className="p-4 border border-border bg-card shadow-xs rounded-2xl">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">BAA / Vendor Compliance</span>
+            <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-serif font-bold text-foreground mt-2">100%</div>
+          <p className="text-[11px] text-emerald-600 font-medium mt-0.5">All vendors verified</p>
+        </Card>
+      </div>
+
+      {/* HIPAA Modules */}
+      <h2 className="font-serif text-lg font-semibold text-foreground pt-4">HIPAA & Security Modules</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {[
+          { title: "Compliance Overview", desc: "Overall practice HIPAA status", icon: ShieldAlert, link: "/staff/compliance/admin", color: "text-blue-600 bg-blue-500/10" },
+          { title: "PHI Access Audit", desc: "View immutable access logs", icon: Activity, link: "/staff/audit-report", color: "text-purple-600 bg-purple-500/10" },
+          { title: "HIPAA Policies", desc: "Review and manage policies", icon: FileText, link: "/staff/hipaa-policies", color: "text-emerald-600 bg-emerald-500/10" },
+          { title: "Breach Incident Logs", desc: "Manage reported breaches", icon: ShieldAlert, link: "/staff/breach-report", color: "text-amber-600 bg-amber-500/10" },
+          { title: "BAA & Vendors", desc: "Business Associate Agreements", icon: Users, link: "/staff/vendors", color: "text-rose-600 bg-rose-500/10" }
+        ].map(mod => (
+          <Link key={mod.title} to={mod.link} className="group rounded-2xl border border-border bg-card p-5 hover:border-primary/50 transition flex items-start gap-4 shadow-xs">
+            <div className={`p-3 rounded-xl shrink-0 ${mod.color}`}>
+              <mod.icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-serif text-base font-semibold text-foreground group-hover:text-primary transition">
+                {mod.title}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{mod.desc}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ── Staff Today Main Dispatcher Component ─────────────────────────────────── */
 export default function StaffToday() {
-  const { isMedicalDirector, isProvider } = useAuth();
+  const { isMedicalDirector, isProvider, isPrivacyOfficer } = useAuth();
+
+  if (isPrivacyOfficer) {
+    return <SecurityOfficerDashboard />;
+  }
 
   if (isMedicalDirector) {
     return <MedicalDirectorDashboard />;
