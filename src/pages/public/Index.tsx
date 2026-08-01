@@ -191,14 +191,18 @@ const Index = () => {
               <Link
                 key={title}
                 to={href}
-                className="group rounded-xl border border-border bg-card text-card-foreground p-4 hover:border-primary/60 hover:shadow-md transition text-center flex flex-col items-center justify-between h-full"
+                className="group rounded-xl border border-border bg-card text-card-foreground pt-6 pb-4 px-4 hover:border-primary/60 hover:shadow-md transition-all text-center flex flex-col items-center justify-between h-full"
               >
                 <div className="w-full flex flex-col items-center">
-                  <div className="p-3 rounded-full bg-primary/10 text-primary mb-3 group-hover:scale-105 transition">
+                  <div className="p-3 rounded-full bg-primary/10 text-primary mb-3 group-hover:scale-110 transition-transform duration-300">
                     <Icon className="h-5 w-5" strokeWidth={1.5} />
                   </div>
                   <h3 className="font-serif text-lg font-medium text-card-foreground mb-1">{title}</h3>
                   <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed font-light">{desc}</p>
+                </div>
+                
+                <div className="mt-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] font-bold text-primary">
+                  Explore <ArrowRight className="h-3 w-3" />
                 </div>
               </Link>
             ))}
