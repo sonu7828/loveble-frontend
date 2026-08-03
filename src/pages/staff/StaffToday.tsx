@@ -19,6 +19,7 @@ import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices"
 import { SmsThread } from "@/components/messaging/SmsThread";
 import { fetchIncompleteCharts } from "@/lib/incompleteCharts";
 import { sendNoShowSms } from "@/lib/noShowSms";
+import { getDynamicProfileName } from "@/lib/userProfile";
 import ProviderDashboard from "./ProviderDashboard";
 
 type Appt = {
@@ -88,7 +89,7 @@ function MedicalDirectorDashboard() {
 
   useEffect(() => {
     (async () => {
-      const [notesRes, gfeRes, staffRes] = await Promise.all([
+      const [notesRes, gfeRes, staffRes]: any[] = await Promise.all([
         apiQuery("clinical_notes").select("id, client_id, provider_id, service_name, created_at, status").eq("cosign_required", true).catch(() => ({ data: [] })),
         apiQuery("gfe_records").select("id, client_name, provider_name, created_at, status").eq("status", "pending_review").catch(() => ({ data: [] })),
         apiQuery("staff_profiles").select("id").eq("is_provider", true).catch(() => ({ data: [] })),
@@ -119,10 +120,7 @@ function MedicalDirectorDashboard() {
     toast.success(`Order ${action === "approve" ? "approved & e-signed" : "rejected"}`);
   };
 
-  const uMeta = (user as any)?.user_metadata;
-  const directorName = user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
-    ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim() + " (Medical Director)"
-    : "Dr. Aloysius N. Fobi, MD (Medical Director)";
+  const directorName = getDynamicProfileName(user, "Medical Director") + " (Medical Director)";
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
@@ -434,22 +432,7 @@ function StandardStaffToday() {
       toast.error(e.message ?? "Failed to check in");
     }
   };
-  const uMeta = (user as any)?.user_metadata;
-  // Resolve staff name from approved accounts (real staff data) rather than hardcoded auth names
-  const staffName = (() => {
-    const userEmail = (user?.email || "").toLowerCase();
-    if (userEmail) {
-      try {
-        const approved: Array<{ email: string; full_name?: string }> =
-          JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-        const match = approved.find((a) => a.email?.toLowerCase() === userEmail);
-        if (match?.full_name) return match.full_name;
-      } catch { }
-    }
-    return user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
-      ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim()
-      : user?.email || "Front Desk Staff";
-  })();
+  const staffName = getDynamicProfileName(user, "Staff Member");
 
   const toggleStaffTask = (id: number) => {
     setMyTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
@@ -500,7 +483,10 @@ function StandardStaffToday() {
       {/* ── 4 KPI Cards Grid ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Today's Appointments */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-primary/30 transition rounded-xl">
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-primary/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/calendar")}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Today's Appointments</span>
             <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -508,27 +494,31 @@ function StandardStaffToday() {
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{appts.length}</div>
-          <div className="text-[11px] text-muted-foreground mt-1 font-medium">
-            Scheduled for today
-          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">Confirmed for today</p>
         </Card>
 
-        {/* KPI 2: Waiting Patients */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl">
+        {/* KPI 2: Checked In Patients */}
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/checkout")}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Waiting Patients</span>
+            <span className="font-medium">Checked In</span>
             <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <UserCheck className="h-4 w-4 text-emerald-600" />
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{waitingPatientsCount}</div>
           <div className="text-[11px] text-emerald-600 font-medium mt-1">
-            Checked in & in building
+            Checked in &amp; in building
           </div>
         </Card>
 
         {/* KPI 3: Today's Check-ins */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-blue-500/30 transition rounded-xl">
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-blue-500/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/checkout")}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Today's Check-ins</span>
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -544,7 +534,10 @@ function StandardStaffToday() {
         </Card>
 
         {/* KPI 4: Booking Requests */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-purple-500/30 transition rounded-xl">
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-purple-500/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/inbox")}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Booking Requests</span>
             <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
@@ -790,9 +783,7 @@ function StandardStaffToday() {
 function SecurityOfficerDashboard() {
   const { user } = useAuth();
 
-  const officerName = (user?.first_name || user?.last_name)
-    ? `${user?.first_name || ""} ${user?.last_name || ""}`.trim()
-    : "Kiem Vukadinovic, NP";
+  const officerName = getDynamicProfileName(user, "Privacy & Security Officer");
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">

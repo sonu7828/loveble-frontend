@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ArrowLeft, FileCheck2, ShieldAlert, Download, Trash2, Plus, Mic, MicOff, Sparkles, Camera } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, ArrowLeft, FileCheck2, ShieldAlert, Download, Trash2, Plus, Mic, MicOff, Sparkles, Camera, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useDictation } from "@/hooks/useDictation";
 import { computeInteractionAlerts } from "@/lib/interactionAlerts";
@@ -96,6 +97,17 @@ function categoryFromServiceName(name: string | null | undefined, categoryName?:
 
 function makeClinicalNoteId() {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
+function fmtDate(val: any, fmt = "PPP p"): string {
+  if (!val) return "—";
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "—";
+    return format(d, fmt);
+  } catch {
+    return "—";
+  }
 }
 
 function energyDeviceOptionForService(serviceName: string | null | undefined) {
@@ -414,10 +426,117 @@ export default function ChartNoteEditor() {
   // Signature
   const [sigFullName, setSigFullName] = useState("");
   const [sigPng, setSigPng] = useState("");
+  const [providerOptions, setProviderOptions] = useState<string[]>([]);
   // Saved provider signature (from staff_profiles). Auto-fills when present.
   const [savedSig, setSavedSig] = useState<{ png: string; name: string } | null>(null);
   const [saveSigForFuture, setSaveSigForFuture] = useState(false);
   const sigAutoFilledRef = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      let list: string[] = [];
+      try {
+        const { data } = await apiQuery("staff_profiles").select("full_name, title").order("full_name");
+        if (data) {
+          list = data.map((sp: any) => sp.full_name).filter(Boolean);
+        }
+      } catch { }
+
+      try {
+        const demoStaff: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        demoStaff.forEach((s: any) => {
+          if (s.name) list.push(s.name);
+          if (s.full_name) list.push(s.full_name);
+        });
+      } catch { }
+
+      const defaults = [
+        "Kiem Vukadinovic, NP",
+        "Bob Stane, NP",
+        "Girish, RN Injector",
+        "Dr. Suhaas Sharma, MD",
+        "Dr. Aloysius N. Fobi, MD",
+      ];
+      const merged = Array.from(new Set([...list, ...defaults])).filter(Boolean);
+      setProviderOptions(merged);
+    })();
+  }, []);
+
+  type ClientOption = {
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    dob?: string;
+  };
+
+  const [existingClients, setExistingClients] = useState<ClientOption[]>([]);
+  const [selectedClientEmail, setSelectedClientEmail] = useState("");
+
+  useEffect(() => {
+    if (isViewMode) return;
+    (async () => {
+      let list: ClientOption[] = [];
+      try {
+        const { data: cp } = await apiQuery("client_profiles")
+          .select("email, first_name, last_name, phone, dob")
+          .order("first_name", { ascending: true })
+          .limit(1000);
+        if (cp) {
+          list.push(...cp.map((c: any) => ({
+            email: c.email || "",
+            first_name: c.first_name || "",
+            last_name: c.last_name || "",
+            phone: c.phone || "",
+            dob: c.dob || "",
+          })));
+        }
+      } catch { }
+
+      try {
+        const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+        localClients.forEach((c: any) => {
+          if (c.email) {
+            list.push({
+              email: c.email,
+              first_name: c.first_name || c.client_first_name || "",
+              last_name: c.last_name || c.client_last_name || "",
+              phone: c.phone || c.client_phone || "",
+              dob: c.dob || c.client_dob || "",
+            });
+          }
+        });
+      } catch { }
+
+      // Deduplicate by email
+      const map = new Map<string, ClientOption>();
+      list.forEach(c => {
+        if (c.email && c.email.trim()) {
+          const lower = c.email.trim().toLowerCase();
+          if (!map.has(lower)) {
+            map.set(lower, { ...c, email: lower });
+          }
+        }
+      });
+
+      const arr = Array.from(map.values()).sort((a, b) => a.first_name.localeCompare(b.first_name));
+      setExistingClients(arr);
+    })();
+  }, [isViewMode]);
+
+  const handleSelectClient = (email: string) => {
+    const found = existingClients.find(c => c.email.toLowerCase() === email.toLowerCase());
+    if (found) {
+      setSelectedClientEmail(found.email);
+      setClient({
+        first: found.first_name || client.first,
+        last: found.last_name || client.last,
+        email: found.email || client.email,
+        dob: found.dob ? found.dob.slice(0, 10) : client.dob,
+      });
+      toast.success(`Selected patient: ${found.first_name} ${found.last_name}`);
+    }
+  };
 
   useEffect(() => {
     if (isViewMode || !user) return;
@@ -553,8 +672,19 @@ export default function ChartNoteEditor() {
     const draftId = sp.get("draft");
     (async () => {
       if (!user) return;
-      const { data: sprof } = await apiQuery("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
-      if (sprof?.full_name) { setProviderName(sprof.full_name); setSigFullName(sprof.full_name); }
+      let initialName = "";
+      try {
+        const { data: sprof } = await apiQuery("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
+        if (sprof?.full_name) initialName = sprof.full_name;
+      } catch {}
+      if (!initialName) {
+        initialName = (user as any)?.user_metadata?.full_name
+          || (user as any)?.user_metadata?.name
+          || (user as any)?.email?.split("@")[0]
+          || "Bob Stane, NP";
+      }
+      setProviderName(prev => prev || initialName);
+      setSigFullName(prev => prev || initialName);
 
       if (appointmentId) {
         const { data: appt } = await apiQuery("appointments").select("*").eq("id", appointmentId).maybeSingle();
@@ -895,8 +1025,20 @@ export default function ChartNoteEditor() {
   useEffect(() => {
     if (!isViewMode || !id) return;
     (async () => {
-      const { data: n, error } = await apiQuery("clinical_notes").select("*").eq("id", id).maybeSingle();
-      if (error || !n) { toast.error("Note not found"); navigate(-1); return; }
+      let n: any = null;
+      try {
+        const { data, error } = await apiQuery("clinical_notes").select("*").eq("id", id).maybeSingle();
+        if (!error && data) n = data;
+      } catch { }
+
+      if (!n) {
+        try {
+          const cachedNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+          n = cachedNotes.find((x: any) => x.id === id);
+        } catch { }
+      }
+
+      if (!n) { toast.error("Note not found"); navigate(-1); return; }
       // Draft notes should resume in edit mode, not the read-only view (which renders the
       // category template with example imagery and confuses providers mid-chart).
       if (n.status === "draft") {
@@ -1304,6 +1446,39 @@ export default function ChartNoteEditor() {
           requires_cosign: notePayload.requires_cosign,
         }).eq("id", noteId);
         if (signErr) throw signErr;
+
+        // Dual persistence: store in local cache as fallback so note is immediately visible everywhere
+        try {
+          const cachedNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+          const noteObj = {
+            id: noteId,
+            appointment_id: svc.appointmentId ?? appointmentId,
+            client_email: client.email.toLowerCase(),
+            client_first_name: client.first,
+            client_last_name: client.last,
+            client_dob: client.dob || null,
+            location_id: locationId,
+            provider_user_id: user!.id,
+            provider_staff_id: staffId,
+            provider_name: providerName || sigFullName || "Provider",
+            provider_role: providerRole,
+            category: noteCategory,
+            service_name: svc.name,
+            summary: visitSummary,
+            status: notePayload.status,
+            signed_at: notePayload.signed_at,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            indication,
+            provider_notes: providerNotes,
+          };
+          const updatedCached = [noteObj, ...cachedNotes.filter((n: any) => n.id !== noteId)];
+          localStorage.setItem("rka_demo_chart_notes", JSON.stringify(updatedCached));
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("rka_chart_note_updated"));
+          }
+        } catch { }
+
         await apiQuery("clinical_audit_log").insert({
           actor_user_id: user!.id, actor_name: providerName,
           resource_type: "clinical_note", resource_id: noteId,
@@ -1461,7 +1636,7 @@ export default function ChartNoteEditor() {
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Chart Note • {CATEGORY_LABEL[note.category as Category]}</div>
           <h1 className="text-2xl md:text-3xl font-serif tracking-tight">{note.client_first_name} {note.client_last_name}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {note.service_name ?? "—"} • {format(new Date(note.created_at), "PPP p")} • <StatusBadge s={note.status} />
+            {note.service_name ?? "—"} • {fmtDate(note.signed_at || note.created_at)} • <StatusBadge s={note.status} />
           </p>
           {(note as any).summary && (
             <p className="mt-3 text-sm leading-relaxed rounded-md border border-border bg-secondary/30 px-3 py-2 italic">
@@ -1478,6 +1653,7 @@ export default function ChartNoteEditor() {
               fullName={sigFullName} onFullNameChange={setSigFullName}
               signaturePng={sigPng} onSignatureChange={setSigPng}
               nameLabel="Co-signing NP / Medical Director full legal name"
+              providerOptions={providerOptions}
             />
             <Button onClick={cosign} disabled={saving || !sigPng}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} Co-sign &amp; lock note
@@ -1520,7 +1696,7 @@ export default function ChartNoteEditor() {
             {sigs.map(s => (
               <div key={s.id} className="rounded-md border border-border p-3">
                 <p className="text-sm font-medium capitalize">{s.signer_role}: {s.signer_name}</p>
-                <p className="text-xs text-muted-foreground">{format(new Date(s.signed_at), "PPP p")}</p>
+                <p className="text-xs text-muted-foreground">{fmtDate(s.signed_at)}</p>
                 {s.signature_png && <img src={s.signature_png} alt="" className="mt-2 h-16 object-contain bg-white rounded border" />}
               </div>
             ))}
@@ -1715,7 +1891,7 @@ export default function ChartNoteEditor() {
       )}
       {gfeValid && (
         <div className="rounded-lg border border-success/30 bg-success-soft dark:bg-success-soft p-3 text-sm flex items-center justify-between">
-          <span>GFE on file by <strong>{gfe.np_name}</strong>, valid until {format(new Date(gfe.expires_at), "PP")}</span>
+          <span>GFE on file by <strong>{gfe.np_name}</strong>, valid until {fmtDate(gfe.expires_at, "PP")}</span>
           <Button size="sm" variant="ghost" onClick={() => navigate(`/staff/clinical/gfe/${gfe.id}`)}>View</Button>
         </div>
       )}
@@ -1726,7 +1902,7 @@ export default function ChartNoteEditor() {
         <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm">
             <span className="font-medium">Last {CATEGORY_LABEL[lastVisit.category].toLowerCase()} visit:</span>{" "}
-            {format(new Date(lastVisit.when), "PPP")} · {lastVisit.provider}
+            {fmtDate(lastVisit.when, "PPP")} · {lastVisit.provider}
             {lastVisit.serviceName ? ` · ${lastVisit.serviceName}` : ""}
           </div>
           <Button size="sm" variant="outline" className="rounded-full" onClick={applyPrefillFromLastVisit}>
@@ -1741,6 +1917,45 @@ export default function ChartNoteEditor() {
       )}
 
       <Section title="Patient">
+        {existingClients.length > 0 && !isViewMode && (
+          <div className="mb-4 p-3.5 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-medium text-xs text-foreground">
+                <UserCheck className="h-4 w-4 text-primary" />
+                <span>Select Existing Patient (Auto-fills profile & DOB)</span>
+              </div>
+              {client.email && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedClientEmail("");
+                    setClient({ first: "", last: "", email: "", dob: "" });
+                    toast.info("Cleared patient fields for manual entry");
+                  }}
+                  className="text-[11px] text-primary font-medium hover:underline"
+                >
+                  Clear / Enter New Patient
+                </button>
+              )}
+            </div>
+            <Select value={selectedClientEmail} onValueChange={handleSelectClient}>
+              <SelectTrigger className="w-full bg-card border-border text-xs h-9">
+                <SelectValue placeholder="🔍 Search & pick existing patient profile..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-64">
+                {existingClients.map(c => (
+                  <SelectItem key={c.email} value={c.email}>
+                    <div className="flex items-center justify-between gap-4 w-full">
+                      <span className="font-medium">{c.first_name} {c.last_name}</span>
+                      <span className="text-[11px] text-muted-foreground">{c.email}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <LabeledInput label="First *" value={client.first} onChange={v => setClient({ ...client, first: v })} />
           <LabeledInput label="Last *" value={client.last} onChange={v => setClient({ ...client, last: v })} />
@@ -2572,9 +2787,14 @@ export default function ChartNoteEditor() {
           )}
         </div>
         <MiniSignaturePad
-          fullName={sigFullName} onFullNameChange={setSigFullName}
+          fullName={sigFullName}
+          onFullNameChange={(val) => {
+            setSigFullName(val);
+            if (val) setProviderName(val);
+          }}
           signaturePng={sigPng} onSignatureChange={setSigPng}
           nameLabel="Provider full legal name *"
+          providerOptions={providerOptions}
         />
         <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
           <Checkbox checked={saveSigForFuture} onCheckedChange={(v) => setSaveSigForFuture(v === true)} />
@@ -2809,7 +3029,7 @@ function AddendumsPanel({
               <div className="min-w-0">
                 <p className="text-sm font-medium">{a.reason}</p>
                 <p className="text-xs text-muted-foreground">
-                  {a.author_name} • {a.author_role ?? "—"} • {format(new Date(a.created_at), "PPP p")}
+                  {a.author_name} • {a.author_role ?? "—"} • {fmtDate(a.created_at)}
                 </p>
               </div>
             </div>

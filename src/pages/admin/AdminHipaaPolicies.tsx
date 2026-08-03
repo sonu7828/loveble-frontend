@@ -866,47 +866,49 @@ export default function AdminHipaaPolicies() {
               </div>
 
               {/* Simplified Audit History */}
-              <div className="pt-4 border-t space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <History className="h-3.5 w-3.5 text-primary" /> Simplified Audit Log ({auditLogs.length} events)
-                  </h3>
-                  <span className="text-[11px] text-muted-foreground font-mono">{acknowledgements.length} staff signatures</span>
-                </div>
-
-                {auditLogs.length === 0 ? (
-                  <div className="text-xs text-muted-foreground italic">No audit events recorded yet.</div>
-                ) : (
-                  <div className="rounded-xl border border-border overflow-hidden bg-card text-xs">
-                    <table className="w-full text-left">
-                      <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border font-mono">
-                        <tr>
-                          <th className="p-2.5">Event Action</th>
-                          <th className="p-2.5">Officer / User</th>
-                          <th className="p-2.5">Details</th>
-                          <th className="p-2.5 text-right">Timestamp</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {auditLogs.map((log) => (
-                          <tr key={log.id} className="hover:bg-muted/30">
-                            <td className="p-2.5 font-medium text-foreground">
-                              <Badge variant="outline" className="text-[9px] font-semibold">
-                                {log.action}
-                              </Badge>
-                            </td>
-                            <td className="p-2.5 text-muted-foreground">{log.officer_name}</td>
-                            <td className="p-2.5 text-muted-foreground">{log.notes}</td>
-                            <td className="p-2.5 text-right font-mono text-[10px] text-muted-foreground">
-                              {new Date(log.timestamp).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {isPrivacyOfficer && (
+                <div className="pt-4 border-t space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <History className="h-3.5 w-3.5 text-primary" /> Simplified Audit Log ({auditLogs.length} events)
+                    </h3>
+                    <span className="text-[11px] text-muted-foreground font-mono">{acknowledgements.length} staff signatures</span>
                   </div>
-                )}
-              </div>
+
+                  {auditLogs.length === 0 ? (
+                    <div className="text-xs text-muted-foreground italic">No audit events recorded yet.</div>
+                  ) : (
+                    <div className="rounded-xl border border-border overflow-hidden bg-card text-xs">
+                      <table className="w-full text-left">
+                        <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border font-mono">
+                          <tr>
+                            <th className="p-2.5">Event Action</th>
+                            <th className="p-2.5">Officer / User</th>
+                            <th className="p-2.5">Details</th>
+                            <th className="p-2.5 text-right">Timestamp</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {auditLogs.map((log) => (
+                            <tr key={log.id} className="hover:bg-muted/30">
+                              <td className="p-2.5 font-medium text-foreground">
+                                <Badge variant="outline" className="text-[9px] font-semibold">
+                                  {log.action}
+                                </Badge>
+                              </td>
+                              <td className="p-2.5 text-muted-foreground">{log.officer_name}</td>
+                              <td className="p-2.5 text-muted-foreground">{log.notes}</td>
+                              <td className="p-2.5 text-right font-mono text-[10px] text-muted-foreground">
+                                {new Date(log.timestamp).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </Card>

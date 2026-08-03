@@ -30,19 +30,41 @@ export default function GFEIndex() {
 
   const loadData = async () => {
     setLoading(true);
-    const { data } = await apiQuery
-      .from("gfe_records")
-      .select("id, client_email, client_first_name, client_last_name, np_name, signed_at, expires_at")
-      .order("expires_at", { ascending: true, nullsFirst: false })
-      .limit(1000);
-    const list = (data as any[]) ?? [];
-    setRows(list);
-    setProviders(Array.from(new Set(list.map((r) => r.np_name).filter(Boolean))));
+    let dbList: any[] = [];
+    try {
+      const { data } = await apiQuery
+        .from("gfe_records")
+        .select("id, client_email, client_first_name, client_last_name, np_name, signed_at, expires_at, created_at")
+        .limit(1000);
+      dbList = (data as any[]) ?? [];
+    } catch { }
+
+    let localList: any[] = [];
+    try {
+      localList = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+    } catch { }
+
+    // Merge DB & LocalStorage records by id, prioritizing newest local updates
+    const map = new Map<string, any>();
+    dbList.forEach(r => { if (r.id) map.set(r.id, r); });
+    localList.forEach(r => { if (r.id) map.set(r.id, r); });
+
+    const merged = Array.from(map.values()).sort((a, b) => {
+      const timeA = new Date(a.signed_at || a.created_at || a.expires_at || 0).getTime();
+      const timeB = new Date(b.signed_at || b.created_at || b.expires_at || 0).getTime();
+      return timeB - timeA; // NEWEST GFE FIRST
+    });
+
+    setRows(merged);
+    setProviders(Array.from(new Set(merged.map((r) => r.np_name).filter(Boolean))));
     setLoading(false);
   };
 
   useEffect(() => {
     loadData();
+    const handleUpdate = () => loadData();
+    window.addEventListener("rka_gfe_updated", handleUpdate);
+    return () => window.removeEventListener("rka_gfe_updated", handleUpdate);
   }, []);
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -59,7 +81,10 @@ export default function GFEIndex() {
       /* ignore */
     }
 
-    await apiQuery.from("gfe_records").delete().eq("id", id);
+    try {
+      await apiQuery.from("gfe_records").delete().eq("id", id);
+    } catch { }
+
     setRows((prev) => prev.filter((r) => r.id !== id));
     toast.success("GFE record deleted");
   };

@@ -111,8 +111,9 @@ export default function StaffAppointmentDetail() {
       setAppt(a);
 
       if (a.client_email) {
+        let gfeData: any = null;
         try {
-          const { data: gfeData } = await apiQuery
+          const { data } = await apiQuery
             .from("gfe_records")
             .select("id, expires_at, signed_at")
             .ilike("client_email", a.client_email)
@@ -120,8 +121,17 @@ export default function StaffAppointmentDetail() {
             .order("signed_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-          setGfe(gfeData ?? null);
+          gfeData = data;
         } catch (_err) {}
+
+        if (!gfeData) {
+          try {
+            const localItems: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+            const found = localItems.find((g: any) => g.client_email?.toLowerCase() === a.client_email?.toLowerCase());
+            if (found) gfeData = found;
+          } catch {}
+        }
+        setGfe(gfeData ?? null);
       }
 
       let s: any = null, st: any = null, l: any = null, hist: any[] = [], apsv: any[] = [], consentRows: any[] = [];

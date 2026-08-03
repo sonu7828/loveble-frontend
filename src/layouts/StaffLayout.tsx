@@ -149,7 +149,7 @@ export default function StaffLayout() {
           icon: LayoutDashboard,
           show: true,
           children: [
-            { to: "/staff/today", label: "Dashboard", icon: LayoutDashboard },
+            { to: "/staff/security-officer", label: "Dashboard", icon: LayoutDashboard },
           ],
         },
         {
@@ -158,7 +158,6 @@ export default function StaffLayout() {
           icon: ShieldAlert,
           show: true,
           children: [
-            { to: "/staff/security-officer", label: "Compliance Overview", icon: ShieldCheck },
             { to: "/staff/audit-report", label: "PHI Access Audit", icon: FileText },
             { to: "/staff/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
             { to: "/staff/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
