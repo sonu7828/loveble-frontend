@@ -51,28 +51,15 @@ export default function StaffMyProfile() {
         }
       } catch (e) { }
 
-      if (!myEmail) {
-        const demoSession = JSON.parse(
-          sessionStorage.getItem("rka_demo_session") ||
-          localStorage.getItem("rka_demo_session") ||
-          "{}"
-        );
-        if (demoSession?.email) {
-          myEmail = demoSession.email.toLowerCase();
-        }
-      }
 
-      if (!myEmail) {
-        myEmail = "admin@gmail.com";
-      }
 
       setUserEmail(myEmail);
 
-      const isMd = isMedicalDirector || (authUser?.roles ?? []).includes("medical_director") || myEmail.includes("fobi") || myEmail.includes("md");
-      const isPo = isPrivacyOfficer || (authUser?.roles ?? []).includes("privacy_officer") || myEmail.includes("kiem") || myEmail.includes("privacy");
-      const isNurse = isNP || (authUser?.roles ?? []).includes("nurse_practitioner");
-      const isRn = isRNInjector || (authUser?.roles ?? []).includes("rn_injector") || myEmail.includes("girish");
-      const isFd = isFrontDesk || (authUser?.roles ?? []).includes("front_desk") || myEmail.includes("frontdesk") || myEmail.includes("staff");
+      const isMd = isMedicalDirector;
+      const isPo = isPrivacyOfficer;
+      const isNurse = isNP;
+      const isRn = isRNInjector;
+      const isFd = isFrontDesk;
 
       const cols = "id, user_id, full_name, title, email, phone, license_number" as any;
       let sp: any = null;

@@ -300,17 +300,7 @@ export default function AdminTeam() {
       const sanitizedDeleted = deletedEmails.filter((e) => e.toLowerCase() !== email);
       localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitizedDeleted));
 
-      // Sync active auth user profile if editing currently logged-in account
-      const curUser = JSON.parse(sessionStorage.getItem("user_profile") || localStorage.getItem("user_profile") || "null");
-      if (curUser && curUser.email?.toLowerCase() === email) {
-        let updatedRoles: Role[] = [draft.role];
-        if (draft.role === "admin") updatedRoles = ["admin"];
-        else if (draft.role === "medical_director") updatedRoles = ["medical_director", "nurse_practitioner"];
-        curUser.roles = updatedRoles;
-        sessionStorage.setItem("user_profile", JSON.stringify(curUser));
-        localStorage.setItem("user_profile", JSON.stringify(curUser));
-        window.dispatchEvent(new Event("rka_demo_auth_change"));
-      }
+
     } catch (_err) {}
 
     setAddBusy(false);

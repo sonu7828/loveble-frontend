@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, resolveLandingRoute } from "@/hooks/useAuth";
 import { usePendingBookings } from "@/hooks/usePendingBookings";
 import { useIdleLogout } from "@/hooks/useIdleLogout";
 import { authService } from "@/services/api";
@@ -42,7 +42,7 @@ interface Group {
 }
 
 export default function StaffLayout() {
-  const { user, loading, roles, isAdmin, isNP, isStaff, isFrontDesk, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged, isProvider, isRNInjector } = useAuth();
+  const { user, loading, roles, isAdmin, isNP, isStaff, isFrontDesk, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged, isProvider, isRNInjector, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -339,14 +339,10 @@ export default function StaffLayout() {
   const isStaffMember = isAdmin || isFrontDesk || isNP || isPrivacyOfficer || isMedicalDirector || isRNInjector;
 
   if (!isStaffMember) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-center px-4">
-        <div>
-          <p className="text-sm">Your account doesn't have staff access yet.</p>
-          <Button variant="link" onClick={async () => { await authService.logout(); navigate("/staff/login"); }}>Sign out</Button>
-        </div>
-      </div>
-    );
+    const landing = resolveLandingRoute(roles);
+    if (landing !== location.pathname) {
+      return <Navigate to={landing} replace />;
+    }
   }
 
   const footerLinkCls = ({ isActive }: { isActive: boolean }) =>
@@ -493,8 +489,8 @@ export default function StaffLayout() {
                     size="sm"
                     className="w-full justify-start text-xs"
                     onClick={async () => {
-                      await authService.logout();
-                      navigate("/staff/login");
+                      await logout();
+                      navigate("/staff/login", { replace: true });
                     }}
                   >
                     <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
@@ -561,8 +557,8 @@ export default function StaffLayout() {
               size="sm"
               className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
               onClick={async () => {
-                await authService.logout();
-                navigate("/staff/login");
+                await logout();
+                navigate("/staff/login", { replace: true });
               }}
             >
               <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out

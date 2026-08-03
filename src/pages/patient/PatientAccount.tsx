@@ -31,6 +31,7 @@ import { ClientAvatar } from "@/components/ClientAvatar";
 import { DownloadRecordsCard } from "@/components/patient/DownloadRecordsCard";
 import { PatientAmendmentModal } from "@/components/patient/PatientAmendmentModal";
 import { getClientSession } from "@/hooks/useClientAuth";
+import { useAuth } from "@/hooks/useAuth";
 import {
   CANCELLATION_NOTICE_HOURS, CLINIC_PHONE_DISPLAY, CLINIC_PHONE_TEL, WITHIN_WINDOW_WARNING,
 } from "@/lib/cancellationPolicy";
@@ -122,7 +123,7 @@ export default function PatientAccount() {
 
       const [{ data: prof }, { data: ap }, { data: cs }, { data: sv }, { data: st }, { data: loc }] = await Promise.all([
         apiQuery("client_profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
-        apiQuery("appointments").select("*").order("start_at", { ascending: false }),
+        apiQuery("appointments").select("*").ilike("client_email", email ?? "").order("start_at", { ascending: false }),
         apiQuery("consent_signatures").select("*").ilike("client_email", email ?? "").order("signed_at", { ascending: false }),
         apiQuery("services").select("id, name"),
         apiQuery("staff_directory" as any).select("id, full_name, title"),
@@ -160,9 +161,11 @@ export default function PatientAccount() {
   }, [navigate]);
 
 
+  const { logout } = useAuth();
+
   const signOut = async () => {
-    await authService.logout();
-    navigate("/");
+    await logout();
+    navigate("/account/auth", { replace: true });
   };
 
   const saveProfile = async (e: React.FormEvent) => {
