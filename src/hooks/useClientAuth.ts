@@ -30,13 +30,13 @@ export function useClientAuth(): ClientAuthState {
 
     loadClientSession();
 
-    const handleAuthChange = () => {
-      loadClientSession();
+    const handleSessionExpired = () => {
+      setUser(null);
     };
 
-    window.addEventListener("rka_demo_auth_change", handleAuthChange);
+    window.addEventListener("rka_session_expired", handleSessionExpired);
     return () => {
-      window.removeEventListener("rka_demo_auth_change", handleAuthChange);
+      window.removeEventListener("rka_session_expired", handleSessionExpired);
     };
   }, []);
 

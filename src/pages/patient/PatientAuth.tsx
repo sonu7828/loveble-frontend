@@ -19,8 +19,11 @@ const signupSchema = z.object({
   password: z.string().min(8, "At least 8 characters").max(72),
 });
 
+import { useAuth } from "@/hooks/useAuth";
+
 export default function PatientAuth() {
   const navigate = useNavigate();
+  const { refreshCurrentUser } = useAuth();
   const [params] = useSearchParams();
   const initialMode = params.get("mode") === "signup" ? "signup" : "signin";
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
@@ -56,6 +59,7 @@ export default function PatientAuth() {
         }
         return;
       }
+      await refreshCurrentUser();
       navigate("/account", { replace: true });
       return;
     }

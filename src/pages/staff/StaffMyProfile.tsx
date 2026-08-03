@@ -51,28 +51,15 @@ export default function StaffMyProfile() {
         }
       } catch (e) { }
 
-      if (!myEmail) {
-        const demoSession = JSON.parse(
-          sessionStorage.getItem("rka_demo_session") ||
-          localStorage.getItem("rka_demo_session") ||
-          "{}"
-        );
-        if (demoSession?.email) {
-          myEmail = demoSession.email.toLowerCase();
-        }
-      }
 
-      if (!myEmail) {
-        myEmail = "admin@gmail.com";
-      }
 
       setUserEmail(myEmail);
 
-      const isMd = isMedicalDirector || (authUser?.roles ?? []).includes("medical_director") || myEmail.includes("fobi") || myEmail.includes("md");
-      const isPo = isPrivacyOfficer || (authUser?.roles ?? []).includes("privacy_officer") || myEmail.includes("kiem") || myEmail.includes("privacy");
-      const isNurse = isNP || (authUser?.roles ?? []).includes("nurse_practitioner");
-      const isRn = isRNInjector || (authUser?.roles ?? []).includes("rn_injector") || myEmail.includes("girish");
-      const isFd = isFrontDesk || (authUser?.roles ?? []).includes("front_desk") || myEmail.includes("frontdesk") || myEmail.includes("staff");
+      const isMd = isMedicalDirector;
+      const isPo = isPrivacyOfficer;
+      const isNurse = isNP;
+      const isRn = isRNInjector;
+      const isFd = isFrontDesk;
 
       const cols = "id, user_id, full_name, title, email, phone, license_number" as any;
       let sp: any = null;
@@ -121,24 +108,35 @@ export default function StaffMyProfile() {
         }
       } catch {}
 
-      // 2. Check local saved profile override for demo/offline sessions
+      // 2. Check local saved profile override for demo/offline sessions (User edits take HIGHEST priority!)
+      const globalOverride = JSON.parse(localStorage.getItem("rka_user_profile_override") || "null");
       const localSaved = JSON.parse(localStorage.getItem(`rka_demo_profile_${myEmail}`) || "null");
-      const savedForm = localSaved?.form;
+      const savedForm = globalOverride || localSaved?.form;
 
       const isGenericName = (n: string | undefined) =>
         !n || n === "System Admin" || n === "Front Desk Receptionist" || n === "Staff Member" || n === "admin";
       const isGenericTitle = (t: string | undefined) =>
         !t || t === "Administrator" || t === "Staff" || t === "admin";
 
-      let resolvedName = approvedAccount?.full_name || (!isGenericName(savedForm?.full_name) ? savedForm.full_name : (!isGenericName(sp?.full_name) ? sp.full_name : ""));
-      let resolvedEmail = approvedAccount?.email || (savedForm?.email !== "admin@gmail.com" ? savedForm?.email : null) || (sp?.email !== "admin@gmail.com" ? sp?.email : null) || "";
-      let resolvedTitle = approvedAccount?.title || savedForm?.title || sp?.title || "";
-      let resolvedPhone = approvedAccount?.phone || savedForm?.phone || sp?.phone || "(408) 555-0199";
-      let resolvedLicense = approvedAccount?.license_number || savedForm?.license_number || sp?.license_number || "";
+      let resolvedName = (savedForm?.full_name && savedForm.full_name.trim())
+        ? savedForm.full_name
+        : (approvedAccount?.full_name || (!isGenericName(sp?.full_name) ? sp.full_name : ""));
+      let resolvedEmail = (savedForm?.email && savedForm.email.trim())
+        ? savedForm.email
+        : (approvedAccount?.email || (sp?.email !== "admin@gmail.com" ? sp?.email : null) || "");
+      let resolvedTitle = (savedForm?.title && savedForm.title.trim())
+        ? savedForm.title
+        : (approvedAccount?.title || sp?.title || "");
+      let resolvedPhone = (savedForm?.phone && savedForm.phone.trim())
+        ? savedForm.phone
+        : (approvedAccount?.phone || sp?.phone || "(408) 555-0199");
+      let resolvedLicense = (savedForm?.license_number && savedForm.license_number.trim())
+        ? savedForm.license_number
+        : (approvedAccount?.license_number || sp?.license_number || "");
 
       if (isGenericName(resolvedName)) {
         if (isMd) resolvedName = "Dr. Aloysius N. Fobi, MD";
-        else if (isPo || isNurse) resolvedName = "NursePrectitioner";
+        else if (isPo || isNurse) resolvedName = "Bob Stane";
         else if (isRn) resolvedName = "Girish, RN Injector";
         else if (isFd) resolvedName = "Front Desk Receptionist";
         else resolvedName = "System Admin";
@@ -203,16 +201,52 @@ export default function StaffMyProfile() {
 
     setSaving(true);
     try {
+      const nameParts = form.full_name.trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
       if (userEmail) {
         localStorage.setItem(
-          `rka_demo_profile_${userEmail}`,
+          `rka_demo_profile_${userEmail.toLowerCase()}`,
           JSON.stringify({ id: staffId, form })
         );
         localStorage.setItem(
-          `rka_availability_${userEmail}`,
+          `rka_availability_${userEmail.toLowerCase()}`,
           JSON.stringify(weeklyAvailability)
         );
       }
+
+      // Save global user profile override so ALL dashboards pick up the change immediately
+      localStorage.setItem(
+        "rka_user_profile_override",
+        JSON.stringify({
+          full_name: form.full_name,
+          first_name: firstName,
+          last_name: lastName,
+          email: form.email,
+          title: form.title,
+          phone: form.phone,
+          license_number: form.license_number,
+        })
+      );
+
+      // Update approved staff account list if present
+      try {
+        const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        const updatedList = approvedList.map((acc: any) => {
+          if (acc.email && acc.email.toLowerCase() === form.email.toLowerCase()) {
+            return {
+              ...acc,
+              full_name: form.full_name,
+              title: form.title,
+              phone: form.phone,
+              license_number: form.license_number,
+            };
+          }
+          return acc;
+        });
+        localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(updatedList));
+      } catch (e) {}
 
       if (staffId && !staffId.startsWith("staff-")) {
         await apiQuery
@@ -228,6 +262,8 @@ export default function StaffMyProfile() {
           .catch(() => {});
       }
 
+      // Dispatch event to notify all components to re-render with the new profile details
+      window.dispatchEvent(new Event("rka_profile_updated"));
       toast.success("Profile & Availability saved successfully");
     } catch (err: any) {
       toast.error(err?.message || "Failed to update profile");

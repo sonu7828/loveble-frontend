@@ -32,7 +32,16 @@ let _isRefreshing = false;
 let _refreshPromise: Promise<boolean> | null = null;
 
 /** Endpoints excluded from the automatic 401 refresh interceptor */
-const AUTH_ENDPOINTS = ['/auth/login', '/auth/refresh', '/auth/refresh-token', '/auth/logout'];
+const AUTH_ENDPOINTS = [
+  '/auth/login',
+  '/auth/refresh',
+  '/auth/refresh-token',
+  '/auth/logout',
+  '/auth/me',
+  '/auth/mfa/login-verify',
+  '/auth/mfa/setup',
+  '/auth/mfa/verify',
+];
 
 function isAuthEndpoint(endpoint: string): boolean {
   const normalized = endpoint.replace(/^\/+/, '/');

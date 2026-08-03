@@ -1,12 +1,12 @@
+import React from "react";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, resolveLandingRoute } from "@/hooks/useAuth";
 
-/** Owner-only route guard — restricted to Kiem Vukadinovic. */
-const KIEM_STAFF_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-
+/** Owner / Admin-only route guard — restricted to server-returned admin/owner role. */
 export function OwnerOnly({ children }: { children: React.ReactNode }) {
-  const { loading, isAdmin, staffId } = useAuth();
+  const { loading, roles, isAdmin } = useAuth();
+
   if (loading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
@@ -14,8 +14,12 @@ export function OwnerOnly({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!isAdmin || staffId !== KIEM_STAFF_ID) {
-    return <Navigate to="/staff/today" replace />;
+
+  // Owner permission comes strictly from server-returned role
+  if (!isAdmin && !roles.includes("owner")) {
+    const landing = resolveLandingRoute(roles);
+    return <Navigate to={landing} replace />;
   }
+
   return <>{children}</>;
 }

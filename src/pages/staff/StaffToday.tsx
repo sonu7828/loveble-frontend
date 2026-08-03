@@ -19,6 +19,7 @@ import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices"
 import { SmsThread } from "@/components/messaging/SmsThread";
 import { fetchIncompleteCharts } from "@/lib/incompleteCharts";
 import { sendNoShowSms } from "@/lib/noShowSms";
+import { getDynamicProfileName } from "@/lib/userProfile";
 import ProviderDashboard from "./ProviderDashboard";
 
 type Appt = {
@@ -434,22 +435,7 @@ function StandardStaffToday() {
       toast.error(e.message ?? "Failed to check in");
     }
   };
-  const uMeta = (user as any)?.user_metadata;
-  // Resolve staff name from approved accounts (real staff data) rather than hardcoded auth names
-  const staffName = (() => {
-    const userEmail = (user?.email || "").toLowerCase();
-    if (userEmail) {
-      try {
-        const approved: Array<{ email: string; full_name?: string }> =
-          JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-        const match = approved.find((a) => a.email?.toLowerCase() === userEmail);
-        if (match?.full_name) return match.full_name;
-      } catch { }
-    }
-    return user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
-      ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim()
-      : user?.email || "Front Desk Staff";
-  })();
+  const staffName = getDynamicProfileName(user, "Staff Member");
 
   const toggleStaffTask = (id: number) => {
     setMyTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
@@ -511,25 +497,28 @@ function StandardStaffToday() {
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{appts.length}</div>
-          <div className="text-[11px] text-muted-foreground mt-1 font-medium">
-            Scheduled for today
-          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">Confirmed for today</p>
         </Card>
 
+<<<<<<< HEAD
         {/* KPI 2: Waiting Patients */}
         <Card 
           className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl cursor-pointer"
           onClick={() => navigate("/staff/checkout")}
         >
+=======
+        {/* KPI 2: Checked In Patients */}
+        <Card className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl">
+>>>>>>> 89e2a81f7da9333f0a421d0990f55ad84d30329f
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-            <span className="font-medium">Waiting Patients</span>
+            <span className="font-medium">Checked In</span>
             <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <UserCheck className="h-4 w-4 text-emerald-600" />
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-serif font-medium text-foreground">{waitingPatientsCount}</div>
           <div className="text-[11px] text-emerald-600 font-medium mt-1">
-            Checked in & in building
+            Checked in &amp; in building
           </div>
         </Card>
 
@@ -802,9 +791,7 @@ function StandardStaffToday() {
 function SecurityOfficerDashboard() {
   const { user } = useAuth();
 
-  const officerName = (user?.first_name || user?.last_name)
-    ? `${user?.first_name || ""} ${user?.last_name || ""}`.trim()
-    : "Kiem Vukadinovic, NP";
+  const officerName = getDynamicProfileName(user, "Privacy & Security Officer");
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">

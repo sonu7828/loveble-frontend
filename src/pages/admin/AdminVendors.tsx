@@ -77,18 +77,29 @@ export default function AdminVendors() {
       if (!error && data) remoteVendors = (data as any) as Vendor[];
     } catch (e) { }
 
-    const localDemoVendors: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "null") ?? DEFAULT_DEMO_VENDORS;
+    const storedLocalRaw = localStorage.getItem("rka_demo_vendors");
+    const localDemoVendors: Vendor[] = storedLocalRaw ? JSON.parse(storedLocalRaw) : DEFAULT_DEMO_VENDORS;
     const deletedVendorIds: string[] = JSON.parse(localStorage.getItem("rka_deleted_vendor_ids") || "[]");
-    const mergedList = [...remoteVendors];
 
-    for (const loc of localDemoVendors) {
-      if (deletedVendorIds.includes(loc.id)) continue;
-      if (!mergedList.some((x) => x.id === loc.id)) {
-        mergedList.push(loc);
+    const combined = [...localDemoVendors, ...remoteVendors].filter(
+      (v) => v && v.id && v.name && !deletedVendorIds.includes(v.id)
+    );
+
+    // Strict deduplication by vendor ID and normalized vendor name
+    const vendorMap = new Map<string, Vendor>();
+    const normNameMap = new Map<string, Vendor>();
+
+    combined.forEach((v) => {
+      const normName = v.name.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+
+      if (!vendorMap.has(v.id) && !normNameMap.has(normName)) {
+        vendorMap.set(v.id, v);
+        normNameMap.set(normName, v);
       }
-    }
+    });
 
-    const finalList = mergedList.filter(v => !deletedVendorIds.includes(v.id));
+    const finalList = Array.from(vendorMap.values());
+    localStorage.setItem("rka_demo_vendors", JSON.stringify(finalList));
     setRows(finalList);
     setLoading(false);
   }
@@ -99,13 +110,33 @@ export default function AdminVendors() {
   function openEdit(v: Vendor) { setForm(v); setOpen(true); }
 
   async function save() {
-    if (!form.name?.trim()) {
+    const trimmedName = form.name?.trim();
+    if (!trimmedName) {
       toast({ title: "Name required", variant: "destructive" });
       return;
     }
+
+    const normName = trimmedName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    // Prevent adding vendor with duplicate name
+    const duplicate = rows.find((r) => {
+      if (form.id && r.id === form.id) return false;
+      const rNorm = r.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return rNorm === normName;
+    });
+
+    if (duplicate) {
+      toast({
+        title: "Vendor already exists",
+        description: `A vendor named "${duplicate.name}" is already in your records. Please edit the existing vendor instead of creating a duplicate.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     const payload: any = {
-      name: form.name!.trim(),
+      name: trimmedName,
       category: form.category || null,
       touches_phi: !!form.touches_phi,
       baa_required: !!form.baa_required,
@@ -117,11 +148,14 @@ export default function AdminVendors() {
     if (form.id) {
       try { await apiQuery("vendors" as any).update(payload).eq("id", form.id); } catch (e) { }
       const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
-      localStorage.setItem("rka_demo_vendors", JSON.stringify(local.map(v => v.id === form.id ? { ...v, ...payload } : v)));
+      const updated = local.map((v) => (v.id === form.id ? { ...v, ...payload } : v));
+      localStorage.setItem("rka_demo_vendors", JSON.stringify(updated));
     } else {
-      try { await apiQuery("vendors" as any).insert(payload); } catch (e) { }
+      const newId = `vendor-${Date.now()}`;
+      const newVendor = { id: newId, ...payload };
+      try { await apiQuery("vendors" as any).insert(newVendor); } catch (e) { }
       const local: Vendor[] = JSON.parse(localStorage.getItem("rka_demo_vendors") || "[]");
-      local.push({ id: `vendor-${Date.now()}`, ...payload });
+      local.push(newVendor);
       localStorage.setItem("rka_demo_vendors", JSON.stringify(local));
     }
 

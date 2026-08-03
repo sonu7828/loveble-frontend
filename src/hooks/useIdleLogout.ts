@@ -1,106 +1,159 @@
-import { useCallback, useState, useEffect, useRef } from "react";
-import { authService } from "@/services/api";
+/**
+ * Radiantilyk EMR — useIdleLogout Hook
+ * Phase 1B: Staff Idle-Session Management & Auto-Logout.
+ *
+ * Requirements & Mandatory Corrections:
+ * 1. 15-minute (900s) inactivity timeout for staff/admin portals.
+ * 2. Warning shown 60 seconds before logout (at 14 minutes / 840s).
+ * 3. Robust activity tracking in React memory (lastActivityTimeRef), recalculated on visibilitychange/focus/tab-restoration.
+ * 4. Throttled activity handlers (mousemove, keydown, click, scroll, touchstart).
+ * 5. 'Stay signed in' validates server session via GET /api/v1/auth/me before resetting warning.
+ * 6. On timeout: calls real authService.logout(), broadcasts logout, dispatches session-expired event, navigates to /staff/login.
+ * 7. Applies ONLY to staff/admin portals when enabled (user is logged in).
+ * 8. NO timestamp storage in localStorage or sessionStorage.
+ */
 
-const IDLE_TIMEOUT_MS = 14 * 60 * 1000; // 14 minutes
-const COUNTDOWN_SECONDS = 60; // 60 seconds
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { authService } from "@/services/api/authService";
+import { toast } from "sonner";
+
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes = 900,000 ms
+const WARNING_THRESHOLD_MS = 14 * 60 * 1000; // 14 minutes = 840,000 ms
+const THROTTLE_MS = 2000; // Throttle activity updates to once every 2s
 
 export function useIdleLogout(enabled: boolean) {
+  const navigate = useNavigate();
   const [showWarning, setShowWarning] = useState(false);
-  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
+  const [countdown, setCountdown] = useState(60);
 
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityTimeRef = useRef<number>(Date.now());
+  const lastThrottleTimeRef = useRef<number>(0);
+  const isLoggingOutRef = useRef<boolean>(false);
+  const warningActiveRef = useRef<boolean>(false);
 
-  // Use a ref to track if warning is showing to avoid dependency cycle in handleActivity
-  const showWarningRef = useRef(showWarning);
+  // Keep warningActiveRef in sync with showWarning
   useEffect(() => {
-    showWarningRef.current = showWarning;
+    warningActiveRef.current = showWarning;
   }, [showWarning]);
 
-  const handleIdle = useCallback(() => {
-    setShowWarning(true);
-    setCountdown(COUNTDOWN_SECONDS);
-  }, []);
-
-  const resetTimer = useCallback(() => {
-    if (!enabled) return;
-
-    // Do not automatically reset if the warning is showing.
-    // The user MUST explicitly click "Stay Signed In".
-    if (showWarningRef.current) return;
-
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    timeoutRef.current = setTimeout(handleIdle, IDLE_TIMEOUT_MS);
-  }, [enabled, handleIdle]);
-
-  const staySignedIn = useCallback(() => {
+  const performIdleLogout = useCallback(async () => {
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
     setShowWarning(false);
-    setCountdown(COUNTDOWN_SECONDS);
-    // Explicitly reset the timer after dismissing the warning
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(handleIdle, IDLE_TIMEOUT_MS);
-  }, [handleIdle]);
+
+    try {
+      await authService.logout();
+    } catch {
+      // Ignore logout errors
+    } finally {
+      // Broadcast logout to other tabs
+      try {
+        const bc = new BroadcastChannel("rka_auth_channel");
+        bc.postMessage({ type: "LOGOUT", context: "staff", reason: "IDLE_TIMEOUT" });
+        bc.close();
+      } catch {
+        // Fallback if BroadcastChannel not supported
+      }
+
+      // Dispatch local session expired event
+      window.dispatchEvent(
+        new CustomEvent("rka_session_expired", {
+          detail: { context: "staff", reason: "IDLE_TIMEOUT" },
+        })
+      );
+
+      toast.error("Session timed out due to 15 minutes of inactivity. Please sign in again.");
+      navigate("/staff/login", { replace: true });
+    }
+  }, [navigate]);
+
+  const staySignedIn = useCallback(async () => {
+    try {
+      // Validate server session via GET /api/v1/auth/me before resetting
+      const sessionResult = await authService.getSession();
+      if (sessionResult.session && sessionResult.user) {
+        lastActivityTimeRef.current = Date.now();
+        setShowWarning(false);
+        setCountdown(60);
+        isLoggingOutRef.current = false;
+        toast.success("Session extended. You remain signed in.");
+      } else {
+        performIdleLogout();
+      }
+    } catch {
+      performIdleLogout();
+    }
+  }, [performIdleLogout]);
 
   useEffect(() => {
     if (!enabled) {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      setShowWarning(false);
       return;
     }
 
-    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    lastActivityTimeRef.current = Date.now();
+    isLoggingOutRef.current = false;
 
-    // Throttle the event listeners to reduce performance overhead
-    let throttleTimeout: NodeJS.Timeout | null = null;
-    const handleActivity = () => {
-      if (throttleTimeout) return;
+    // Activity event handler with throttling
+    const handleUserActivity = () => {
+      const now = Date.now();
+      // If warning modal is active, passive mouse movements do NOT reset the timer
+      if (warningActiveRef.current) return;
 
-      resetTimer();
-
-      throttleTimeout = setTimeout(() => {
-        throttleTimeout = null;
-      }, 1000); // 1 second throttle
+      if (now - lastThrottleTimeRef.current > THROTTLE_MS) {
+        lastThrottleTimeRef.current = now;
+        lastActivityTimeRef.current = now;
+      }
     };
 
-    events.forEach(event => {
-      window.addEventListener(event, handleActivity, { passive: true });
-    });
+    const activityEvents = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    activityEvents.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }));
 
-    resetTimer();
+    // Ticker check every 1000ms
+    const timer = setInterval(() => {
+      if (isLoggingOutRef.current) return;
+
+      const elapsed = Date.now() - lastActivityTimeRef.current;
+
+      if (elapsed >= IDLE_TIMEOUT_MS) {
+        performIdleLogout();
+      } else if (elapsed >= WARNING_THRESHOLD_MS) {
+        const remaining = Math.max(0, Math.ceil((IDLE_TIMEOUT_MS - elapsed) / 1000));
+        setShowWarning(true);
+        setCountdown(remaining);
+      } else {
+        if (warningActiveRef.current) {
+          setShowWarning(false);
+          setCountdown(60);
+        }
+      }
+    }, 1000);
+
+    // Recalculate elapsed idle time on tab focus or computer sleep wake-up
+    const handleVisibilityOrFocusChange = () => {
+      if (document.visibilityState === "visible" && !isLoggingOutRef.current) {
+        const elapsed = Date.now() - lastActivityTimeRef.current;
+        if (elapsed >= IDLE_TIMEOUT_MS) {
+          performIdleLogout();
+        } else if (elapsed >= WARNING_THRESHOLD_MS) {
+          const remaining = Math.max(0, Math.ceil((IDLE_TIMEOUT_MS - elapsed) / 1000));
+          setShowWarning(true);
+          setCountdown(remaining);
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocusChange);
+    window.addEventListener("focus", handleVisibilityOrFocusChange);
 
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (throttleTimeout) clearTimeout(throttleTimeout);
-      events.forEach(event => {
-        window.removeEventListener(event, handleActivity);
-      });
+      activityEvents.forEach((evt) => window.removeEventListener(evt, handleUserActivity));
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocusChange);
+      window.removeEventListener("focus", handleVisibilityOrFocusChange);
+      clearInterval(timer);
     };
-  }, [enabled, resetTimer]);
-
-  useEffect(() => {
-    if (showWarning) {
-      countdownIntervalRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(countdownIntervalRef.current!);
-
-            authService.logout().then(() => {
-              window.location.href = "/staff/login?reason=idle";
-            });
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    }
-
-    return () => {
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    };
-  }, [showWarning]);
+  }, [enabled, performIdleLogout]);
 
   return { showWarning, countdown, staySignedIn };
 }

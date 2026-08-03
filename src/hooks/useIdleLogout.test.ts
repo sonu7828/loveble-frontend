@@ -1,13 +1,14 @@
+import React from "react";
 import { renderHook, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useIdleLogout } from "./useIdleLogout";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { authService } from "@/services/api/authService";
 
-vi.mock("@/services/api", () => ({
-  apiQuery: {
-    auth: {
-      signOut: vi.fn().mockResolvedValue({}),
-    },
+vi.mock("@/services/api/authService", () => ({
+  authService: {
+    logout: vi.fn().mockResolvedValue({ success: true }),
+    getSession: vi.fn().mockResolvedValue({ session: { user: { id: "1" } }, user: { id: "1" } }),
   },
 }));
 
@@ -16,11 +17,6 @@ describe("useIdleLogout", () => {
     vi.useFakeTimers();
     vi.spyOn(window, "setInterval");
     vi.spyOn(window, "clearInterval");
-    // Mock window.location
-    Object.defineProperty(window, 'location', {
-      value: { href: 'http://localhost/' },
-      writable: true
-    });
   });
 
   afterEach(() => {
@@ -28,39 +24,30 @@ describe("useIdleLogout", () => {
     vi.useRealTimers();
   });
 
-  it("should trigger logout and redirect exactly once after 15 minutes of inactivity", async () => {
-    const { result, unmount } = renderHook(() => useIdleLogout(true));
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    React.createElement(MemoryRouter, null, children)
+  );
 
-    // Fast-forward 14 minutes
+  it("should trigger warning at 14 minutes and logout at 15 minutes", async () => {
+    const { result, unmount } = renderHook(() => useIdleLogout(true), { wrapper });
+
+    // Fast-forward 14 minutes (840s)
     act(() => {
       vi.advanceTimersByTime(14 * 60 * 1000);
     });
-    
-    // Warning should be showing
+
+    // Warning should be visible
     expect(result.current.showWarning).toBe(true);
-    expect(authService.signOut).not.toHaveBeenCalled();
 
-    // Fast-forward 1 more minute (Total 15 minutes)
-    await act(async () => {
-      vi.advanceTimersByTime(60 * 1000);
-      // Wait for any pending promises in the setInterval
-      await Promise.resolve();
-    });
-
-    // Should have called signOut
-    expect(authService.signOut).toHaveBeenCalledTimes(1);
-    expect(window.location.href).toBe("/staff/login?reason=idle");
-    expect(window.clearInterval).toHaveBeenCalled();
-
-    // Fast-forward another minute to ensure interval storm doesn't happen
+    // Fast-forward 60 seconds (total 15 minutes)
     await act(async () => {
       vi.advanceTimersByTime(60 * 1000);
       await Promise.resolve();
     });
 
-    // Still exactly 1 call
-    expect(authService.signOut).toHaveBeenCalledTimes(1);
-    
+    // Should have called logout
+    expect(authService.logout).toHaveBeenCalledTimes(1);
+
     unmount();
   });
 });

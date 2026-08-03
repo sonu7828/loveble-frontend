@@ -31,6 +31,7 @@ import { ClientAvatar } from "@/components/ClientAvatar";
 import { DownloadRecordsCard } from "@/components/patient/DownloadRecordsCard";
 import { PatientAmendmentModal } from "@/components/patient/PatientAmendmentModal";
 import { getClientSession } from "@/hooks/useClientAuth";
+import { useAuth } from "@/hooks/useAuth";
 import {
   CANCELLATION_NOTICE_HOURS, CLINIC_PHONE_DISPLAY, CLINIC_PHONE_TEL, WITHIN_WINDOW_WARNING,
 } from "@/lib/cancellationPolicy";
@@ -160,9 +161,11 @@ export default function PatientAccount() {
   }, [navigate]);
 
 
+  const { logout } = useAuth();
+
   const signOut = async () => {
-    await authService.logout();
-    navigate("/");
+    await logout();
+    navigate("/account/auth", { replace: true });
   };
 
   const saveProfile = async (e: React.FormEvent) => {

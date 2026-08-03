@@ -16,7 +16,9 @@ export type AppRole =
   | "medical_director"
   | "rn_injector"
   | "privacy_officer"
-  | "front_desk";
+  | "front_desk"
+  | "patient"
+  | "owner";
 
 /** Roles that represent bookable clinical providers */
 export const CLINICAL_PROVIDER_ROLES: AppRole[] = [

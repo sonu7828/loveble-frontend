@@ -1,10 +1,11 @@
+import React from "react";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, resolveLandingRoute } from "@/hooks/useAuth";
 
-/** Wrap an admin-only route element. Non-admins are bounced to /staff/today. */
+/** Wrap an admin-only route element. Non-admins are routed to their authorized landing page. */
 export function AdminOnly({ children }: { children: React.ReactNode }) {
-  const { loading, isAdmin, isMedicalDirector } = useAuth();
+  const { loading, roles, isAdmin, isMedicalDirector } = useAuth();
   if (loading) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
@@ -12,6 +13,9 @@ export function AdminOnly({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!isAdmin && !isMedicalDirector) return <Navigate to="/staff/today" replace />;
+  if (!isAdmin && !isMedicalDirector) {
+    const landing = resolveLandingRoute(roles);
+    return <Navigate to={landing} replace />;
+  }
   return <>{children}</>;
 }

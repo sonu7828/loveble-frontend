@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, resolveLandingRoute } from "@/hooks/useAuth";
 import { useIdleLogout } from "@/hooks/useIdleLogout";
 import { authService } from "@/services/api";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 export default function AdminLayout() {
-  const { user, loading, isAdmin, isPrivileged } = useAuth();
+  const { user, roles, loading, isAdmin, isPrivileged, logout } = useAuth();
   const canAccessAdminLayout = isAdmin;
   const location = useLocation();
   const navigate = useNavigate();
@@ -75,7 +75,9 @@ export default function AdminLayout() {
   if (isPrivileged && !mfaOk) return <Navigate to="/staff/mfa" replace />;
 
   if (!canAccessAdminLayout) {
-    return <StaffLayout />;
+    const landing = resolveLandingRoute(roles);
+    if (landing === location.pathname) return <StaffLayout />;
+    return <Navigate to={landing} replace />;
   }
 
   const footerLinkCls = ({ isActive }: { isActive: boolean }) =>
