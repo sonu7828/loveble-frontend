@@ -3,6 +3,7 @@ import SignatureCanvas from "react-signature-canvas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Props = {
   fullName: string;
@@ -11,6 +12,7 @@ type Props = {
   onSignatureChange: (dataUrl: string) => void;
   label?: string;
   nameLabel?: string;
+  providerOptions?: string[];
 };
 
 export function MiniSignaturePad({
@@ -20,6 +22,7 @@ export function MiniSignaturePad({
   onSignatureChange,
   label = "Draw your signature",
   nameLabel = "Type your full legal name",
+  providerOptions,
 }: Props) {
   const sigRef = useRef<SignatureCanvas | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -66,7 +69,39 @@ export function MiniSignaturePad({
     <div className="space-y-3 rounded-lg border border-border bg-card/40 p-4">
       <div className="space-y-1.5">
         <Label className="text-xs uppercase tracking-widest text-muted-foreground">{nameLabel}</Label>
-        <Input value={fullName} onChange={e => onFullNameChange(e.target.value)} placeholder="First Last, credentials (e.g. Jane Doe, NP)" className="h-12 text-base" />
+        {providerOptions && providerOptions.length > 0 ? (
+          <div className="space-y-2">
+            <Select
+              value={providerOptions.includes(fullName) ? fullName : (fullName ? "custom" : "")}
+              onValueChange={(val) => {
+                if (val !== "custom") onFullNameChange(val);
+              }}
+            >
+              <SelectTrigger className="h-11 text-sm bg-background w-full">
+                <SelectValue placeholder="Select Provider Name from List..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {providerOptions.map(p => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+                <SelectItem value="custom">Enter custom name below...</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              value={fullName}
+              onChange={e => onFullNameChange(e.target.value)}
+              placeholder="First Last, credentials (e.g. Jane Doe, NP)"
+              className="h-11 text-sm"
+            />
+          </div>
+        ) : (
+          <Input
+            value={fullName}
+            onChange={e => onFullNameChange(e.target.value)}
+            placeholder="First Last, credentials (e.g. Jane Doe, NP)"
+            className="h-12 text-base"
+          />
+        )}
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">

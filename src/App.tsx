@@ -192,12 +192,12 @@ const App = () => (
                 <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
                 <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
                 <Route path="device-inventory" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
-                <Route path="team" element={<AdminTeam />} />
                 <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
               </Route>
 
               <Route element={<StaffLayout />}>
                 <Route index element={<StaffToday />} />
+                <Route path="team" element={<AdminTeam />} />
                 <Route path="security-officer" element={<AdminSecurityOfficer />} />
                 <Route path="audit-report" element={<AdminAuditReport />} />
                 <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />

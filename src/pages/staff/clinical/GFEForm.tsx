@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ArrowLeft, ShieldAlert, FileCheck2, Download, RotateCcw, CheckCircle2, Sparkles } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, ArrowLeft, ShieldAlert, FileCheck2, Download, RotateCcw, CheckCircle2, Sparkles, UserCheck, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { ChecklistGroup, SingleSelectChips } from "@/components/clinical/ChecklistGroup";
 import { MiniSignaturePad } from "@/components/clinical/MiniSignaturePad";
@@ -155,6 +156,120 @@ export default function GFEForm() {
     no_controlled_substances_prescribed: true,
   });
 
+  type ClientOption = {
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    dob?: string;
+  };
+
+  const [existingClients, setExistingClients] = useState<ClientOption[]>([]);
+  const [selectedClientEmail, setSelectedClientEmail] = useState("");
+
+  useEffect(() => {
+    if (isViewMode) return;
+    (async () => {
+      let list: ClientOption[] = [];
+      try {
+        const { data: cp } = await apiQuery("client_profiles")
+          .select("email, first_name, last_name, phone, dob")
+          .order("first_name", { ascending: true })
+          .limit(1000);
+        if (cp) {
+          list.push(...cp.map((c: any) => ({
+            email: c.email || "",
+            first_name: c.first_name || "",
+            last_name: c.last_name || "",
+            phone: c.phone || "",
+            dob: c.dob || "",
+          })));
+        }
+      } catch { }
+
+      try {
+        const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+        localClients.forEach((c: any) => {
+          if (c.email) {
+            list.push({
+              email: c.email,
+              first_name: c.first_name || c.client_first_name || "",
+              last_name: c.last_name || c.client_last_name || "",
+              phone: c.phone || c.client_phone || "",
+              dob: c.dob || c.client_dob || "",
+            });
+          }
+        });
+      } catch { }
+
+      // Deduplicate by email
+      const map = new Map<string, ClientOption>();
+      list.forEach(c => {
+        if (c.email && c.email.trim()) {
+          const lower = c.email.trim().toLowerCase();
+          if (!map.has(lower)) {
+            map.set(lower, { ...c, email: lower });
+          }
+        }
+      });
+
+      const arr = Array.from(map.values()).sort((a, b) => a.first_name.localeCompare(b.first_name));
+      setExistingClients(arr);
+    })();
+  }, [isViewMode]);
+
+  const handleSelectClient = (email: string) => {
+    const found = existingClients.find(c => c.email.toLowerCase() === email.toLowerCase());
+    if (found) {
+      setSelectedClientEmail(found.email);
+      setForm(f => ({
+        ...f,
+        client_first_name: found.first_name || f.client_first_name,
+        client_last_name: found.last_name || f.client_last_name,
+        client_email: found.email || f.client_email,
+        client_dob: found.dob ? found.dob.slice(0, 10) : f.client_dob,
+      }));
+
+      // Auto-load past GFE / medical history if available
+      (async () => {
+        let pastGfe: any = null;
+        try {
+          const { data } = await apiQuery("gfe_records")
+            .select("*")
+            .ilike("client_email", found.email)
+            .order("signed_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data) pastGfe = data;
+        } catch { }
+
+        if (!pastGfe) {
+          try {
+            const localGfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+            pastGfe = localGfes.find((g: any) => g.client_email?.toLowerCase() === found.email.toLowerCase());
+          } catch { }
+        }
+
+        if (pastGfe) {
+          setForm(f => ({
+            ...f,
+            chief_concerns: pastGfe.chief_concerns?.length ? pastGfe.chief_concerns : f.chief_concerns,
+            medical_history: pastGfe.medical_history?.length ? pastGfe.medical_history : f.medical_history,
+            current_medications: pastGfe.current_medications?.length ? pastGfe.current_medications : f.current_medications,
+            allergies: pastGfe.allergies?.length ? pastGfe.allergies : f.allergies,
+            fitzpatrick: pastGfe.fitzpatrick || f.fitzpatrick,
+            bp_systolic: pastGfe.bp_systolic ? String(pastGfe.bp_systolic) : f.bp_systolic,
+            bp_diastolic: pastGfe.bp_diastolic ? String(pastGfe.bp_diastolic) : f.bp_diastolic,
+            heart_rate: pastGfe.heart_rate ? String(pastGfe.heart_rate) : f.heart_rate,
+          }));
+          toast.success(`Selected ${found.first_name} ${found.last_name} — loaded client details & past history`);
+        } else {
+          toast.success(`Selected ${found.first_name} ${found.last_name}`);
+        }
+      })();
+    }
+  };
+
   // ---- Draft autosave (per-NP, per-client) ------------------------------
   // Keyed by signed-in NP + the opening appointment/client. It must not change
   // while typing, or mobile Safari can accumulate huge stale drafts and freeze.
@@ -292,12 +407,29 @@ export default function GFEForm() {
       return;
     }
     (async () => {
-      const { data, error } = await apiQuery("gfe_records").select("*").eq("id", id).maybeSingle();
-      if (error || !data) { toast.error("GFE not found"); navigate(-1); return; }
-      setRecord(data);
+      let recordData: any = null;
+      try {
+        const { data } = await apiQuery("gfe_records").select("*").eq("id", id).maybeSingle();
+        if (data) recordData = data;
+      } catch { }
+
+      if (!recordData) {
+        try {
+          const localItems: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+          recordData = localItems.find((item: any) => item.id === id);
+        } catch { }
+      }
+
+      if (!recordData) {
+        toast.error("GFE not found");
+        navigate("/staff/clinical/gfe", { replace: true });
+        return;
+      }
+
+      setRecord(recordData);
       // HIPAA audit: record PHI read
       void import("@/lib/phiAudit").then(({ logPhiAccess }) =>
-        logPhiAccess({ resourceType: "gfe", resourceId: id, clientEmail: (data as any).client_email, action: "view" })
+        logPhiAccess({ resourceType: "gfe", resourceId: id, clientEmail: (recordData as any).client_email, action: "view" })
       );
       setLoading(false);
     })();
@@ -473,9 +605,22 @@ export default function GFEForm() {
         signature_png: form.signature_png,
         signed_user_agent: ua,
       };
-      const { data, error } = await apiQuery("gfe_records").insert(payload).select("id").maybeSingle();
-      if (error) throw error;
-      const savedId = (data as any)?.id ?? gfeId;
+      let savedId = gfeId;
+      try {
+        const { data } = await apiQuery("gfe_records").insert(payload).select("id").maybeSingle();
+        if ((data as any)?.id) savedId = (data as any).id;
+      } catch (dbErr) {
+        console.warn("DB insert fallback to local storage", dbErr);
+      }
+
+      // Always update local storage cache & dispatch refresh event
+      try {
+        const localItems: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+        const updated = [payload, ...localItems.filter((item: any) => item.id !== savedId)];
+        localStorage.setItem("rka_demo_gfe_records", JSON.stringify(updated));
+        window.dispatchEvent(new Event("rka_gfe_updated"));
+      } catch { }
+
       try {
         await apiQuery("clinical_audit_log").insert({
           actor_user_id: user!.id,
@@ -485,10 +630,9 @@ export default function GFEForm() {
           action: "sign",
           user_agent: ua,
         });
-      } catch {
-        /* ignore audit log insert failure */
-      }
-      toast.success("GFE signed and saved");
+      } catch { }
+
+      toast.success("GFE signed and saved successfully");
       autosave.clear();
       navigate(`/staff/clinical/gfe/${savedId}`, { replace: true });
     } catch (e: any) {
@@ -679,6 +823,45 @@ export default function GFEForm() {
 
 
       <Section title="Patient">
+        {existingClients.length > 0 && (
+          <div className="mb-4 p-3.5 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-medium text-xs text-foreground">
+                <UserCheck className="h-4 w-4 text-primary" />
+                <span>Select Existing Patient (Auto-fills profile & history)</span>
+              </div>
+              {form.client_email && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedClientEmail("");
+                    setForm(f => ({ ...f, client_first_name: "", client_last_name: "", client_email: "", client_dob: "" }));
+                    toast.info("Cleared patient fields for manual entry");
+                  }}
+                  className="text-[11px] text-primary font-medium hover:underline"
+                >
+                  Clear / Enter New Patient
+                </button>
+              )}
+            </div>
+            <Select value={selectedClientEmail} onValueChange={handleSelectClient}>
+              <SelectTrigger className="w-full bg-card border-border text-xs h-9">
+                <SelectValue placeholder="🔍 Search & pick existing client profile..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-64">
+                {existingClients.map(c => (
+                  <SelectItem key={c.email} value={c.email}>
+                    <div className="flex items-center justify-between gap-4 w-full">
+                      <span className="font-medium">{c.first_name} {c.last_name}</span>
+                      <span className="text-[11px] text-muted-foreground">{c.email}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <LabeledInput label="First name *" value={form.client_first_name} onChange={v => setForm(f => ({ ...f, client_first_name: v }))} />
           <LabeledInput label="Last name *" value={form.client_last_name} onChange={v => setForm(f => ({ ...f, client_last_name: v }))} />

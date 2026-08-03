@@ -120,10 +120,7 @@ function MedicalDirectorDashboard() {
     toast.success(`Order ${action === "approve" ? "approved & e-signed" : "rejected"}`);
   };
 
-  const uMeta = (user as any)?.user_metadata;
-  const directorName = user?.first_name || user?.last_name || uMeta?.first_name || uMeta?.last_name
-    ? `${user?.first_name || uMeta?.first_name || ""} ${user?.last_name || uMeta?.last_name || ""}`.trim() + " (Medical Director)"
-    : "Dr. Aloysius N. Fobi, MD (Medical Director)";
+  const directorName = getDynamicProfileName(user, "Medical Director") + " (Medical Director)";
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">

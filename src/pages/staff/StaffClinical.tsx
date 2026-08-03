@@ -19,6 +19,38 @@ export default function StaffClinical() {
   const [expiringGfes, setExpiringGfes] = useState<any[]>([]);
   const [incomplete, setIncomplete] = useState<IncompleteChart[]>([]);
   const [incompleteError, setIncompleteError] = useState<string | null>(null);
+  const [recentNotes, setRecentNotes] = useState<any[]>([]);
+
+  const loadRecentNotes = async () => {
+    let dbNotes: any[] = [];
+    try {
+      const { data } = await apiQuery("clinical_notes")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (data) dbNotes = data;
+    } catch { }
+
+    let localNotes: any[] = [];
+    try {
+      localNotes = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+    } catch { }
+
+    const map = new Map<string, any>();
+    [...dbNotes, ...localNotes].forEach(n => {
+      if (n && n.id && !map.has(n.id)) {
+        map.set(n.id, n);
+      }
+    });
+
+    const sorted = Array.from(map.values()).sort((a, b) => {
+      const tA = new Date(a.signed_at || a.created_at || 0).getTime();
+      const tB = new Date(b.signed_at || b.created_at || 0).getTime();
+      return tB - tA;
+    });
+
+    setRecentNotes(sorted);
+  };
 
   useEffect(() => {
     if (!user || authLoading) return;
@@ -40,6 +72,7 @@ export default function StaffClinical() {
         setNeedsCosign(cos ?? []);
         setExpiringGfes(gex ?? []);
         setIncomplete(incompleteRows);
+        await loadRecentNotes();
       } catch (e) {
         console.error("[StaffClinical] load failed:", e);
         setIncompleteError(e instanceof Error ? e.message : "Incomplete charts could not be loaded.");
@@ -47,6 +80,10 @@ export default function StaffClinical() {
         setLoading(false);
       }
     })();
+
+    const handleUpdate = () => loadRecentNotes();
+    window.addEventListener("rka_chart_note_updated", handleUpdate);
+    return () => window.removeEventListener("rka_chart_note_updated", handleUpdate);
   }, [user, authLoading, canSeeAll, staffId]);
 
   if (authLoading) return <div className="p-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -176,6 +213,25 @@ export default function StaffClinical() {
 
       {!loading && (
         <>
+          <Section title={`Recent Chart Notes (${recentNotes.length})`}>
+            <div className="flex items-center justify-between gap-2 -mt-1 mb-1">
+              <p className="text-[11px] text-muted-foreground">Recently created and signed chart notes across all patients</p>
+              <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs text-primary font-medium">
+                <Link to="/staff/clinical/notes">View all chart notes →</Link>
+              </Button>
+            </div>
+
+            {recentNotes.length === 0 ? (
+              <p className="rounded-md border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+                No recent chart notes found. Create a new chart note from any patient appointment or profile.
+              </p>
+            ) : (
+              recentNotes.slice(0, 10).map((n) => (
+                <NoteRow key={n.id} n={n} />
+              ))
+            )}
+          </Section>
+
           {(isNP || isMedicalDirector || isAdmin) && needsCosign.length > 0 && (
             <Section title={`Awaiting co-signature (${needsCosign.length})`} accent>
               {needsCosign.map(n => <NoteRow key={n.id} n={n} />)}
@@ -195,7 +251,7 @@ export default function StaffClinical() {
                         <p className="text-xs text-muted-foreground truncate">{g.client_email} • by {g.np_name}</p>
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground">Expires {format(new Date(g.expires_at), "PP")}</span>
+                    <span className="text-xs text-muted-foreground">Expires {formatDateSafe(g.expires_at, "PP")}</span>
                   </div>
                 </Link>
               ))}
@@ -207,6 +263,17 @@ export default function StaffClinical() {
   );
 }
 
+function formatDateSafe(val: any, fmt = "PPP p") {
+  if (!val) return "Recently";
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "Recently";
+    return format(d, fmt);
+  } catch {
+    return "Recently";
+  }
+}
+
 function Section({ title, accent, children }: { title: string; accent?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
@@ -215,22 +282,24 @@ function Section({ title, accent, children }: { title: string; accent?: boolean;
     </div>
   );
 }
+
 function NoteRow({ n }: { n: any }) {
   const cls =
     n.status === "cosigned" || n.status === "locked" ? "bg-success-soft text-success-soft-foreground" :
     n.status === "signed" ? "bg-warning-soft text-warning-soft-foreground" :
     "bg-secondary text-muted-foreground";
+  const name = `${n.client_first_name ?? ""} ${n.client_last_name ?? ""}`.trim() || n.client_email || "Client";
   return (
     <Link to={`/staff/clinical/notes/${n.id}`} className="block rounded-md border border-border p-3 hover:border-primary/40 hover:bg-secondary/40 transition">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
           <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{n.client_first_name} {n.client_last_name} <span className="text-muted-foreground">— {n.service_name ?? n.category}</span></p>
-            <p className="text-xs text-muted-foreground truncate">{n.provider_name} • {format(new Date(n.created_at), "PPP p")}</p>
+            <p className="text-sm font-medium truncate">{name} <span className="text-muted-foreground">— {n.service_name ?? n.category}</span></p>
+            <p className="text-xs text-muted-foreground truncate">{n.provider_name || "Provider"} • {formatDateSafe(n.signed_at || n.created_at)}</p>
           </div>
         </div>
-        <span className={`text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0 ${cls}`}>{n.status}</span>
+        <span className={`text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0 ${cls}`}>{n.status || "signed"}</span>
       </div>
     </Link>
   );

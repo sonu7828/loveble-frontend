@@ -137,13 +137,25 @@ export default function StaffClientDetail() {
         .order("paid_at", { ascending: false });
       setReceipts((salesData ?? []) as any);
 
-      const { data: gfeData } = await apiQuery
-        .from("gfe_records")
-        .select("id, expires_at, signed_at")
-        .ilike("client_email", decodedEmail)
-        .order("expires_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      let gfeData: any = null;
+      try {
+        const res = await apiQuery
+          .from("gfe_records")
+          .select("id, expires_at, signed_at")
+          .ilike("client_email", decodedEmail)
+          .order("expires_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        gfeData = res.data;
+      } catch { }
+
+      if (!gfeData) {
+        try {
+          const localItems: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+          const found = localItems.find((g: any) => g.client_email?.toLowerCase() === decodedEmail.toLowerCase());
+          if (found) gfeData = found;
+        } catch { }
+      }
       setGfe(gfeData ?? null);
 
       const { data: noteRows, count: nc } = await apiQuery
@@ -152,8 +164,17 @@ export default function StaffClientDetail() {
         .ilike("client_email", decodedEmail)
         .order("created_at", { ascending: false })
         .limit(1);
-      setRecentNote(((noteRows ?? [])[0] as any) ?? null);
-      setNoteCount(nc ?? 0);
+      let noteRowsList: any[] = (noteRows ?? []) as any[];
+      try {
+        const localNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+        const matchingLocalNotes = localNotes.filter((item: any) => item.client_email?.toLowerCase() === decodedEmail.toLowerCase());
+        const nMap = new Map<string, any>();
+        noteRowsList.forEach(r => { if (r.id) nMap.set(r.id, r); });
+        matchingLocalNotes.forEach(r => { if (r.id) nMap.set(r.id, r); });
+        noteRowsList = Array.from(nMap.values()).sort((a, b) => new Date(b.created_at || b.signed_at || 0).getTime() - new Date(a.created_at || a.signed_at || 0).getTime());
+      } catch { }
+      setRecentNote((noteRowsList[0] as any) ?? null);
+      setNoteCount(noteRowsList.length);
 
 
 
@@ -230,9 +251,10 @@ export default function StaffClientDetail() {
     if (reason === null) return;
     setBusyAction(true);
     try {
-      const { data: u } = await authService.getSession();
+      const sessionRes = await authService.getSession();
+      const actorUserId = sessionRes?.user?.id || sessionRes?.data?.session?.user?.id || null;
       const { error } = await apiQuery("blocked_clients").upsert(
-        { email: decodedEmail, reason: reason || null, blocked_by: u.user?.id ?? null },
+        { email: decodedEmail, reason: reason || null, blocked_by: actorUserId },
         { onConflict: "email" },
       );
       if (error) throw error;
