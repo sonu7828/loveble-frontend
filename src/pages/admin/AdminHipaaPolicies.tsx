@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Download, FileText, CheckCircle2, Archive, History, Save, Plus, Search, ShieldCheck, Lock, XCircle, FileSignature, AlertTriangle, Send } from "lucide-react";
+import { Loader2, Download, FileText, CheckCircle2, Archive, History, Save, Plus, Search, ShieldCheck, Lock, XCircle, FileSignature, AlertTriangle, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/ui/confirm";
 
@@ -668,6 +668,47 @@ export default function AdminHipaaPolicies() {
     load();
   };
 
+  const deletePolicy = async () => {
+    if (!draft) return;
+    if (!isPrivacyOfficer) {
+      toast.error("Access Denied: Only Privacy & Security Officers can delete policies.");
+      return;
+    }
+    if (!(await confirmDialog({
+      title: `Delete Policy "${draft.title}"?`,
+      description: "Are you sure you want to delete this HIPAA policy? This action is permanent and cannot be undone.",
+      destructive: true,
+      confirmLabel: "Delete Policy"
+    }))) return;
+
+    setSaving(true);
+    const deletedId = draft.id;
+    try {
+      await apiQuery("hipaa_policies" as any).delete().eq("id", deletedId);
+    } catch (e) {}
+
+    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
+    const filteredLocal = localDemoPolicies.filter((p) => p.id !== deletedId);
+    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(filteredLocal));
+
+    localStorage.removeItem(`rka_policy_audit_${deletedId}`);
+    localStorage.removeItem(`rka_demo_versions_${deletedId}`);
+    localStorage.removeItem(`rka_staff_acknowledgements_${deletedId}`);
+
+    toast.success(`Policy "${draft.title}" deleted successfully`);
+
+    const remaining = policies.filter((p) => p.id !== deletedId);
+    setPolicies(remaining);
+    if (remaining.length > 0) {
+      setSelectedId(remaining[0].id);
+      setDraft({ ...remaining[0] });
+    } else {
+      setSelectedId(null);
+      setDraft(null);
+    }
+    setSaving(false);
+  };
+
   // Staff Acknowledgement Submission
   const submitStaffAcknowledgement = async () => {
     if (!draft) return;
@@ -896,6 +937,11 @@ ${approved.map(policyToHtml).join("<hr/>")}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                  {isPrivacyOfficer && (
+                    <Button variant="outline" size="sm" onClick={deletePolicy} disabled={saving} className="h-8 text-xs gap-1 border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800">
+                      <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Delete Policy
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => setSignOpen(true)} className="h-8 text-xs gap-1">
                     <FileSignature className="h-3.5 w-3.5 text-primary" /> Sign Policy
                   </Button>
@@ -1044,8 +1090,11 @@ ${approved.map(policyToHtml).join("<hr/>")}
                       <Button onClick={approve} disabled={saving} size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700">
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Approve
                       </Button>
-                      <Button onClick={reject} disabled={saving} size="sm" variant="destructive" className="h-9 text-xs">
-                        <XCircle className="h-3.5 w-3.5 mr-1.5" />Reject Policy
+                      <Button onClick={reject} disabled={saving} size="sm" variant="outline" className="h-9 text-xs border-amber-300 text-amber-800 hover:bg-amber-50">
+                        <XCircle className="h-3.5 w-3.5 mr-1.5 text-amber-600" />Reject Policy
+                      </Button>
+                      <Button onClick={deletePolicy} disabled={saving} size="sm" variant="destructive" className="h-9 text-xs">
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />Delete Policy
                       </Button>
                     </>
                   ) : (
