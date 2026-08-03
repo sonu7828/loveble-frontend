@@ -51,17 +51,19 @@ export default function AdminLayout() {
   }, [user]);
 
   const adminNavItems: NavItem[] = useMemo(() => [
-    { to: "/staff/admin", label: "Admin Overview", icon: ShieldCheck },
-    { to: "/staff/model-applications", label: "Model Applications", icon: Star },
-    { to: "/staff/team", label: "Staff Management", icon: Users },
-    { to: "/staff/services", label: "Services & Pricing", icon: Tag },
-    { to: "/staff/security-officer", label: "Privacy & Security Officer", icon: ShieldCheck },
-    { to: "/staff/audit-report", label: "Audit Logs", icon: HistoryIcon },
+    ...(isAdmin ? [
+      { to: "/staff/admin", label: "Admin Overview", icon: ShieldCheck },
+      { to: "/staff/model-applications", label: "Model Applications", icon: Star },
+      { to: "/staff/team", label: "Staff Management", icon: Users },
+      { to: "/staff/services", label: "Services & Pricing", icon: Tag },
+      { to: "/staff/device-presets", label: "Device Inventory", icon: Laptop },
+    ] : []),
+    { to: "/staff/security-officer", label: "Compliance Overview", icon: ShieldCheck },
+    { to: "/staff/audit-report", label: "PHI Access Audit", icon: HistoryIcon },
     { to: "/staff/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
-    { to: "/staff/device-presets", label: "Device Inventory", icon: Laptop },
-    { to: "/staff/vendors", label: "Vendor Management", icon: Building2 },
-    { to: "/staff/breach-report", label: "Breach Reports", icon: ShieldAlert },
-  ], []);
+    { to: "/staff/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
+    { to: "/staff/vendors", label: "BAA & Vendors", icon: Building2 },
+  ], [isAdmin]);
 
   if (loading || (user && !mfaChecked)) {
     return (

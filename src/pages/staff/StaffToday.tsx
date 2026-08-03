@@ -89,7 +89,7 @@ function MedicalDirectorDashboard() {
 
   useEffect(() => {
     (async () => {
-      const [notesRes, gfeRes, staffRes] = await Promise.all([
+      const [notesRes, gfeRes, staffRes]: any[] = await Promise.all([
         apiQuery("clinical_notes").select("id, client_id, provider_id, service_name, created_at, status").eq("cosign_required", true).catch(() => ({ data: [] })),
         apiQuery("gfe_records").select("id, client_name, provider_name, created_at, status").eq("status", "pending_review").catch(() => ({ data: [] })),
         apiQuery("staff_profiles").select("id").eq("is_provider", true).catch(() => ({ data: [] })),

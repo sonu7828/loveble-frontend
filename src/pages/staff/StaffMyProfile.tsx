@@ -44,7 +44,8 @@ export default function StaffMyProfile() {
       let myUserId = "";
 
       try {
-        const { data: { user } } = await authService.getSession();
+        const sessionRes = await authService.getSession();
+        const user = sessionRes?.user || sessionRes?.data?.session?.user;
         if (user) {
           myEmail = (user.email ?? "").toLowerCase();
           myUserId = user.id;
