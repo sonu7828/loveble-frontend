@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
-import { useAuth, clearDemoAuthSession } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useIdleLogout } from "@/hooks/useIdleLogout";
 import { authService } from "@/services/api";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsHelp } from "@/components/staff/KeyboardShortcutsHelp";
+import { HipaaMandatoryAcknowledgementModal } from "@/components/staff/HipaaMandatoryAcknowledgementModal";
 import ThemeToggle from "@/components/ThemeToggle";
 import StaffLayout from "./StaffLayout";
 import {
@@ -28,7 +29,7 @@ interface NavItem {
 }
 
 export default function AdminLayout() {
-  const { user, loading, isAdmin, isMedicalDirector, isPrivacyOfficer, isPrivileged } = useAuth();
+  const { user, loading, isAdmin, isPrivileged } = useAuth();
   const canAccessAdminLayout = isAdmin;
   const location = useLocation();
   const navigate = useNavigate();
@@ -134,6 +135,7 @@ export default function AdminLayout() {
 
   return (
     <div className="h-screen max-h-screen w-full overflow-hidden bg-background flex flex-col">
+      <HipaaMandatoryAcknowledgementModal />
       <header className="w-full border-b border-border bg-card/80 backdrop-blur px-4 md:px-6 py-3 flex items-center justify-between z-30 shrink-0">
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="xl:hidden">
@@ -152,7 +154,6 @@ export default function AdminLayout() {
                     size="sm"
                     className="w-full justify-start text-xs"
                     onClick={async () => {
-                      clearDemoAuthSession();
                       await authService.logout();
                       navigate("/staff/login");
                     }}
@@ -195,7 +196,6 @@ export default function AdminLayout() {
               size="sm"
               className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
               onClick={async () => {
-                clearDemoAuthSession();
                 await authService.logout();
                 navigate("/staff/login");
               }}

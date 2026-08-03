@@ -229,7 +229,7 @@ export default function AdminTeam() {
             await apiQuery("user_roles" as any).delete().eq("user_id", targetMember.user_id);
             await apiQuery("user_roles" as any).insert([
               { user_id: targetMember.user_id, role: draft.role },
-              ...(draft.role !== "staff" ? [{ user_id: targetMember.user_id, role: "staff" }] : []),
+              ...((draft.role as string) !== "staff" && (draft.role as string) !== "front_desk" ? [{ user_id: targetMember.user_id, role: "front_desk" }] : []),
             ]);
           } catch (e) {}
         }
@@ -718,7 +718,9 @@ export default function AdminTeam() {
                   </div>
                   <div className="min-w-0">
                     <div className="font-medium truncate">{m.full_name || "Unnamed Member"}</div>
-                    <div className="text-xs text-muted-foreground truncate">{m.title} · {m.email || "no email"}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {primaryRole ? primaryRole.replace(/_/g, " ").toUpperCase() : (m.title || "TEAM MEMBER")} · {m.email || "no email"}
+                    </div>
                     <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-1.5 items-center">
                       {m.is_owner && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">Owner</span>}
                     </div>

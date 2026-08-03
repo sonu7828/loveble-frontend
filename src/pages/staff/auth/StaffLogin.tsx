@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Loader2, ShieldAlert, ShieldCheck, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { setDemoAuthSession, clearDemoAuthSession, AppRole } from "@/hooks/useAuth";
+import { AppRole } from "@/hooks/useAuth";
 
 type Step = "credentials" | "mfa-enroll" | "mfa-verify" | "redirecting";
 type Mode = "loading" | "ready";
@@ -73,98 +73,25 @@ export default function StaffLogin() {
   useEffect(() => {
     setMode("ready");
     setStep("credentials");
-    setPendingDemoLogin(null);
     setEmail("");
     setPassword("");
     setCode("");
   }, [roleParam]);
 
-  const beginMfa = async (cancelled?: boolean) => {
+  const beginMfa = async (_cancelled?: boolean) => {
     setMode("loading");
     setErrMsg("");
     try {
-      const { data: aal, error: aalErr } = await withTimeout(
-        authService.mfa.getAuthenticatorAssuranceLevel(),
-        "Checking two-factor status",
-      );
-      if (aalErr) throw aalErr;
-      if (aal?.currentLevel === "aal2") {
-        setStep("redirecting");
-        setMode("ready");
-        // Resolve target from DB roles — no email hardcoding.
-        let aal2Target = nextPath || "/staff/today";
-        if (!nextPath) {
-          const { data: { session: s } } = await authService.getSession();
-          const userRoles = s?.user?.roles || [];
-          aal2Target = resolveRedirectTarget(userRoles);
-        }
-        setTimeout(() => navigate(aal2Target, { replace: true }), 350);
-        return;
-      }
-      const { data: factors, error } = await withTimeout(authService.mfa.listFactors(), "Loading authenticator factors");
-      if (error) throw error;
-      const verified = factors?.totp?.find((f) => f.status === "verified");
-      if (verified) {
-        const { data: ch, error: chErr } = await withTimeout(
-          authService.mfa.challenge({ factorId: verified.id }),
-          "Starting two-factor verification",
-        );
-        if (chErr) throw chErr;
-        if (cancelled) return;
-        setFactorId(verified.id);
-        setChallengeId(ch.id);
-        setStep("mfa-verify");
-        setMode("ready");
-      } else {
-        // Evaluate if user is in a privileged role (admin, provider/staff, nurse_practitioner)
-        const { data: { session: currentSession } } = await authService.getSession();
-        const userRoles = currentSession?.user?.roles || [];
-        const isPrivileged = userRoles.includes("admin") || userRoles.includes("staff") ||
-          userRoles.includes("nurse_practitioner") || userRoles.includes("privacy_officer");
+      const { session } = await authService.getSession();
+      const userRoles = session?.user?.roles || [];
+      const target = nextPath || resolveRedirectTarget(userRoles);
 
-        if (!isPrivileged) {
-          // Non-privileged users (receptionists, schedulers, etc.) bypass mandatory MFA enrollment
-          setStep("redirecting");
-          setMode("ready");
-          let fallbackTarget = nextPath || "/staff/today";
-          if (!nextPath) {
-            fallbackTarget = resolveRedirectTarget(userRoles);
-          }
-          setTimeout(() => navigate(fallbackTarget, { replace: true }), 350);
-          return;
-        }
-
-        const unverified = factors?.totp?.filter((f) => f.status !== "verified") ?? [];
-        for (const f of unverified) {
-          try { await withTimeout(authService.mfa.unenroll({ factorId: f.id }), "Clearing old authenticator setup"); } catch (e) { console.warn(e); }
-        }
-        let { data: enroll, error: enrErr } = await withTimeout(authService.mfa.enroll({
-          factorType: "totp",
-          friendlyName: `Authenticator-${crypto.randomUUID()}`,
-        }), "Creating authenticator setup");
-        if (enrErr && isFactorNameConflict(enrErr)) {
-          const { data: latest } = await withTimeout(authService.mfa.listFactors(), "Refreshing authenticator factors");
-          for (const f of latest?.totp?.filter((i) => i.status !== "verified") ?? []) {
-            try { await withTimeout(authService.mfa.unenroll({ factorId: f.id }), "Clearing duplicate authenticator setup"); } catch (e) { console.warn(e); }
-          }
-          const retry = await withTimeout(authService.mfa.enroll({
-            factorType: "totp",
-            friendlyName: `Authenticator-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          }), "Creating a fresh authenticator setup");
-          enroll = retry.data; enrErr = retry.error;
-        }
-        if (enrErr) throw enrErr;
-        if (!enroll) throw new Error("Could not create an authenticator setup.");
-        if (cancelled) return;
-        setFactorId(enroll.id);
-        setQrSvg(enroll.totp.qr_code);
-        setSecret(enroll.totp.secret);
-        setStep("mfa-enroll");
-        setMode("ready");
-      }
-    } catch (e) {
-      setErrMsg(errorMessage(e, "Could not load two-factor setup."));
+      setStep("redirecting");
       setMode("ready");
+      setTimeout(() => navigate(target, { replace: true }), 350);
+    } catch {
+      const fallbackTarget = nextPath || "/staff/today";
+      navigate(fallbackTarget, { replace: true });
     }
   };
 
@@ -190,46 +117,13 @@ export default function StaffLogin() {
     setErrMsg("");
     const cleanEmail = email.trim().toLowerCase();
 
-    // 0. Check if account has been deleted
-    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-    if (deletedEmails.includes(cleanEmail)) {
-      setLoading(false);
-      setPassword("");
-      const errorMsg = "This staff account has been deleted by an Administrator. Access denied.";
-      setErrMsg(errorMsg);
-      toast.error(errorMsg);
-      return;
-    }
-
-    // 1. Check built-in demo patient user account
-    if (cleanEmail === "user@gmail.com") {
-      setDemoAuthSession("user@gmail.com", []);
-      toast.success("Signed in as Demo Patient");
-      setLoading(false);
-      navigate("/account", { replace: true });
-      return;
-    }
-
-    // 2. Try live database authentication via REST API
+    // Authenticate via backend API
     const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password });
+
     if (data?.user) {
       setLoading(false);
       setPassword("");
       await beginMfa();
-      return;
-    }
-
-    // 3. Check if email matches any staff in approved accounts or built-in getUserProfileByEmail
-    const { getUserProfileByEmail } = await import("@/services/api/authService");
-    const resolvedUser = getUserProfileByEmail(cleanEmail, password);
-    if (resolvedUser) {
-      const isAd = resolvedUser.roles.includes("admin");
-      setPendingDemoLogin({ cleanEmail, roles: resolvedUser.roles as AppRole[], isAd });
-      setLoading(false);
-      setCode("");
-      setStep("mfa-verify");
-      setMode("ready");
-      toast.info("Credentials verified! Please enter 2-Factor code 123456 to access Dashboard.");
       return;
     }
 
@@ -274,16 +168,9 @@ export default function StaffLogin() {
     e.preventDefault();
 
     if (pendingDemoLogin) {
-      if (code.trim().length !== 6) {
-        toast.error("Please enter a valid 6-digit authentication code.");
-        return;
-      }
-      setBusy(true);
-      setDemoAuthSession(pendingDemoLogin.cleanEmail, pendingDemoLogin.roles);
-      toast.success("MFA Verification Successful — Security Operations Center Access Granted");
-      setStep("redirecting");
-      const demoTarget = resolveRedirectTarget(pendingDemoLogin.roles);
-      setTimeout(() => navigate(demoTarget, { replace: true }), 400);
+      // pendingDemoLogin is no longer used — redirect to credentials step
+      toast.error("Please sign in again.");
+      setStep("credentials");
       return;
     }
 

@@ -1,5 +1,14 @@
-import { useEffect, useState } from "react";
-import { authService, AppRole, UserProfile, getUserProfileByEmail } from "@/services/api/authService";
+/**
+ * Radiantilyk EMR — useAuth Hook
+ * Phase 1A: Cookie-based session management.
+ *
+ * Calls GET /api/auth/me on mount to establish session from HttpOnly cookies.
+ * No localStorage, sessionStorage, or demo tokens.
+ * Listens for 'rka_session_expired' events from the API client's 401 interceptor.
+ */
+
+import { useEffect, useState, useCallback } from "react";
+import { authService, AppRole, UserProfile } from "@/services/api/authService";
 
 export type { AppRole };
 
@@ -33,7 +42,6 @@ export interface AuthState {
   canOverride: boolean;
 
   // ── Backwards-compatible aliases ──
-  // These map to the new role structure so existing code doesn't break.
   /** @deprecated Use isFrontDesk */
   isScheduler: boolean;
   /** @deprecated Use isFrontDesk */
@@ -42,60 +50,49 @@ export interface AuthState {
   isStaff: boolean;
 }
 
-export function setDemoAuthSession(email: string, roles: AppRole[], staffId?: string) {
-  const user = getUserProfileByEmail(email);
-  if (roles && roles.length > 0) {
-    user.roles = roles;
-  }
-  sessionStorage.setItem("auth_token", "demo-token");
-  sessionStorage.setItem("user_profile", JSON.stringify(user));
-  localStorage.setItem("auth_token", "demo-token");
-  localStorage.setItem("user_profile", JSON.stringify(user));
-  window.dispatchEvent(new Event("rka_demo_auth_change"));
-}
-
-export function clearDemoAuthSession() {
-  authService.logout();
-}
-
 export function useAuth(): AuthState {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [staffId, setStaffId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadUserSession() {
-      const session = await authService.getSession();
-      const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-      const userEmail = (session?.user?.email || "").toLowerCase();
+  const loadUserSession = useCallback(async () => {
+    try {
+      const result = await authService.getSession();
 
-      if (session && session.user && !deletedEmails.includes(userEmail)) {
-        setUser(session.user);
-        setRoles(session.user.roles || ["admin"]);
-        setStaffId(session.user.staff_id || session.user.id);
+      if (result.session && result.user) {
+        setUser(result.user);
+        setRoles(result.user.roles || []);
+        setStaffId(result.user.staff_id || result.user.id);
       } else {
-        if (session && session.user && deletedEmails.includes(userEmail)) {
-          authService.logout();
-        }
         setUser(null);
         setRoles([]);
         setStaffId(null);
       }
+    } catch {
+      setUser(null);
+      setRoles([]);
+      setStaffId(null);
+    } finally {
       setLoading(false);
     }
+  }, []);
 
+  useEffect(() => {
     loadUserSession();
 
-    const handleAuthChange = () => {
-      loadUserSession();
+    // Listen for session expiry events from the API client
+    const handleSessionExpired = () => {
+      setUser(null);
+      setRoles([]);
+      setStaffId(null);
     };
 
-    window.addEventListener("rka_demo_auth_change", handleAuthChange);
+    window.addEventListener("rka_session_expired", handleSessionExpired);
     return () => {
-      window.removeEventListener("rka_demo_auth_change", handleAuthChange);
+      window.removeEventListener("rka_session_expired", handleSessionExpired);
     };
-  }, []);
+  }, [loadUserSession]);
 
   // ── Core role flags ──
   const isAdmin = roles.includes("admin");
