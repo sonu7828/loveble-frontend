@@ -497,7 +497,11 @@ function StandardStaffToday() {
           <p className="text-[11px] text-muted-foreground mt-1">Confirmed for today</p>
         </Card>
 
+<<<<<<< HEAD
+        {/* KPI 2: Checked In Patients */}
+=======
         {/* KPI 2: Waiting Patients */}
+>>>>>>> 370fa0222fb141e5ee449fcab77a48c45b45ca4e
         <Card 
           className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl cursor-pointer"
           onClick={() => navigate("/staff/checkout")}
