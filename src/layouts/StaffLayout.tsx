@@ -41,7 +41,7 @@ interface Group {
 }
 
 export default function StaffLayout() {
-  const { user, loading, isAdmin, isFrontDesk, isMedicalDirector, isPrivileged } = useAuth();
+  const { user, loading, roles, isAdmin, isNP, isStaff, isFrontDesk, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged, isProvider, isRNInjector } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);

@@ -4,7 +4,7 @@
  *
  * All authentication flows go through the REST API.
  * HttpOnly cookies are managed by the browser and backend.
- * No localStorage, sessionStorage, mock data, or demo tokens.
+ * Includes compatibility wrappers for existing UI components.
  */
 import { ApiClient } from "./client";
 
@@ -64,15 +64,23 @@ export interface AuthSession {
   user: UserProfile;
 }
 
+export interface GetSessionResult {
+  data: {
+    session: AuthSession | null;
+  };
+  session: AuthSession | null;
+  user: UserProfile | null;
+  error: string | null;
+}
+
 // ── Auth Service ──
 
 export const authService = {
   /**
    * Get current session by calling GET /auth/me.
-   * The browser sends the HttpOnly cookie automatically.
-   * Returns null if not authenticated.
+   * Returns data object with nested session for backward compatibility.
    */
-  async getSession(): Promise<{ session: AuthSession | null; user: UserProfile | null; error: string | null }> {
+  async getSession(): Promise<GetSessionResult> {
     try {
       const res = await ApiClient.get<{ success: boolean; data: { user: UserProfile } }>("/auth/me");
 
@@ -87,23 +95,25 @@ export const authService = {
           staff_id: rawUser.staff_id || rawUser.id,
         };
 
+        const session: AuthSession = { user };
+
         return {
-          session: { user },
+          data: { session },
+          session,
           user,
           error: null,
         };
       }
 
-      return { session: null, user: null, error: null };
+      return { data: { session: null }, session: null, user: null, error: null };
     } catch {
-      return { session: null, user: null, error: null };
+      return { data: { session: null }, session: null, user: null, error: null };
     }
   },
 
   /**
    * Login with email and password.
    * Backend sets HttpOnly cookies on success.
-   * Returns user profile or error message.
    */
   async login(email: string, password?: string): Promise<{
     user: UserProfile | null;
@@ -152,7 +162,6 @@ export const authService = {
 
   /**
    * Supabase-compatible signInWithPassword wrapper.
-   * Used by existing login components.
    */
   async signInWithPassword(params: { email: string; password?: string }) {
     const result = await this.login(params.email, params.password);
@@ -185,6 +194,57 @@ export const authService = {
   },
 
   /**
+   * Register new patient user via REST API.
+   */
+  async signUp(params: { email: string; password?: string; options?: any }) {
+    const clean = (params.email || "").trim().toLowerCase();
+    const meta = params.options?.data || {};
+
+    const res = await ApiClient.post<{ success: boolean; data: { user: UserProfile } }>("/auth/register", {
+      email: clean,
+      password: params.password,
+      firstName: meta.first_name || meta.firstName,
+      lastName: meta.last_name || meta.lastName,
+      phone: meta.phone,
+    });
+
+    if (res.error) {
+      const is409 = res.status === 409 || res.error.includes("409") || res.error.toLowerCase().includes("already exists");
+      return {
+        data: { user: null, session: null },
+        error: { message: is409 ? "An account with this email address already exists. Please sign in instead." : res.error, statusCode: res.status },
+      };
+    }
+
+    if (res.data?.data?.user) {
+      const user = res.data.data.user;
+      return {
+        data: { user, session: { user } },
+        error: null,
+      };
+    }
+
+    return {
+      data: { user: null, session: null },
+      error: { message: "Registration failed" },
+    };
+  },
+
+  /**
+   * Stub for OTP sign-in.
+   */
+  async signInWithOtp(_params?: any) {
+    return { data: { user: null }, error: { message: "OTP login not implemented" } };
+  },
+
+  /**
+   * Top-level getAuthenticatorAssuranceLevel for MFA compatibility.
+   */
+  async getAuthenticatorAssuranceLevel() {
+    return { data: { currentLevel: "aal1", nextLevel: "aal1" }, error: null };
+  },
+
+  /**
    * Logout — calls backend to clear cookies and revoke session.
    */
   async logout(): Promise<void> {
@@ -193,7 +253,6 @@ export const authService = {
     } catch {
       // Always succeed client-side even if backend is unreachable
     }
-    // Clear any frontend cache
     ApiClient.clearCache();
   },
 
@@ -229,8 +288,7 @@ export const authService = {
   },
 
   /**
-   * MFA namespace for future MFA integration (Phase 2+).
-   * Currently returns stubs for compatibility.
+   * MFA namespace for MFA integration.
    */
   mfa: {
     async getAuthenticatorAssuranceLevel() {

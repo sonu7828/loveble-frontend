@@ -28,7 +28,7 @@ const Feedback = () => {
     });
     setSubmitting(false);
     if (error || data?.error) {
-      toast.error(data?.error || error?.message || "Could not submit");
+      toast.error(data?.error || (typeof error === "string" ? error : "Could not submit"));
       return;
     }
     if (rating === 5 && data?.reviewUrl) {
