@@ -194,18 +194,16 @@ const App = () => (
                 <Route path="device-inventory" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
                 <Route path="team" element={<AdminTeam />} />
                 <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
+              </Route>
+
+              <Route element={<StaffLayout />}>
+                <Route index element={<StaffToday />} />
                 <Route path="security-officer" element={<AdminSecurityOfficer />} />
                 <Route path="audit-report" element={<AdminAuditReport />} />
                 <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
                 <Route path="compliance/admin" element={<ComplianceAdmin />} />
                 <Route path="breach-report" element={<AdminBreachReport />} />
                 <Route path="vendors" element={<AdminVendors />} />
-                <Route path="me" element={<StaffMyProfile />} />
-                <Route path="help" element={<StaffHelp />} />
-              </Route>
-
-              <Route element={<StaffLayout />}>
-                <Route index element={<StaffToday />} />
                 <Route path="dashboard" element={<Navigate to="/staff/today" replace />} />
                 <Route path="today" element={<StaffToday />} />
                 <Route path="clinical-reviews" element={<StaffClinicalReviews />} />
