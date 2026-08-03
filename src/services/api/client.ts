@@ -1,7 +1,13 @@
 /**
- * Base API Client for Node.js + Express REST API Backend.
- * Handles HTTP requests, headers, authorization tokens, and API error formatting.
- * Includes: in-flight deduplication, short-lived GET cache, and 429 exponential-backoff retry.
+ * Radiantilyk EMR — Central API Client
+ * Phase 1A: Cookie-based authentication.
+ *
+ * - Uses `credentials: 'include'` on every request (browser sends HttpOnly cookies)
+ * - No localStorage/sessionStorage token storage
+ * - No Authorization: Bearer header injection
+ * - Automatic 401 → silent refresh → retry (ONE attempt only)
+ * - Auth endpoints (login, refresh, logout) are EXCLUDED from the refresh interceptor
+ * - 429 exponential backoff retry
  */
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:5000/api";
@@ -12,18 +18,58 @@ export interface ApiResponse<T = any> {
   status: number;
 }
 
+// ── In-flight deduplication & cache ──
 const inFlightRequests = new Map<string, Promise<ApiResponse<any>>>();
 const responseCache = new Map<string, { data: ApiResponse<any>; timestamp: number }>();
-const CACHE_TTL_MS = 10_000; // 10 s — avoids duplicate requests after mutations
+const CACHE_TTL_MS = 10_000; // 10s
 
 /** Sleep helper for backoff delays */
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-export class ApiClient {
-  private static getToken(): string | null {
-    return localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token");
+// ── Refresh interceptor state ──
+// Prevents infinite 401→refresh loops and concurrent refresh attempts
+let _isRefreshing = false;
+let _refreshPromise: Promise<boolean> | null = null;
+
+/** Endpoints excluded from the automatic 401 refresh interceptor */
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/refresh', '/auth/refresh-token', '/auth/logout'];
+
+function isAuthEndpoint(endpoint: string): boolean {
+  const normalized = endpoint.replace(/^\/+/, '/');
+  return AUTH_ENDPOINTS.some((ae) => normalized.endsWith(ae));
+}
+
+/**
+ * Attempt a silent token refresh via POST /auth/refresh.
+ * Returns true if refresh succeeded, false if it failed.
+ */
+async function silentRefresh(): Promise<boolean> {
+  if (_isRefreshing && _refreshPromise) {
+    return _refreshPromise;
   }
 
+  _isRefreshing = true;
+  _refreshPromise = (async () => {
+    try {
+      const normalizedBase = API_BASE_URL.replace(/\/$/, "");
+      const resp = await fetch(`${normalizedBase}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return resp.ok;
+    } catch {
+      return false;
+    } finally {
+      _isRefreshing = false;
+      _refreshPromise = null;
+    }
+  })();
+
+  return _refreshPromise;
+}
+
+export class ApiClient {
   public static clearCache(endpointPattern?: string) {
     if (!endpointPattern) {
       responseCache.clear();
@@ -38,23 +84,20 @@ export class ApiClient {
   }
 
   /**
-   * Core HTTP request with automatic 429 retry using exponential backoff.
-   * Retries up to `maxRetries` times on 429 or network errors.
+   * Core HTTP request.
+   * - credentials: 'include' on every request
+   * - Automatic 429 exponential backoff
+   * - Automatic 401 → silent refresh → ONE retry (only for non-auth endpoints)
    */
   public static async request<T = any>(
     endpoint: string,
     options: RequestInit = {},
     maxRetries = 4
   ): Promise<ApiResponse<T>> {
-    const token = this.getToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(options.headers as Record<string, string>),
     };
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
 
     const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const url = `${API_BASE_URL.replace(/\/$/, "")}${normalizedEndpoint}`;
@@ -64,6 +107,7 @@ export class ApiClient {
         const response = await fetch(url, {
           ...options,
           headers,
+          credentials: 'include', // Send HttpOnly cookies
         });
 
         const contentType = response.headers.get("content-type");
@@ -77,15 +121,64 @@ export class ApiClient {
           const retryAfterHeader = response.headers.get("retry-after");
           const waitMs = retryAfterHeader
             ? parseInt(retryAfterHeader, 10) * 1000
-            : Math.min(600 * Math.pow(2, attempt), 10_000); // 600ms → 1.2s → 2.4s → 4.8s…
+            : Math.min(600 * Math.pow(2, attempt), 10_000);
           await sleep(waitMs);
           continue;
         }
 
-        if (!response.ok) {
+        // 401 – attempt ONE silent refresh, then retry original request
+        if (response.status === 401 && !isAuthEndpoint(normalizedEndpoint)) {
+          const refreshed = await silentRefresh();
+          if (refreshed) {
+            // Retry the original request exactly once
+            const retryResponse = await fetch(url, {
+              ...options,
+              headers,
+              credentials: 'include',
+            });
+
+            const retryContentType = retryResponse.headers.get("content-type");
+            let retryData: any = null;
+            if (retryContentType && retryContentType.includes("application/json")) {
+              retryData = await retryResponse.json();
+            }
+
+            if (!retryResponse.ok) {
+              return {
+                data: null,
+                error: retryData?.message || retryData?.error?.message || `HTTP ${retryResponse.status}`,
+                status: retryResponse.status,
+              };
+            }
+
+            return {
+              data: retryData !== null ? retryData : ({} as T),
+              error: null,
+              status: retryResponse.status,
+            };
+          }
+
+          // Refresh failed → redirect to login
+          // Dispatch a custom event so the auth context can handle it
+          window.dispatchEvent(new CustomEvent('rka_session_expired'));
+
           return {
             data: null,
-            error: data?.message || data?.error || `HTTP ${response.status}: ${response.statusText}`,
+            error: data?.message || data?.error?.message || 'Session expired',
+            status: 401,
+          };
+        }
+
+        if (!response.ok) {
+          const errorMessage =
+            data?.message ||
+            data?.error?.message ||
+            data?.error ||
+            `HTTP ${response.status}: ${response.statusText}`;
+
+          return {
+            data: null,
+            error: errorMessage,
             status: response.status,
           };
         }

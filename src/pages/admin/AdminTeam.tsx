@@ -229,7 +229,7 @@ export default function AdminTeam() {
             await apiQuery("user_roles" as any).delete().eq("user_id", targetMember.user_id);
             await apiQuery("user_roles" as any).insert([
               { user_id: targetMember.user_id, role: draft.role },
-              ...(draft.role !== "staff" ? [{ user_id: targetMember.user_id, role: "staff" }] : []),
+              ...((draft.role as string) !== "staff" && (draft.role as string) !== "front_desk" ? [{ user_id: targetMember.user_id, role: "front_desk" }] : []),
             ]);
           } catch (e) {}
         }
