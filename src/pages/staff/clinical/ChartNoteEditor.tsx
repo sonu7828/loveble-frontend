@@ -99,6 +99,17 @@ function makeClinicalNoteId() {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }
 
+function fmtDate(val: any, fmt = "PPP p"): string {
+  if (!val) return "—";
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "—";
+    return format(d, fmt);
+  } catch {
+    return "—";
+  }
+}
+
 function energyDeviceOptionForService(serviceName: string | null | undefined) {
   const n = (serviceName ?? "").toLowerCase();
   if (/(co2|co₂|carbon dioxide)/.test(n)) return "CO2 fractional";
@@ -1625,7 +1636,7 @@ export default function ChartNoteEditor() {
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Chart Note • {CATEGORY_LABEL[note.category as Category]}</div>
           <h1 className="text-2xl md:text-3xl font-serif tracking-tight">{note.client_first_name} {note.client_last_name}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {note.service_name ?? "—"} • {format(new Date(note.created_at), "PPP p")} • <StatusBadge s={note.status} />
+            {note.service_name ?? "—"} • {fmtDate(note.signed_at || note.created_at)} • <StatusBadge s={note.status} />
           </p>
           {(note as any).summary && (
             <p className="mt-3 text-sm leading-relaxed rounded-md border border-border bg-secondary/30 px-3 py-2 italic">
@@ -1685,7 +1696,7 @@ export default function ChartNoteEditor() {
             {sigs.map(s => (
               <div key={s.id} className="rounded-md border border-border p-3">
                 <p className="text-sm font-medium capitalize">{s.signer_role}: {s.signer_name}</p>
-                <p className="text-xs text-muted-foreground">{format(new Date(s.signed_at), "PPP p")}</p>
+                <p className="text-xs text-muted-foreground">{fmtDate(s.signed_at)}</p>
                 {s.signature_png && <img src={s.signature_png} alt="" className="mt-2 h-16 object-contain bg-white rounded border" />}
               </div>
             ))}
@@ -1880,7 +1891,7 @@ export default function ChartNoteEditor() {
       )}
       {gfeValid && (
         <div className="rounded-lg border border-success/30 bg-success-soft dark:bg-success-soft p-3 text-sm flex items-center justify-between">
-          <span>GFE on file by <strong>{gfe.np_name}</strong>, valid until {format(new Date(gfe.expires_at), "PP")}</span>
+          <span>GFE on file by <strong>{gfe.np_name}</strong>, valid until {fmtDate(gfe.expires_at, "PP")}</span>
           <Button size="sm" variant="ghost" onClick={() => navigate(`/staff/clinical/gfe/${gfe.id}`)}>View</Button>
         </div>
       )}
@@ -1891,7 +1902,7 @@ export default function ChartNoteEditor() {
         <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm">
             <span className="font-medium">Last {CATEGORY_LABEL[lastVisit.category].toLowerCase()} visit:</span>{" "}
-            {format(new Date(lastVisit.when), "PPP")} · {lastVisit.provider}
+            {fmtDate(lastVisit.when, "PPP")} · {lastVisit.provider}
             {lastVisit.serviceName ? ` · ${lastVisit.serviceName}` : ""}
           </div>
           <Button size="sm" variant="outline" className="rounded-full" onClick={applyPrefillFromLastVisit}>
@@ -3018,7 +3029,7 @@ function AddendumsPanel({
               <div className="min-w-0">
                 <p className="text-sm font-medium">{a.reason}</p>
                 <p className="text-xs text-muted-foreground">
-                  {a.author_name} • {a.author_role ?? "—"} • {format(new Date(a.created_at), "PPP p")}
+                  {a.author_name} • {a.author_role ?? "—"} • {fmtDate(a.created_at)}
                 </p>
               </div>
             </div>
