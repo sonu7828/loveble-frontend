@@ -57,7 +57,7 @@ export default function AdminLayout() {
     { to: "/staff/security-officer", label: "Privacy & Security Officer", icon: ShieldCheck },
     { to: "/staff/audit-report", label: "Audit Logs", icon: HistoryIcon },
     { to: "/staff/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
-    { to: "/staff/vendors?tab=devices", label: "Device Inventory", icon: Laptop },
+    { to: "/staff/device-presets", label: "Device Inventory", icon: Laptop },
     { to: "/staff/vendors", label: "Vendor Management", icon: Building2 },
     { to: "/staff/breach-report", label: "Breach Reports", icon: ShieldAlert },
   ], []);

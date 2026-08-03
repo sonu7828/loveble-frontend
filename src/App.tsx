@@ -189,6 +189,7 @@ const App = () => (
                 <Route path="sms-snippets" element={<AdminOnly><AdminSmsSnippets /></AdminOnly>} />
                 <Route path="tox-followup" element={<AdminOnly><AdminToxFollowup /></AdminOnly>} />
                 <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
+                <Route path="device-inventory" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
                 <Route path="team" element={<AdminTeam />} />
                 <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
                 <Route path="security-officer" element={<AdminSecurityOfficer />} />

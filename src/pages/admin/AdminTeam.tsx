@@ -222,6 +222,37 @@ export default function AdminTeam() {
           role: draft.role,
           password,
         });
+
+        const targetMember = members.find((m) => m.id === draft.id);
+        if (targetMember?.user_id) {
+          try {
+            await apiQuery("user_roles" as any).delete().eq("user_id", targetMember.user_id);
+            await apiQuery("user_roles" as any).insert([
+              { user_id: targetMember.user_id, role: draft.role },
+              ...(draft.role !== "staff" ? [{ user_id: targetMember.user_id, role: "staff" }] : []),
+            ]);
+          } catch (e) {}
+        }
+
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.id === draft.id
+              ? {
+                  ...m,
+                  full_name: draft.full_name.trim(),
+                  title,
+                  email,
+                  color: draft.color,
+                  pending_role: draft.role,
+                }
+              : m
+          )
+        );
+
+        if (targetMember?.user_id) {
+          setRoles((prev) => ({ ...prev, [targetMember.user_id!]: [draft.role] }));
+        }
+
         toast.success(`Member ${draft.full_name} updated successfully!`);
       } catch (e: any) {
         toast.error(e?.message || "Failed to update member");
@@ -268,6 +299,18 @@ export default function AdminTeam() {
       const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
       const sanitizedDeleted = deletedEmails.filter((e) => e.toLowerCase() !== email);
       localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitizedDeleted));
+
+      // Sync active auth user profile if editing currently logged-in account
+      const curUser = JSON.parse(sessionStorage.getItem("user_profile") || localStorage.getItem("user_profile") || "null");
+      if (curUser && curUser.email?.toLowerCase() === email) {
+        let updatedRoles: Role[] = [draft.role];
+        if (draft.role === "admin") updatedRoles = ["admin"];
+        else if (draft.role === "medical_director") updatedRoles = ["medical_director", "nurse_practitioner"];
+        curUser.roles = updatedRoles;
+        sessionStorage.setItem("user_profile", JSON.stringify(curUser));
+        localStorage.setItem("user_profile", JSON.stringify(curUser));
+        window.dispatchEvent(new Event("rka_demo_auth_change"));
+      }
     } catch (_err) {}
 
     setAddBusy(false);
@@ -360,22 +403,12 @@ export default function AdminTeam() {
   const resolveMemberRole = (m: Member): Role => {
     const memberRoles = m.user_id ? (roles[m.user_id] ?? []) : [];
 
-    const explicitRole =
-      (m as any).role ||
-      m.pending_role ||
-      (memberRoles.includes("admin")
-        ? "admin"
-        : memberRoles.includes("medical_director")
-          ? "medical_director"
-          : memberRoles.includes("nurse_practitioner")
-            ? "nurse_practitioner"
-            : memberRoles.includes("rn_injector")
-              ? "rn_injector"
-              : memberRoles.includes("privacy_officer")
-                ? "privacy_officer"
-                : memberRoles.includes("front_desk")
-                  ? "front_desk"
-                  : null);
+    const activeAssignedRole = memberRoles.find((r) => r !== ("staff" as any));
+    if (activeAssignedRole) {
+      return activeAssignedRole as Role;
+    }
+
+    const explicitRole = (m as any).role || m.pending_role;
 
     if (explicitRole) {
       // Normalize any legacy role strings
@@ -387,6 +420,7 @@ export default function AdminTeam() {
     }
 
     const titleLower = (m.title || "").toLowerCase();
+    if (titleLower.includes("admin")) return "admin";
     if (titleLower.includes("medical director") || titleLower.includes("supervising physician")) return "medical_director";
     if (titleLower.includes("nurse practitioner") || titleLower.includes("np")) return "nurse_practitioner";
     if (titleLower.includes("injector") || titleLower.includes("rn")) return "rn_injector";
@@ -750,38 +784,38 @@ export default function AdminTeam() {
                 {draft.id ? "Enter a new password to update staff login." : "Staff will use this password to sign into the Staff Portal."}
               </p>
             </div>
-            {draft.role !== "admin" && (
-              <>
-                <div>
-                  <Label>Role</Label>
-                  <select
-                    value={draft.role}
-                    onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}
-                    className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="" disabled>Select Role...</option>
-                    {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
-                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label>Calendar color</Label>
-                  <div className="mt-1.5 flex gap-2 flex-wrap">
-                    {PALETTE.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setDraft({ ...draft, color: c })}
-                        className={`h-8 w-8 rounded-full border-2 transition ${draft.color === c ? "border-foreground scale-110" : "border-transparent"}`}
-                        style={{ background: c }}
-                        aria-label={`color ${c}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+            <div>
+              <Label>Role</Label>
+              <select
+                value={draft.role}
+                onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}
+                className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                disabled={draft.email?.toLowerCase() === "admin@gmail.com"}
+              >
+                <option value="" disabled>Select Role...</option>
+                {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
+                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                ))}
+              </select>
+              {draft.email?.toLowerCase() === "admin@gmail.com" && (
+                <p className="text-[10px] text-muted-foreground mt-1">System Admin role cannot be modified.</p>
+              )}
+            </div>
+            <div>
+              <Label>Calendar color</Label>
+              <div className="mt-1.5 flex gap-2 flex-wrap">
+                {PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, color: c })}
+                    className={`h-8 w-8 rounded-full border-2 transition ${draft.color === c ? "border-foreground scale-110" : "border-transparent"}`}
+                    style={{ background: c }}
+                    aria-label={`color ${c}`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAddOpen(false)} disabled={addBusy}>Cancel</Button>
