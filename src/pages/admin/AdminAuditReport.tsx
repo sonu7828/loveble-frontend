@@ -458,92 +458,93 @@ export default function AdminAuditReport() {
         </div>
       </div>
 
-      {/* Date & Preset Filters Bar */}
-      <div className="rounded-2xl border border-border/80 bg-card p-4 space-y-3.5 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Simplified Search & Date Filter Bar */}
+      <div className="rounded-2xl border border-border/80 bg-card p-4 space-y-4 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           
+          {/* Main Search Input */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search actor name, patient email, or action detail..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-10 text-xs rounded-xl bg-background border-border/80"
+            />
+          </div>
+
           {/* Quick Date Presets */}
-          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl text-xs font-medium border border-border/50">
+          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl text-xs font-medium border border-border/50 shrink-0 overflow-x-auto">
             <span className="text-[11px] text-muted-foreground px-2 flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" /> Range:
+              <CalendarIcon className="h-3.5 w-3.5" /> Date:
             </span>
             {(["7d", "30d", "90d", "365d", "custom"] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => handlePresetChange(p)}
-                className={`px-3 py-1 rounded-lg transition-all text-[11px] capitalize ${
+                className={`px-3 py-1.5 rounded-lg transition-all text-[11px] capitalize whitespace-nowrap ${
                   datePreset === p
                     ? "bg-background text-foreground shadow-2xs font-semibold"
                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                 }`}
               >
-                {p === "custom" ? "Custom Range" : `Last ${p.replace("d", " Days")}`}
+                {p === "custom" ? "Custom" : `Last ${p.replace("d", "D")}`}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Custom Date Pickers */}
-          <div className="flex items-center gap-2 text-xs">
-            <div className="flex items-center gap-1.5 bg-background px-3 py-1.5 rounded-xl border border-border">
+        {/* Expandable Custom Date Range (Only visible when 'custom' selected) */}
+        {datePreset === "custom" && (
+          <div className="flex items-center gap-3 pt-2 border-t border-border/60 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-2 bg-background px-3 py-1.5 rounded-xl border border-border">
               <span className="text-[10px] text-muted-foreground font-medium uppercase">From:</span>
               <input
                 type="date"
                 value={from}
-                onChange={(e) => { setFrom(e.target.value); setDatePreset("custom"); }}
+                onChange={(e) => setFrom(e.target.value)}
                 max={to}
                 className="bg-transparent text-xs font-mono focus:outline-none cursor-pointer"
               />
             </div>
             <span className="text-muted-foreground text-xs">→</span>
-            <div className="flex items-center gap-1.5 bg-background px-3 py-1.5 rounded-xl border border-border">
+            <div className="flex items-center gap-2 bg-background px-3 py-1.5 rounded-xl border border-border">
               <span className="text-[10px] text-muted-foreground font-medium uppercase">To:</span>
               <input
                 type="date"
                 value={to}
-                onChange={(e) => { setTo(e.target.value); setDatePreset("custom"); }}
+                onChange={(e) => setTo(e.target.value)}
                 min={from}
                 className="bg-transparent text-xs font-mono focus:outline-none cursor-pointer"
               />
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Search & Category Filter Pills */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-border/60">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search actor name, patient email, or action detail..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-xs rounded-xl bg-background border-border/80"
-            />
-          </div>
-
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 text-xs">
-            <button
-              onClick={() => setSelectedCategory("all")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition ${
-                selectedCategory === "all" ? "bg-primary text-primary-foreground font-semibold" : "bg-muted/60 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              All Categories ({filteredEvents.length})
-            </button>
-            {(["phi", "clinical", "consent_signed", "consent_email", "appointment"] as const).map((cat) => {
-              const count = events.filter((e) => e.category === cat).length;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition whitespace-nowrap ${
-                    selectedCategory === cat ? "bg-primary text-primary-foreground font-semibold" : "bg-muted/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {CATEGORY_LABEL[cat]} ({count})
-                </button>
-              );
-            })}
-          </div>
+        {/* Category Pill Filters */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pt-1 text-xs border-t border-border/40">
+          <button
+            onClick={() => setSelectedCategory("all")}
+            className={`px-3 py-1 rounded-lg text-[11px] font-medium transition ${
+              selectedCategory === "all" ? "bg-primary text-primary-foreground font-semibold shadow-2xs" : "bg-muted/50 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Categories ({filteredEvents.length})
+          </button>
+          {(["phi", "clinical", "consent_signed", "consent_email", "appointment"] as const).map((cat) => {
+            const count = events.filter((e) => e.category === cat).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1 rounded-lg text-[11px] font-medium transition whitespace-nowrap ${
+                  selectedCategory === cat ? "bg-primary text-primary-foreground font-semibold shadow-2xs" : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {CATEGORY_LABEL[cat]} ({count})
+              </button>
+            );
+          })}
         </div>
       </div>
 

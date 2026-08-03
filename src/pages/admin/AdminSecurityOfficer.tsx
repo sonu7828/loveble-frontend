@@ -12,7 +12,7 @@ export default function AdminSecurityOfficer() {
 
   const officerName = (user?.first_name || user?.last_name)
     ? `${user?.first_name || ""} ${user?.last_name || ""}`.trim() + " (Privacy & Security Officer)"
-    : "Kiem Vukadinovic, NP (Privacy & Security Officer)";
+    : "Designated Privacy & Security Officer";
 
   const COMPLIANCE_MODULES = [
     {

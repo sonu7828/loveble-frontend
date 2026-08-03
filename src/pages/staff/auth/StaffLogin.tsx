@@ -9,7 +9,7 @@ import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Loader2, ShieldAlert, ShieldCheck, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { AppRole } from "@/hooks/useAuth";
+import { useAuth, AppRole } from "@/hooks/useAuth";
 
 type Step = "credentials" | "mfa-enroll" | "mfa-verify" | "redirecting";
 type Mode = "loading" | "ready";
@@ -44,6 +44,7 @@ function resolveRedirectTarget(roles: string[]): string {
 
 export default function StaffLogin() {
   const navigate = useNavigate();
+  const { refreshCurrentUser } = useAuth();
   const [sp] = useSearchParams();
   const reason = sp.get("reason");
   const nextParam = sp.get("next");
@@ -82,6 +83,7 @@ export default function StaffLogin() {
     setMode("loading");
     setErrMsg("");
     try {
+      await refreshCurrentUser();
       const { session } = await authService.getSession();
       const userRoles = session?.user?.roles || [];
       const target = nextPath || resolveRedirectTarget(userRoles);
@@ -121,6 +123,7 @@ export default function StaffLogin() {
     const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password });
 
     if (data?.user) {
+      await refreshCurrentUser();
       setLoading(false);
       setPassword("");
       await beginMfa();
