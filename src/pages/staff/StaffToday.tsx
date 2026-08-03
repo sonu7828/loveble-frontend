@@ -486,7 +486,10 @@ function StandardStaffToday() {
       {/* ── 4 KPI Cards Grid ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Today's Appointments */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-primary/30 transition rounded-xl">
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-primary/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/calendar")}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Today's Appointments</span>
             <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -497,8 +500,16 @@ function StandardStaffToday() {
           <p className="text-[11px] text-muted-foreground mt-1">Confirmed for today</p>
         </Card>
 
+<<<<<<< HEAD
+        {/* KPI 2: Waiting Patients */}
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/checkout")}
+        >
+=======
         {/* KPI 2: Checked In Patients */}
         <Card className="p-4 border border-border bg-card shadow-xs hover:border-emerald-500/30 transition rounded-xl">
+>>>>>>> 89e2a81f7da9333f0a421d0990f55ad84d30329f
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Checked In</span>
             <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
@@ -512,7 +523,10 @@ function StandardStaffToday() {
         </Card>
 
         {/* KPI 3: Today's Check-ins */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-blue-500/30 transition rounded-xl">
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-blue-500/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/checkout")}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Today's Check-ins</span>
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -528,7 +542,10 @@ function StandardStaffToday() {
         </Card>
 
         {/* KPI 4: Booking Requests */}
-        <Card className="p-4 border border-border bg-card shadow-xs hover:border-purple-500/30 transition rounded-xl">
+        <Card 
+          className="p-4 border border-border bg-card shadow-xs hover:border-purple-500/30 transition rounded-xl cursor-pointer"
+          onClick={() => navigate("/staff/inbox")}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span className="font-medium">Booking Requests</span>
             <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
