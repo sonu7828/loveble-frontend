@@ -86,9 +86,7 @@ export default function AdminLayout() {
   const isSubActive = (targetUrl: string) => {
     const [targetPath, targetQuery] = targetUrl.split("?");
     if (location.pathname !== targetPath) return false;
-    if (!targetQuery) {
-      return !location.search || location.search === "" || location.search === "?";
-    }
+    if (!targetQuery) return true;
     const currentParams = new URLSearchParams(location.search);
     const targetParams = new URLSearchParams(targetQuery);
     for (const [key, val] of targetParams.entries()) {
