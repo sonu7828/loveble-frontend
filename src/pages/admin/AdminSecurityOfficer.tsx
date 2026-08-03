@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { getDynamicProfileName } from "@/lib/userProfile";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -10,9 +11,7 @@ import {
 export default function AdminSecurityOfficer() {
   const { user } = useAuth();
 
-  const officerName = (user?.first_name || user?.last_name)
-    ? `${user?.first_name || ""} ${user?.last_name || ""}`.trim() + " (Privacy & Security Officer)"
-    : "Kiem Vukadinovic, NP (Privacy & Security Officer)";
+  const officerName = getDynamicProfileName(user, "Privacy & Security Officer") + " (Privacy & Security Officer)";
 
   const COMPLIANCE_MODULES = [
     {
