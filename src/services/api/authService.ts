@@ -1,8 +1,14 @@
 /**
- * Authentication Service for Node.js + Express REST API Backend.
- * Replaces Supabase Auth calls across the application.
+ * Radiantilyk EMR — Authentication Service
+ * Phase 1A: Cookie-based authentication via Node.js/Express backend.
+ *
+ * All authentication flows go through the REST API.
+ * HttpOnly cookies are managed by the browser and backend.
+ * No localStorage, sessionStorage, mock data, or demo tokens.
  */
 import { ApiClient } from "./client";
+
+// ── Role Types ──
 
 export type AppRole =
   | "admin"
@@ -41,6 +47,8 @@ export function normalizeRole(role: string): AppRole {
   return "front_desk"; // safe default for unknown
 }
 
+// ── User Profile Types ──
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -53,353 +61,195 @@ export interface UserProfile {
 }
 
 export interface AuthSession {
-  token: string;
   user: UserProfile;
 }
 
-export function getUserProfileByEmail(email: string, password?: string): UserProfile | null {
-  const clean = (email || "").trim().toLowerCase();
-
-  // 1. Check deleted staff list
-  const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-  if (deletedEmails.includes(clean)) {
-    return null;
-  }
-
-  // 2. Look up actual staff from rka_approved_staff_accounts (synced from AdminTeam / Staff Management)
-  const approvedAccounts: Array<{ id?: string; email: string; role: string; full_name?: string; password?: string }> =
-    JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-  const staffMatch = approvedAccounts.find((a) => a.email?.toLowerCase() === clean);
-
-  if (staffMatch) {
-    // Update password if provided
-    if (password && password !== "••••••••") {
-      staffMatch.password = password;
-      localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
-    }
-
-    const r = normalizeRole(staffMatch.role || "front_desk");
-    let roles: AppRole[] = [r];
-    if (r === "admin") roles = ["admin"];
-    else if (r === "medical_director") roles = ["medical_director", "nurse_practitioner"];
-    else if (r === "privacy_officer") roles = ["privacy_officer"];
-    else if (r === "nurse_practitioner") roles = ["nurse_practitioner"];
-    else if (r === "rn_injector") roles = ["rn_injector"];
-    else if (r === "front_desk") roles = ["front_desk"];
-
-    const fullName = staffMatch.full_name || "Staff Member";
-    const nameParts = fullName.trim().split(" ");
-    const firstName = nameParts[0] || fullName;
-    const lastName = nameParts.slice(1).join(" ") || "";
-
-    return {
-      id: staffMatch.id || `approved-${clean}`,
-      email: staffMatch.email,
-      first_name: firstName,
-      last_name: lastName,
-      roles,
-      staff_id: staffMatch.id || `approved-${clean}`,
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
-  }
-
-  // 3. Built-in fallback for admin@gmail.com (always available even before AdminTeam loads)
-  if (clean === "admin@gmail.com") {
-    return {
-      id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      email: "admin@gmail.com",
-      first_name: "System",
-      last_name: "Admin",
-      roles: ["admin"],
-      staff_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
-  }
-
-  // 4. Auto-register staff accounts matching common practice email patterns
-  if (
-    !staffMatch &&
-    clean.includes("@") &&
-    !clean.includes("user@") &&
-    (clean.includes("provider") || clean.includes("staff") || clean.includes("doctor") || clean.includes("nurse") || clean.includes("md") || clean.includes("admin") || clean.includes("medical") || clean.includes("security") || clean.includes("officer") || clean.includes("injector") || clean.includes("frontdesk") || clean.includes("front_desk"))
-  ) {
-    const rawRole: AppRole = clean.includes("admin")
-      ? "admin"
-      : clean.includes("md") || clean.includes("doctor") || clean.includes("medical")
-      ? "medical_director"
-      : clean.includes("officer") || clean.includes("security")
-      ? "privacy_officer"
-      : clean.includes("nurse")
-      ? "nurse_practitioner"
-      : clean.includes("injector")
-      ? "rn_injector"
-      : clean.includes("frontdesk") || clean.includes("front_desk") || clean.includes("staff")
-      ? "front_desk"
-      : "rn_injector";
-
-    const autoName = clean.split("@")[0].replace(/[0-9]/g, "").replace(/^./, (s) => s.toUpperCase()) || "Staff Member";
-    const newAccount = {
-      id: `approved-${clean}`,
-      email: clean,
-      password: password || "12345678",
-      full_name: autoName,
-      role: rawRole,
-    };
-    approvedAccounts.push(newAccount);
-    localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
-
-    let roles: AppRole[] = [rawRole];
-    if (rawRole === "admin") roles = ["admin"];
-    else if (rawRole === "medical_director") roles = ["medical_director", "nurse_practitioner"];
-
-    const nameParts = autoName.trim().split(" ");
-    return {
-      id: newAccount.id,
-      email: clean,
-      first_name: nameParts[0] || autoName,
-      last_name: nameParts.slice(1).join(" ") || "",
-      roles,
-      staff_id: newAccount.id,
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
-  }
-
-  // 5. Built-in Demo Patient User
-  if (clean === "user@gmail.com") {
-    return {
-      id: "usr-404-user-id",
-      email: "user@gmail.com",
-      first_name: "Valued",
-      last_name: "Patient",
-      roles: [],
-      staff_id: "usr-404-user-id",
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
-  }
-
-  return null;
-}
+// ── Auth Service ──
 
 export const authService = {
-  async getSession(): Promise<any> {
-    const token = sessionStorage.getItem("auth_token") || localStorage.getItem("auth_token");
-    const storedUser = sessionStorage.getItem("user_profile") || localStorage.getItem("user_profile");
-
-    let user: UserProfile | null = null;
-    if (storedUser) {
-      try {
-        user = JSON.parse(storedUser);
-      } catch (e) {
-        user = null;
-      }
-    }
-
-    const session = user ? { token: token || "demo-jwt-token", user } : null;
-
-    return {
-      data: { session },
-      session,
-      user,
-      error: null,
-    };
-  },
-
-  async login(email: string, password?: string): Promise<{ user: UserProfile; token: string } | null> {
+  /**
+   * Get current session by calling GET /auth/me.
+   * The browser sends the HttpOnly cookie automatically.
+   * Returns null if not authenticated.
+   */
+  async getSession(): Promise<{ session: AuthSession | null; user: UserProfile | null; error: string | null }> {
     try {
-      const res = await ApiClient.post<{ user: UserProfile; token: string }>("/auth/login", { email, password });
-      if (res.data && res.data.token) {
-        sessionStorage.setItem("auth_token", res.data.token);
-        sessionStorage.setItem("user_profile", JSON.stringify(res.data.user));
-        localStorage.setItem("auth_token", res.data.token);
-        localStorage.setItem("user_profile", JSON.stringify(res.data.user));
-        window.dispatchEvent(new Event("rka_demo_auth_change"));
-        return res.data;
-      }
-    } catch { }
+      const res = await ApiClient.get<{ success: boolean; data: { user: UserProfile } }>("/auth/me");
 
-    // Fallback lookup
-    const demoUser = getUserProfileByEmail(email, password);
-    if (!demoUser) {
-      return null;
-    }
+      if (res.status === 200 && res.data?.success && res.data?.data?.user) {
+        const rawUser = res.data.data.user;
+        const user: UserProfile = {
+          id: rawUser.id,
+          email: rawUser.email,
+          first_name: rawUser.first_name,
+          last_name: rawUser.last_name,
+          roles: (rawUser.roles || []).map((r: string) => normalizeRole(r)),
+          staff_id: rawUser.staff_id || rawUser.id,
+        };
 
-    sessionStorage.setItem("auth_token", "demo-token");
-    sessionStorage.setItem("user_profile", JSON.stringify(demoUser));
-    localStorage.setItem("auth_token", "demo-token");
-    localStorage.setItem("user_profile", JSON.stringify(demoUser));
-    window.dispatchEvent(new Event("rka_demo_auth_change"));
-    return { user: demoUser, token: "demo-token" };
-  },
-
-  async signInWithPassword(params: { email: string; password?: string }) {
-    const result = await this.login(params.email, params.password);
-    if (!result || !result.user) {
-      return {
-        data: { user: null, session: null },
-        error: { message: "Invalid email or password. Access denied." },
-      };
-    }
-    return {
-      data: { user: result.user, session: { token: result.token, user: result.user } },
-      error: null,
-    };
-  },
-
-  async updatePassword(newPassword: string): Promise<{ success: boolean; message?: string }> {
-    try {
-      await ApiClient.post("/auth/update-password", { password: newPassword });
-      return { success: true };
-    } catch (_e) { }
-
-    try {
-      const stored = sessionStorage.getItem("user_profile") || localStorage.getItem("user_profile");
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (u.email) {
-          const approved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-          const match = approved.find((a) => a.email?.toLowerCase() === u.email.toLowerCase());
-          if (match) {
-            match.password = newPassword;
-            localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approved));
-          }
-        }
-      }
-    } catch (_e) {}
-
-    return { success: true };
-  },
-
-  async signUp(params: { email: string; password?: string; options?: any }) {
-    const clean = (params.email || "").trim().toLowerCase();
-
-    // 1. Try API backend registration endpoint if available
-    try {
-      const res = await ApiClient.post<{ user: UserProfile; token: string }>("/auth/register", {
-        email: clean,
-        password: params.password,
-        firstName: params.options?.data?.first_name,
-        lastName: params.options?.data?.last_name,
-        phone: params.options?.data?.phone,
-      });
-      if (res.data && res.data.token) {
-        sessionStorage.setItem("auth_token", res.data.token);
-        sessionStorage.setItem("user_profile", JSON.stringify(res.data.user));
-        localStorage.setItem("auth_token", res.data.token);
-        localStorage.setItem("user_profile", JSON.stringify(res.data.user));
-        window.dispatchEvent(new Event("rka_demo_auth_change"));
-        return { data: { user: res.data.user, session: { token: res.data.token, user: res.data.user } }, error: null };
-      }
-    } catch (e: any) {
-      const status = e?.status || e?.response?.status;
-      const msg = e?.message || e?.response?.data?.message || "";
-      if (status === 409 || msg.includes("409") || msg.toLowerCase().includes("already exists")) {
         return {
-          data: { user: null, session: null },
-          error: { message: "An account with this email address already exists. Please sign in instead.", statusCode: 409 },
+          session: { user },
+          user,
+          error: null,
         };
       }
+
+      return { session: null, user: null, error: null };
+    } catch {
+      return { session: null, user: null, error: null };
+    }
+  },
+
+  /**
+   * Login with email and password.
+   * Backend sets HttpOnly cookies on success.
+   * Returns user profile or error message.
+   */
+  async login(email: string, password?: string): Promise<{
+    user: UserProfile | null;
+    mfaRequired?: boolean;
+    mfaToken?: string;
+    error: string | null;
+  }> {
+    const res = await ApiClient.post<{
+      success: boolean;
+      data: {
+        user?: UserProfile;
+        mfaRequired?: boolean;
+        mfaToken?: string;
+      };
+      message?: string;
+    }>("/auth/login", { email, password });
+
+    if (res.error) {
+      return { user: null, error: res.error };
     }
 
-    // 2. Check local fallback storage for duplicate email
-    const existing = getUserProfileByEmail(clean);
-    if (existing) {
+    if (res.data?.data?.mfaRequired) {
       return {
-        data: { user: null, session: null },
-        error: { message: "An account with this email address already exists. Please sign in instead.", statusCode: 409 },
+        user: null,
+        mfaRequired: true,
+        mfaToken: res.data.data.mfaToken,
+        error: null,
       };
     }
 
-    // 3. Create new user profile
-    const meta = params.options?.data || {};
-    const firstName = meta.first_name || meta.firstName || "Patient";
-    const lastName = meta.last_name || meta.lastName || "";
-    const newUser: UserProfile = {
-      id: `usr-${Date.now()}`,
-      email: clean,
-      first_name: firstName,
-      last_name: lastName,
-      roles: [],
-      created_at: new Date().toISOString(),
-      email_confirmed_at: new Date().toISOString(),
-    };
+    if (res.data?.success && res.data?.data?.user) {
+      const rawUser = res.data.data.user;
+      const user: UserProfile = {
+        id: rawUser.id,
+        email: rawUser.email,
+        first_name: rawUser.first_name,
+        last_name: rawUser.last_name,
+        roles: (rawUser.roles || []).map((r: string) => normalizeRole(r)),
+        staff_id: rawUser.staff_id || rawUser.id,
+      };
+      return { user, error: null };
+    }
 
-    try {
-      const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-      approvedAccounts.push({
-        id: newUser.id,
-        email: clean,
-        password: params.password || "12345678",
-        full_name: `${firstName} ${lastName}`.trim(),
-        role: "patient",
-      });
-      localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(approvedAccounts));
-    } catch (_err) {}
+    return { user: null, error: "Login failed" };
+  },
 
-    sessionStorage.setItem("auth_token", "demo-token");
-    sessionStorage.setItem("user_profile", JSON.stringify(newUser));
-    localStorage.setItem("auth_token", "demo-token");
-    localStorage.setItem("user_profile", JSON.stringify(newUser));
-    window.dispatchEvent(new Event("rka_demo_auth_change"));
+  /**
+   * Supabase-compatible signInWithPassword wrapper.
+   * Used by existing login components.
+   */
+  async signInWithPassword(params: { email: string; password?: string }) {
+    const result = await this.login(params.email, params.password);
+
+    if (result.error) {
+      return {
+        data: { user: null, session: null },
+        error: { message: result.error },
+      };
+    }
+
+    if (result.mfaRequired) {
+      return {
+        data: { user: null, session: null, mfaRequired: true, mfaToken: result.mfaToken },
+        error: null,
+      };
+    }
+
+    if (result.user) {
+      return {
+        data: { user: result.user, session: { user: result.user } },
+        error: null,
+      };
+    }
 
     return {
-      data: { user: newUser, session: { token: "demo-token", user: newUser } },
-      error: null,
+      data: { user: null, session: null },
+      error: { message: "Invalid email or password. Access denied." },
     };
   },
 
-  async signInWithOtp(_params?: any) {
-    const adminUser = getUserProfileByEmail("admin@gmail.com");
-    return { data: { user: adminUser }, error: null };
-  },
-
+  /**
+   * Logout — calls backend to clear cookies and revoke session.
+   */
   async logout(): Promise<void> {
     try {
       await ApiClient.post("/auth/logout");
-    } catch { }
-    sessionStorage.removeItem("auth_token");
-    sessionStorage.removeItem("user_profile");
-    sessionStorage.removeItem("rka_demo_session");
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("user_profile");
-    localStorage.removeItem("rka_demo_session");
-    window.dispatchEvent(new Event("rka_demo_auth_change"));
+    } catch {
+      // Always succeed client-side even if backend is unreachable
+    }
+    // Clear any frontend cache
+    ApiClient.clearCache();
   },
 
+  /**
+   * Alias for logout (Supabase compatibility).
+   */
   async signOut(): Promise<void> {
     return this.logout();
   },
 
-  async getAuthenticatorAssuranceLevel() {
-    return { data: { currentLevel: "aal2", nextLevel: "aal2" }, error: null };
+  /**
+   * Legacy alias for updatePassword
+   */
+  async updatePassword(newPassword: string): Promise<{ success: boolean; message?: string }> {
+    const res = await this.changePassword("", newPassword);
+    return { success: res.success, message: res.error || undefined };
   },
 
+  /**
+   * Change password for the authenticated user.
+   */
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; error: string | null }> {
+    const res = await ApiClient.post("/auth/password/change", {
+      currentPassword,
+      newPassword,
+    });
+
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+
+    return { success: true, error: null };
+  },
+
+  /**
+   * MFA namespace for future MFA integration (Phase 2+).
+   * Currently returns stubs for compatibility.
+   */
   mfa: {
     async getAuthenticatorAssuranceLevel() {
-      return { data: { currentLevel: "aal2", nextLevel: "aal2" }, error: null };
+      return { data: { currentLevel: "aal1", nextLevel: "aal1" }, error: null };
     },
     async listFactors() {
-      return { data: { totp: [{ id: "totp-factor-1", status: "verified" }] }, error: null };
+      return { data: { totp: [] }, error: null };
     },
     async challenge(params: { factorId: string }) {
       return { data: { id: `challenge-${params.factorId}` }, error: null };
     },
-    async verify(params: { factorId: string; challengeId: string; code: string }) {
-      if (params.code === "123456" || params.code.length === 6) {
-        return { data: { user: null }, error: null };
-      }
-      return { error: { message: "Invalid 2-Factor authentication code." } };
+    async verify(_params: { factorId: string; challengeId: string; code: string }) {
+      return { data: null, error: { message: "MFA not yet implemented" } };
     },
-    async enroll(_params: { factorType: string; friendlyName?: string }): Promise<{ data: { id: string; totp: { qr_code: string; secret: string } } | null; error: any }> {
-      // Demo environment: MFA enrollment is bypassed (verified factor already exists)
-      return { data: null, error: { message: "MFA enrollment is managed by the demo session." } };
+    async enroll(_params: { factorType: string; friendlyName?: string }) {
+      return { data: null, error: { message: "MFA enrollment not yet implemented" } };
     },
-    async unenroll(_params: { factorId: string }): Promise<{ data: any; error: any }> {
-      // Demo environment: no real factors to unenroll
-      return { data: {}, error: null };
+    async unenroll(_params: { factorId: string }) {
+      return { data: null, error: { message: "MFA unenrollment not yet implemented" } };
     },
   },
 };

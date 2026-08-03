@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Loader2, ShieldAlert, ShieldCheck, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { setDemoAuthSession, clearDemoAuthSession, AppRole } from "@/hooks/useAuth";
+import { AppRole } from "@/hooks/useAuth";
 
 type Step = "credentials" | "mfa-enroll" | "mfa-verify" | "redirecting";
 type Mode = "loading" | "ready";
@@ -73,7 +73,6 @@ export default function StaffLogin() {
   useEffect(() => {
     setMode("ready");
     setStep("credentials");
-    setPendingDemoLogin(null);
     setEmail("");
     setPassword("");
     setCode("");
@@ -190,46 +189,13 @@ export default function StaffLogin() {
     setErrMsg("");
     const cleanEmail = email.trim().toLowerCase();
 
-    // 0. Check if account has been deleted
-    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-    if (deletedEmails.includes(cleanEmail)) {
-      setLoading(false);
-      setPassword("");
-      const errorMsg = "This staff account has been deleted by an Administrator. Access denied.";
-      setErrMsg(errorMsg);
-      toast.error(errorMsg);
-      return;
-    }
-
-    // 1. Check built-in demo patient user account
-    if (cleanEmail === "user@gmail.com") {
-      setDemoAuthSession("user@gmail.com", []);
-      toast.success("Signed in as Demo Patient");
-      setLoading(false);
-      navigate("/account", { replace: true });
-      return;
-    }
-
-    // 2. Try live database authentication via REST API
+    // Authenticate via backend API
     const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password });
+
     if (data?.user) {
       setLoading(false);
       setPassword("");
       await beginMfa();
-      return;
-    }
-
-    // 3. Check if email matches any staff in approved accounts or built-in getUserProfileByEmail
-    const { getUserProfileByEmail } = await import("@/services/api/authService");
-    const resolvedUser = getUserProfileByEmail(cleanEmail, password);
-    if (resolvedUser) {
-      const isAd = resolvedUser.roles.includes("admin");
-      setPendingDemoLogin({ cleanEmail, roles: resolvedUser.roles as AppRole[], isAd });
-      setLoading(false);
-      setCode("");
-      setStep("mfa-verify");
-      setMode("ready");
-      toast.info("Credentials verified! Please enter 2-Factor code 123456 to access Dashboard.");
       return;
     }
 
@@ -274,16 +240,9 @@ export default function StaffLogin() {
     e.preventDefault();
 
     if (pendingDemoLogin) {
-      if (code.trim().length !== 6) {
-        toast.error("Please enter a valid 6-digit authentication code.");
-        return;
-      }
-      setBusy(true);
-      setDemoAuthSession(pendingDemoLogin.cleanEmail, pendingDemoLogin.roles);
-      toast.success("MFA Verification Successful — Security Operations Center Access Granted");
-      setStep("redirecting");
-      const demoTarget = resolveRedirectTarget(pendingDemoLogin.roles);
-      setTimeout(() => navigate(demoTarget, { replace: true }), 400);
+      // pendingDemoLogin is no longer used — redirect to credentials step
+      toast.error("Please sign in again.");
+      setStep("credentials");
       return;
     }
 

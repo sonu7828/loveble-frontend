@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { authService } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,6 @@ import { Loader2, Mail, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { setDemoAuthSession } from "@/hooks/useAuth";
 import { getClientSession } from "@/hooks/useClientAuth";
 
 const signupSchema = z.object({
@@ -43,31 +42,21 @@ export default function PatientAuth() {
     if (mode === "signin") {
       const cleanEmail = form.email.trim().toLowerCase();
 
-      // Demo fallback for user@gmail.com
-      if (cleanEmail === "user@gmail.com") {
-        setDemoAuthSession("user@gmail.com", []);
-        toast.success("Signed in as Demo Patient");
-        setLoading(false);
-        navigate("/account", { replace: true });
-        return;
-      }
-
       const { error } = await authService.signInWithPassword({
-        email: cleanEmail,
-        password: form.password,
+        email: cleanEmail, password: form.password,
       });
 
       setLoading(false);
       if (error) {
         const msg = error.message?.toLowerCase() ?? "";
         if (msg.includes("invalid") || msg.includes("credentials") || msg.includes("not found")) {
-          toast.error("We couldn't sign you in. Try the email sign-in link below — it works even if you've never set a password.");
+          toast.error("We couldn't sign you in. Please check your email and password.");
         } else {
           toast.error(error.message);
         }
         return;
       }
-      navigate("/account");
+      navigate("/account", { replace: true });
       return;
     }
 

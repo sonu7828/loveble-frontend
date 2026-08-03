@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
-import { useAuth, clearDemoAuthSession } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { usePendingBookings } from "@/hooks/usePendingBookings";
 import { useIdleLogout } from "@/hooks/useIdleLogout";
 import { authService } from "@/services/api";
@@ -41,7 +41,7 @@ interface Group {
 }
 
 export default function StaffLayout() {
-  const { user, loading, roles, isAdmin, isNP, isStaff, isFrontDesk, isReceptionist, isScheduler, isPrivacyOfficer, isMedicalDirector, isPrivileged, isProvider, isRNInjector } = useAuth();
+  const { user, loading, isAdmin, isFrontDesk, isMedicalDirector, isPrivileged } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -342,7 +342,7 @@ export default function StaffLayout() {
       <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
           <p className="text-sm">Your account doesn't have staff access yet.</p>
-          <Button variant="link" onClick={async () => { clearDemoAuthSession(); await authService.logout(); navigate("/staff/login"); }}>Sign out</Button>
+          <Button variant="link" onClick={async () => { await authService.logout(); navigate("/staff/login"); }}>Sign out</Button>
         </div>
       </div>
     );
@@ -491,7 +491,6 @@ export default function StaffLayout() {
                     size="sm"
                     className="w-full justify-start text-xs"
                     onClick={async () => {
-                      clearDemoAuthSession();
                       await authService.logout();
                       navigate("/staff/login");
                     }}
@@ -560,7 +559,6 @@ export default function StaffLayout() {
               size="sm"
               className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
               onClick={async () => {
-                clearDemoAuthSession();
                 await authService.logout();
                 navigate("/staff/login");
               }}
