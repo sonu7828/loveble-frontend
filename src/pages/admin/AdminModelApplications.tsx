@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePageMeta } from "@/hooks/usePageMeta";
-import { Users, Clock, CheckCircle, XCircle, Eye, Search, Check, X } from "lucide-react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { Users, Clock, CheckCircle, XCircle, Eye, Search, Check, X, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { apiQuery } from "@/services/api";
 import { toast } from "sonner";
@@ -69,6 +70,28 @@ export default function AdminModelApplications() {
     } catch (_err) {}
 
     toast.success(`Application ${id} marked as ${newStatus}`);
+  };
+
+  const handleDelete = async (id: string) => {
+    const ok = await confirmDialog({
+      title: "Delete Application",
+      description: "Are you sure you want to delete this model application? This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setApplications((prev) => prev.filter((a) => a.id !== id));
+
+    const localApps = JSON.parse(localStorage.getItem("rka_demo_model_applications") || "[]");
+    const updatedLocal = localApps.filter((app: any) => app.id !== id);
+    localStorage.setItem("rka_demo_model_applications", JSON.stringify(updatedLocal));
+
+    try {
+      await apiQuery("model_applications" as any).delete().eq("id", id);
+    } catch (_err) {}
+
+    toast.success("Application deleted successfully");
   };
 
   const filteredApplications = applications.filter((app) =>
@@ -193,6 +216,15 @@ export default function AdminModelApplications() {
                         <Link to={`/staff/model-applications/${app.id}`}>
                           <Eye className="h-4 w-4 mr-1.5" /> View
                         </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                        onClick={() => handleDelete(app.id)}
+                        title="Delete application"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </td>
