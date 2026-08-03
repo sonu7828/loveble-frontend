@@ -136,7 +136,7 @@ export default function StaffMyProfile() {
         : (approvedAccount?.license_number || sp?.license_number || "");
 
       if (isGenericName(resolvedName)) {
-        if (isMd) resolvedName = "Dr. Aloysius N. Fobi, MD";
+        if (isMd) resolvedName = "Dr. Suhaas Sharma";
         else if (isPo || isNurse) resolvedName = "Bob Stane";
         else if (isRn) resolvedName = "Girish, RN Injector";
         else if (isFd) resolvedName = "Front Desk Receptionist";

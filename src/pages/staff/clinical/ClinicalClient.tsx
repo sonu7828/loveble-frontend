@@ -31,15 +31,41 @@ export default function ClinicalClient() {
     if (!decoded) return;
     (async () => {
       setLoading(true);
-      const [{ data: g }, { data: n }, { data: e }, { data: a }] = await Promise.all([
-        apiQuery("gfe_records").select("*").ilike("client_email", decoded).order("signed_at", { ascending: false }),
-        apiQuery("clinical_notes").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }),
-        apiQuery("clinical_encounters").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }),
+      const [gRes, nRes, eRes, aRes]: any[] = await Promise.all([
+        apiQuery("gfe_records").select("*").ilike("client_email", decoded).order("signed_at", { ascending: false }).catch(() => ({ data: [] })),
+        apiQuery("clinical_notes").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }).catch(() => ({ data: [] })),
+        apiQuery("clinical_encounters").select("*").ilike("client_email", decoded).order("created_at", { ascending: false }).catch(() => ({ data: [] })),
         apiQuery("appointments").select("client_first_name, client_last_name, client_email")
-          .ilike("client_email", decoded).order("start_at", { ascending: false }).limit(1).maybeSingle(),
+          .ilike("client_email", decoded).order("start_at", { ascending: false }).limit(1).maybeSingle().catch(() => ({ data: null })),
       ]);
-      setGfes(g ?? []);
-      setNotes(n ?? []);
+      const g = gRes?.data;
+      const n = nRes?.data;
+      const e = eRes?.data;
+      const a = aRes?.data;
+
+      let gfesList: any[] = (g as any[]) ?? [];
+      try {
+        const localItems: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+        const matchingLocal = localItems.filter((item: any) => item.client_email?.toLowerCase() === decoded.toLowerCase());
+        const map = new Map<string, any>();
+        gfesList.forEach(r => { if (r.id) map.set(r.id, r); });
+        matchingLocal.forEach(r => { if (r.id) map.set(r.id, r); });
+        gfesList = Array.from(map.values());
+      } catch { }
+
+      setGfes(gfesList);
+
+      let notesList: any[] = (n as any[]) ?? [];
+      try {
+        const localNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+        const matchingLocalNotes = localNotes.filter((item: any) => item.client_email?.toLowerCase() === decoded.toLowerCase());
+        const nMap = new Map<string, any>();
+        notesList.forEach(r => { if (r.id) nMap.set(r.id, r); });
+        matchingLocalNotes.forEach(r => { if (r.id) nMap.set(r.id, r); });
+        notesList = Array.from(nMap.values());
+      } catch { }
+      setNotes(notesList);
+
       setEncounters(e ?? []);
       setLatestApt(a ?? null);
       setLoading(false);

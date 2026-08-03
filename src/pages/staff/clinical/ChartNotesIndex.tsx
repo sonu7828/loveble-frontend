@@ -27,9 +27,10 @@ export default function ChartNotesIndex() {
   const [category, setCategory] = useState("all");
   const [range, setRange] = useState("30");
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
+  const loadNotes = async () => {
+    setLoading(true);
+    let dbRows: Note[] = [];
+    try {
       const since = new Date();
       const days = parseInt(range, 10);
       since.setDate(since.getDate() - (isNaN(days) ? 30 : days));
@@ -41,9 +42,39 @@ export default function ChartNotesIndex() {
       if (!isNaN(days)) q = q.gte("created_at", since.toISOString());
       if (category !== "all") q = q.eq("category", category as any);
       const { data } = await q;
-      setRows((data as any) ?? []);
-      setLoading(false);
-    })();
+      if (data) dbRows = data as Note[];
+    } catch { }
+
+    let cachedRows: Note[] = [];
+    try {
+      cachedRows = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+    } catch { }
+
+    // Merge and deduplicate by id
+    const map = new Map<string, Note>();
+    [...dbRows, ...cachedRows].forEach(r => {
+      if (r && r.id && !map.has(r.id)) {
+        if (category === "all" || r.category === category) {
+          map.set(r.id, r);
+        }
+      }
+    });
+
+    const merged = Array.from(map.values()).sort((a, b) => {
+      const timeA = new Date(a.signed_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.signed_at || b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+
+    setRows(merged);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadNotes();
+    const handleUpdate = () => loadNotes();
+    window.addEventListener("rka_chart_note_updated", handleUpdate);
+    return () => window.removeEventListener("rka_chart_note_updated", handleUpdate);
   }, [category, range]);
 
   const filtered = useMemo(() => {
