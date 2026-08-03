@@ -13,6 +13,7 @@ import {
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsHelp } from "@/components/staff/KeyboardShortcutsHelp";
 import { StaffBottomNav } from "@/components/staff/StaffBottomNav";
+import { HipaaMandatoryAcknowledgementModal } from "@/components/staff/HipaaMandatoryAcknowledgementModal";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   Menu, Sun, Inbox, MessageSquare, Calendar as CalIcon, Clock,
@@ -471,6 +472,7 @@ export default function StaffLayout() {
 
   return (
     <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-background flex flex-col">
+      <HipaaMandatoryAcknowledgementModal />
       {/* Top Full-width Portal Header Bar */}
       <header className="w-full border-b border-border bg-card/80 backdrop-blur px-4 md:px-6 py-2.5 flex items-center justify-between z-30 shrink-0">
         {/* Left Corner: Mobile Menu & Company Logo */}

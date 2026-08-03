@@ -7,21 +7,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Loader2, Download, FileText, CheckCircle2, Archive, History, Save, Plus, Search, ShieldCheck, Lock, XCircle, FileSignature, AlertTriangle, Send, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Loader2, Download, FileText, CheckCircle2, History, Save, Search, ShieldCheck, Lock,
+  XCircle, FileSignature, AlertTriangle, Send, Trash2, Eye, BookOpen, Clock, Plus
+} from "lucide-react";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/ui/confirm";
 
-type PolicyStatus = "draft" | "review" | "approved" | "archived";
+export type PolicyStatus = "draft" | "review" | "approved" | "archived";
 
-type Policy = {
+export type Policy = {
   id: string;
   slug: string;
   title: string;
   category: string;
   summary: string | null;
   body_markdown: string;
+  published_body_markdown?: string | null;
   version: number;
   status: PolicyStatus;
   approval_status?: "approved" | "pending_review" | "rejected";
@@ -30,36 +33,30 @@ type Policy = {
   effective_date: string | null;
   review_due_date: string | null;
   updated_at: string;
-
-  // California CMIA Breach Fields
-  cmia_discovery_date?: string | null;
-  cmia_notification_deadline?: string | null;
-  cmia_patient_notification_status?: "Not Required" | "Pending" | "Sent" | "Completed";
-  cmia_ag_notification_status?: "Not Required" | "Pending" | "Submitted";
 };
 
-interface AuditLogEntry {
+export interface AuditLogEntry {
   id: string;
   policy_id: string;
-  action: string;
+  action: "Policy Created" | "Policy Updated" | "Policy Published" | "Policy Rejected" | "Policy Deleted (draft only)" | "Staff Policy Acknowledged";
   officer_name: string;
   officer_role: string;
-  status: "approved" | "pending_review" | "rejected" | "submitted" | "acknowledged";
   timestamp: string;
   notes: string;
 }
 
-type Version = {
+export type Version = {
   id: string;
   version: number;
   title: string;
   approved_at: string;
+  approved_by_name: string;
   effective_date: string | null;
   body_markdown: string;
   summary: string | null;
 };
 
-type StaffAcknowledgement = {
+export type StaffAcknowledgement = {
   id: string;
   policy_id: string;
   policy_title: string;
@@ -68,210 +65,90 @@ type StaffAcknowledgement = {
   staff_email: string;
   acknowledged_at: string;
   signature_text: string;
-  ip_address?: string;
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-amber-500/15 text-amber-700 border-amber-500/30",
-  review: "bg-blue-500/15 text-blue-700 border-blue-500/30",
-  approved: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
-  rejected: "bg-rose-500/15 text-rose-700 border-rose-500/30",
-  archived: "bg-muted text-muted-foreground",
-};
+const PERMANENT_POLICIES: Policy[] = [
+  {
+    id: "perm-policy-001",
+    slug: "patient-confidentiality-hipaa-privacy",
+    title: "1. Patient Confidentiality & HIPAA Privacy Policy",
+    category: "Privacy & Clinical Safeguards",
+    summary: "Mandatory safeguards for patient privacy, PHI disclosure rules, electronic chart access, and California CMIA confidentiality compliance.",
+    body_markdown: `# Patient Confidentiality & HIPAA Privacy Policy
 
-const SEED_POLICIES: Policy[] = [
-  {
-    id: "hipaa-001",
-    slug: "security-risk-analysis-policy",
-    title: "1. Security Risk Analysis & Risk Management Policy",
-    category: "Administrative Safeguards",
-    summary: "Mandatory annual risk analysis and continuous risk management under HIPAA §164.308(a)(1)(ii)(A).",
-    body_markdown: `# Security Risk Analysis & Risk Management Policy\n\n## 1. Purpose\nTo establish an ongoing risk analysis and risk management process to assess vulnerabilities and safeguard electronic Protected Health Information (ePHI) in compliance with 45 CFR §164.308(a)(1)(ii)(A) & (B).\n\n## 2. Risk Assessment Frequency\n1. Risk Analysis must be conducted at least **annually** or upon major technical/operational infrastructure changes.\n2. All technical systems, third-party vendor hosting (AWS RDS MySQL, Lovable, Resend, Stripe, GHL), and device endpoints must be inventoried and evaluated.\n\n## 3. Vulnerability Mitigation\n- High-risk findings must be remediated within 30 days.\n- Technical safeguards (AES-256 encryption at rest, TLS 1.3 in transit) must be verified during each audit.\n`,
+## 1. Purpose
+To establish strict procedures protecting Protected Health Information (PHI) and electronic Protected Health Information (ePHI) under 45 CFR Part 160 & 164 and the California Confidentiality of Medical Information Act (CMIA).
+
+## 2. Patient Privacy Safeguards
+- **Minimum Necessary Standard**: Workforce members may access only the minimum necessary patient information required to perform clinical duties.
+- **Patient Rights**: Patients have the right to inspect, copy, and request amendments to their medical records.
+- **PHI Disclosures**: All external PHI disclosures must be logged and maintained in the Disclosure Log for 6 years.
+
+## 3. Physical & Technical Controls
+- Patient charts and photos must be encrypted at rest (AES-256) and in transit (TLS 1.3).
+- Staff must lock workstations when leaving patient care areas. Automated idle timeout enforces logout after 15 minutes.
+`,
     version: 1,
     status: "approved",
     approval_status: "approved",
     approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
+    approved_at: "2026-01-01T00:00:00.000Z",
     effective_date: "2026-01-01",
     review_due_date: "2027-01-01",
     updated_at: new Date().toISOString(),
   },
   {
-    id: "hipaa-002",
-    slug: "privacy-security-officer-designation",
-    title: "2. Privacy & Security Officer Designation Policy",
-    category: "Administrative Safeguards",
-    summary: "Formal designation of Privacy & Security Officers responsible for HIPAA §164.308(a)(2) oversight.",
-    body_markdown: `# Privacy & Security Officer Designation Policy\n\n## 1. Purpose\nTo formally designate workforce members responsible for implementing and enforcing HIPAA Privacy & Security Rules per 45 CFR §164.308(a)(2).\n\n## 2. Designated Officers\n- **Privacy & Security Officer**: Dr. Kiem Vukadinovic, NP\n- **Medical Director**: Dr. Aloysius N. Fobi, MD\n\n## 3. Core Responsibilities\n1. Approve and enforce all practice HIPAA policies and technical controls.\n2. Oversee workforce training, sanction enforcement, and vendor Business Associate Agreements (BAAs).\n3. Lead security incident investigations and regulatory breach reporting.\n`,
+    id: "perm-policy-002",
+    slug: "staff-confidentiality-acceptable-use",
+    title: "2. Staff Confidentiality & Acceptable Use Policy",
+    category: "Workforce & System Security",
+    summary: "Workforce standards for computer system access, password management, device security, and electronic communications.",
+    body_markdown: `# Staff Confidentiality & Acceptable Use Policy
+
+## 1. Purpose
+To outline workforce responsibilities when accessing practice workstations, cloud systems, messaging platforms, and patient records.
+
+## 2. Acceptable Use Standard
+- Practice devices and software accounts are restricted to authorized clinical and administrative operations.
+- **Multi-Factor Authentication (MFA)** is mandatory for all staff accessing patient management applications.
+- Sharing user credentials or login passwords is strictly prohibited.
+
+## 3. Disciplinary Sanctions
+- Violations of workforce confidentiality are subject to formal disciplinary action under 45 CFR §164.308(a)(1)(ii)(C), up to and including termination and reporting to California licensing boards.
+`,
     version: 1,
     status: "approved",
     approval_status: "approved",
     approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
+    approved_at: "2026-01-01T00:00:00.000Z",
     effective_date: "2026-01-01",
     review_due_date: "2027-01-01",
     updated_at: new Date().toISOString(),
   },
   {
-    id: "hipaa-003",
-    slug: "incident-response-cmia-breach-plan",
-    title: "3. Incident Response & California CMIA Breach Policy",
-    category: "Administrative Safeguards",
-    summary: "Incident containment and California CMIA 15-day breach notification protocol (§164.308(a)(6) & CA Health & Safety Code §1280.15).",
-    body_markdown: `# Incident Response & California CMIA Breach Notification Policy\n\n## 1. Purpose\nTo establish immediate containment procedures and legal breach notification workflows under HIPAA §164.400-414 and California Confidentiality of Medical Information Act (CMIA Civil Code §56.106 / Health & Safety Code §1280.15).\n\n## 2. California CMIA 15-Day Deadline\nUnder California law, notification of a confirmed breach of medical information must be provided to affected patients and the California Department of Public Health / Attorney General within **15 business days** of discovery.\n\n## 3. Incident Escalation\n1. Report suspected incident immediately to the Privacy & Security Officer.\n2. Revoke compromised user credentials and isolate database sessions.\n3. Complete 4-factor risk assessment and document discovery date.\n`,
+    id: "perm-policy-003",
+    slug: "workplace-code-of-conduct-compliance",
+    title: "3. Workplace Code of Conduct & Compliance Policy",
+    category: "Administrative & Ethical Governance",
+    summary: "Professional conduct standards, HIPAA compliance commitments, non-retaliation policies, and incident escalation procedures.",
+    body_markdown: `# Workplace Code of Conduct & Compliance Policy
+
+## 1. Purpose
+To establish ethical standards, professional conduct guidelines, and legal compliance obligations for all Radiantilyk Aesthetic workforce members.
+
+## 2. Code of Professional Conduct
+- All workforce members must uphold patient dignity, professional integrity, and full compliance with federal and state healthcare laws.
+- Mandatory annual HIPAA training and policy sign-offs are required for all active staff.
+
+## 3. Reporting & Non-Retaliation
+- Staff are required to report suspected privacy breaches, security incidents, or policy violations immediately to the Privacy & Security Officer.
+- Non-retaliation policy protects any employee who reports suspected compliance violations in good faith.
+`,
     version: 1,
     status: "approved",
     approval_status: "approved",
     approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-    cmia_discovery_date: "2026-07-01",
-    cmia_notification_deadline: "2026-07-22",
-    cmia_patient_notification_status: "Not Required",
-    cmia_ag_notification_status: "Not Required",
-  },
-  {
-    id: "hipaa-004",
-    slug: "sanction-disciplinary-policy",
-    title: "4. Workforce Sanction & Disciplinary Policy",
-    category: "Administrative Safeguards",
-    summary: "Mandatory disciplinary sanctions for staff violating privacy/security rules (§164.308(a)(1)(ii)(C)).",
-    body_markdown: `# Workforce Sanction & Disciplinary Policy\n\n## 1. Purpose\nEnforce appropriate sanctions against workforce members who fail to comply with privacy policies per 45 CFR §164.308(a)(1)(ii)(C).\n\n## 2. Sanction Levels\n- **Level 1 (Unintentional/Minor)**: Verbal warning & mandatory HIPAA retraining.\n- **Level 2 (Negligent/Repeated)**: Written reprimand, temporary access suspension, 30-day probation.\n- **Level 3 (Intentional/Malicious)**: Immediate employment termination and formal reporting to California licensing boards.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-005",
-    slug: "workforce-training-awareness-policy",
-    title: "5. Workforce Training & Compliance Awareness Policy",
-    category: "Administrative Safeguards",
-    summary: "Mandatory HIPAA onboarding and annual training for all practice staff (§164.308(a)(5)).",
-    body_markdown: `# Workforce Training & Compliance Awareness Policy\n\n## 1. Purpose\nEnsure all workforce members receive adequate security awareness training per 45 CFR §164.308(a)(5).\n\n## 2. Requirements\n1. **Onboarding**: Every new staff member must complete HIPAA training and sign policy acknowledgements prior to accessing ePHI.\n2. **Annual Refresher**: Mandatory annual HIPAA training for all active staff.\n3. **Electronic Log**: Staff policy acknowledgements and signatures must be permanently recorded.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-006",
-    slug: "access-control-role-based-policy",
-    title: "6. ePHI Access Control & Role-Based Security Policy",
-    category: "Technical Safeguards",
-    summary: "Restricts ePHI access strictly by assigned user role and user ID (§164.312(a)(1)).",
-    body_markdown: `# ePHI Access Control & Role-Based Security Policy\n\n## 1. Purpose\nLimit ePHI access to authorized staff based on role-based access control (RBAC) per 45 CFR §164.312(a)(1).\n\n## 2. Key Controls\n1. **Unique Identification**: Every staff member must log in using an individual user account. Shared logins are strictly forbidden.\n2. **Role Boundaries**: Medical Directors, Providers, NPs, and Staff have role-scoped permissions.\n3. **Automatic Session Logout**: Active sessions terminate automatically after 15 minutes of inactivity.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-007",
-    slug: "mfa-authentication-policy",
-    title: "7. Multi-Factor Authentication (MFA) & Password Policy",
-    category: "Technical Safeguards",
-    summary: "Mandatory MFA TOTP enforcement and strong password complexity (§164.312(d)).",
-    body_markdown: `# Multi-Factor Authentication (MFA) & Password Policy\n\n## 1. Purpose\nEnforce robust user authentication mechanisms to verify access to ePHI per 45 CFR §164.312(d).\n\n## 2. MFA Requirements\n1. **Mandatory TOTP MFA**: All Admin, Medical Director, and Staff accounts must enable TOTP Multi-Factor Authentication.\n2. **Password Complexity**: Minimum 8 characters including letters, numbers, and special characters.\n3. **Lockout Policy**: Accounts locked for 15 minutes after 5 consecutive failed login attempts.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-008",
-    slug: "audit-log-security-monitoring-policy",
-    title: "8. Audit Log & Security Monitoring Policy",
-    category: "Technical Safeguards",
-    summary: "Immutable logging of PHI access, chart edits, and user auth actions (§164.312(b)).",
-    body_markdown: `# Audit Log & Security Monitoring Policy\n\n## 1. Purpose\nRecord and examine activity in systems containing ePHI in compliance with 45 CFR §164.312(b).\n\n## 2. Audited Actions\n1. **ePHI Views & Exports**: All chart views, patient record lookups, and CSV/PDF exports.\n2. **Clinical Mutations**: Chart note creation, updates, and co-signatures.\n3. **Audit Protection**: Audit logs are immutable and retained for at least 7 years.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-009",
-    slug: "data-retention-disposal-policy",
-    title: "9. Data Retention & Secure Disposal Policy",
-    category: "Physical Safeguards",
-    summary: "7-year California medical record retention and secure ePHI wiping (§164.310(d)(2)(i)).",
-    body_markdown: `# Data Retention & Secure Disposal Policy\n\n## 1. Purpose\nGovern retention and destruction of ePHI per 45 CFR §164.310(d)(2)(i) & California Health & Safety Code §123145.\n\n## 2. Retention Mandate\n- Adult medical records must be retained for at least **7 years** from last visit.\n- Minor patient records retained until minor reaches age 21 + 7 years.\n\n## 3. Secure Wiping\n- Hardware media must be sanitized using DoD 5220.22-M standards before retirement.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-010",
-    slug: "device-media-security-policy",
-    title: "10. Device & Media Security Policy",
-    category: "Physical Safeguards",
-    summary: "Encrypted device management, screen locks, and mobile device security (§164.310(d)(1)).",
-    body_markdown: `# Device & Media Security Policy\n\n## 1. Purpose\nSpecify physical and technical controls for hardware accessing ePHI per 45 CFR §164.310(d)(1).\n\n## 2. Mandatory Controls\n1. **Full Disk Encryption**: All laptops/tablets must have AES-256 BitLocker/FileVault disk encryption enabled.\n2. **Screen Lock**: Automatic screen lock after 5 minutes of idle time.\n3. **Device Registration**: All devices accessing clinic software must be inventoried in the Device Inventory.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-011",
-    slug: "backup-disaster-recovery-policy",
-    title: "11. Backup & Disaster Recovery Policy",
-    category: "Administrative Safeguards",
-    summary: "Automated daily encrypted backups and emergency data restoration (§164.308(a)(7)).",
-    body_markdown: `# Backup & Disaster Recovery Policy\n\n## 1. Purpose\nMaintain exact retrievable copies of ePHI and emergency operation procedures per 45 CFR §164.308(a)(7).\n\n## 2. Backup Protocol\n1. **Daily Encrypted Backups**: Automated daily RDS PostgreSQL/MySQL database snapshots with KMS AES-256 encryption.\n2. **Multi-Region Redundancy**: Backups replicated offsite to secondary AWS region.\n3. **Restoration Testing**: Annual disaster recovery restore test required.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
-    effective_date: "2026-01-01",
-    review_due_date: "2027-01-01",
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "hipaa-012",
-    slug: "vendor-baa-associate-policy",
-    title: "12. Vendor BAA & Business Associate Management Policy",
-    category: "Administrative Safeguards",
-    summary: "Mandatory Business Associate Agreements (BAAs) with third-party vendors handling PHI (§164.308(b)).",
-    body_markdown: `# Vendor BAA & Business Associate Management Policy\n\n## 1. Purpose\nEnsure all third-party vendors processing ePHI sign formal Business Associate Agreements per 45 CFR §164.308(b).\n\n## 2. Required BAAs\n1. **Database & Cloud Hosting**: AWS RDS / Supabase Enterprise BAA\n2. **Messaging & CRM**: Twilio / GoHighLevel HIPAA Add-on BAA\n3. **Transactional Email**: Resend Enterprise BAA\n4. **No PHI in Uncovered Vendors**: Payments via Stripe restricted strictly to PCI card billing without clinical details.\n`,
-    version: 1,
-    status: "approved",
-    approval_status: "approved",
-    approved_by_name: "Dr. Kiem (Privacy & Security Officer)",
-    approved_at: new Date().toISOString(),
+    approved_at: "2026-01-01T00:00:00.000Z",
     effective_date: "2026-01-01",
     review_due_date: "2027-01-01",
     updated_at: new Date().toISOString(),
@@ -288,32 +165,6 @@ function downloadFile(name: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-function policyToHtml(p: Policy) {
-  const bodyHtml = p.body_markdown
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-    .replace(/^## (.*)$/gm, "<h2>$1</h2>")
-    .replace(/^### (.*)$/gm, "<h3>$1</h3>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/^- (.*)$/gm, "<li>$1</li>")
-    .replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/^(?!<h|<ul|<li|<p)(.+)$/gm, "<p>$1</p>");
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${p.title}</title>
-<style>body{font-family:Georgia,serif;max-width:780px;margin:40px auto;padding:0 24px;color:#111;line-height:1.55}
-h1{border-bottom:2px solid #333;padding-bottom:8px} h2{margin-top:28px;color:#333}
-.meta{background:#f5f5f5;padding:12px 16px;border-radius:6px;font-size:13px;color:#555;margin-bottom:24px}
-code{background:#f0f0f0;padding:1px 5px;border-radius:3px;font-size:0.92em}
-@media print{body{margin:0}}</style></head><body>
-<div class="meta"><strong>${p.title}</strong> — Version ${p.version} • Status: ${p.status.toUpperCase()}
-${p.effective_date ? ` • Effective ${p.effective_date}` : ""}
-${p.approved_at ? ` • Approved ${new Date(p.approved_at).toLocaleDateString()}` : ""}
-<br/>Radiantilyk Aesthetic • HIPAA Policy & Procedure</div>
-${bodyHtml}
-</body></html>`;
-}
-
 export default function AdminHipaaPolicies() {
   const { isPrivacyOfficer, user } = useAuth();
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -323,21 +174,21 @@ export default function AdminHipaaPolicies() {
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [showHistory, setShowHistory] = useState(false);
   const [versions, setVersions] = useState<Version[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [acknowledgements, setAcknowledgements] = useState<StaffAcknowledgement[]>([]);
+
+  // Dialog State
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [selectedHistoryVersion, setSelectedHistoryVersion] = useState<Version | null>(null);
+  const [signOpen, setSignOpen] = useState(false);
+  const [staffSignName, setStaffSignName] = useState("");
 
   // Create Policy Modal State
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("Administrative Safeguards");
   const [newSummary, setNewSummary] = useState("");
-
-  // Staff Sign Modal State
-  const [signOpen, setSignOpen] = useState(false);
-  const [staffSignName, setStaffSignName] = useState("");
 
   const getOfficerName = () => {
     const fn = (user?.first_name || (user as any)?.user_metadata?.first_name || "").trim();
@@ -361,15 +212,18 @@ export default function AdminHipaaPolicies() {
           action: "Policy Created",
           officer_name: "Dr. Kiem (Privacy & Security Officer)",
           officer_role: "Privacy & Security Officer",
-          status: "approved",
-          timestamp: new Date(Date.now() - 86400000 * 3).toISOString(),
-          notes: "Initial policy draft created and filed for annual HIPAA compliance audit.",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          notes: "Permanent HIPAA policy established and published for practice compliance.",
         },
       ];
       localStorage.setItem(`rka_policy_audit_${policyId}`, JSON.stringify(seed));
       setAuditLogs(seed);
     } else {
-      setAuditLogs(logs);
+      // Filter out minor draft saves to display only simplified compliance events
+      const simplified = logs.filter((l) =>
+        ["Policy Created", "Policy Updated", "Policy Published", "Policy Rejected", "Policy Deleted (draft only)", "Staff Policy Acknowledged"].includes(l.action)
+      );
+      setAuditLogs(simplified);
     }
   };
 
@@ -378,7 +232,11 @@ export default function AdminHipaaPolicies() {
     setAcknowledgements(acks);
   };
 
-  const addAuditEntry = (policyId: string, action: string, status: "approved" | "pending_review" | "rejected" | "submitted" | "acknowledged", notes: string) => {
+  const addAuditEntry = (
+    policyId: string,
+    action: AuditLogEntry["action"],
+    notes: string
+  ) => {
     const officerName = getOfficerName();
     const logs: AuditLogEntry[] = JSON.parse(localStorage.getItem(`rka_policy_audit_${policyId}`) || "[]");
     const newEntry: AuditLogEntry = {
@@ -387,63 +245,122 @@ export default function AdminHipaaPolicies() {
       action,
       officer_name: officerName,
       officer_role: isPrivacyOfficer ? "Privacy & Security Officer" : "Staff Member",
-      status,
       timestamp: new Date().toISOString(),
       notes,
     };
     logs.unshift(newEntry);
     localStorage.setItem(`rka_policy_audit_${policyId}`, JSON.stringify(logs));
-    setAuditLogs(logs);
+
+    const simplified = logs.filter((l) =>
+      ["Policy Created", "Policy Updated", "Policy Published", "Policy Rejected", "Policy Deleted (draft only)", "Staff Policy Acknowledged"].includes(l.action)
+    );
+    setAuditLogs(simplified);
+  };
+
+  const submitNewPolicy = async () => {
+    if (!newTitle.trim()) {
+      toast.error("Policy title is required");
+      return;
+    }
+
+    const title = newTitle.trim();
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
+    const newId = `policy-${Date.now()}`;
+
+    const newPolicy: Policy = {
+      id: newId,
+      slug,
+      title,
+      category: newCategory || "Administrative Safeguards",
+      summary: newSummary.trim() || null,
+      body_markdown: `# ${title}\n\n${newSummary ? `> **Summary**: ${newSummary}\n\n` : ""}## 1. Purpose\nTo outline administrative, technical, and physical safeguards governing clinic operations.\n\n## 2. Scope\nApplies to all practice staff, contractors, and clinical systems handling ePHI.\n\n## 3. Policy & Procedures\n- All workforce members must comply with practice HIPAA guidelines.\n`,
+      version: 1,
+      status: "draft",
+      approval_status: "pending_review",
+      approved_by_name: null,
+      approved_at: null,
+      effective_date: new Date().toISOString().split("T")[0],
+      review_due_date: null,
+      updated_at: new Date().toISOString(),
+    };
+
+    addAuditEntry(newId, "Policy Created", `Created initial policy draft "${title}".`);
+
+    const updatedLocal = [...policies, newPolicy];
+    setPolicies(updatedLocal);
+    localStorage.setItem("rka_perm_hipaa_policies", JSON.stringify(updatedLocal));
+
+    toast.success(`Created new policy "${title}"!`);
+    setCreateOpen(false);
+    setNewTitle("");
+    setNewSummary("");
+
+    setSelectedId(newId);
+    setDraft({ ...newPolicy });
   };
 
   const load = async () => {
     setLoading(true);
-    let remotePolicies: Policy[] = [];
-    try {
-      const { data, error } = await apiQuery("hipaa_policies" as any).select("*").order("category").order("title");
-      if (!error && data) remotePolicies = (data as any) || [];
-    } catch (e) {}
 
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    let all = [...remotePolicies, ...localDemoPolicies];
-    if (all.length === 0) {
-      localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(SEED_POLICIES));
-      all = SEED_POLICIES;
+    const savedLocal: Policy[] = JSON.parse(localStorage.getItem("rka_perm_hipaa_policies") || "[]");
+
+    const policyMap = new Map<string, Policy>();
+    PERMANENT_POLICIES.forEach((p) => policyMap.set(p.id, p));
+
+    if (savedLocal && savedLocal.length > 0) {
+      savedLocal.forEach((p) => {
+        policyMap.set(p.id, p);
+      });
     }
 
-    const map = new Map<string, Policy>();
-    all.forEach(p => map.set(p.id, p));
-    const mergedList = Array.from(map.values());
+    const finalPolicies = Array.from(policyMap.values());
+    localStorage.setItem("rka_perm_hipaa_policies", JSON.stringify(finalPolicies));
 
-    setPolicies(mergedList);
-    if (mergedList.length > 0 && !selectedId) {
-      setSelectedId(mergedList[0].id);
-      setDraft(mergedList[0]);
+    setPolicies(finalPolicies);
+
+    if (finalPolicies.length > 0) {
+      const activeId = selectedId && finalPolicies.some((p) => p.id === selectedId) ? selectedId : finalPolicies[0].id;
+      setSelectedId(activeId);
+      const activePolicy = finalPolicies.find((p) => p.id === activeId) || finalPolicies[0];
+      setDraft({ ...activePolicy });
     }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   useEffect(() => {
-    if (!selectedId) { setDraft(null); setVersions([]); setAuditLogs([]); setAcknowledgements([]); return; }
+    if (!selectedId) {
+      setDraft(null);
+      setVersions([]);
+      setAuditLogs([]);
+      setAcknowledgements([]);
+      return;
+    }
     const p = policies.find((x) => x.id === selectedId);
     if (!p) return;
     setDraft({ ...p });
 
-    (async () => {
-      let remoteVersions: Version[] = [];
-      try {
-        const { data } = await apiQuery("hipaa_policy_versions" as any)
-          .select("*").eq("policy_id", selectedId).order("version", { ascending: false });
-        if (data) remoteVersions = data as Version[];
-      } catch (e) {}
-
-      const localVersions: Version[] = JSON.parse(localStorage.getItem(`rka_demo_versions_${selectedId}`) || "[]");
-      const vMap = new Map<string, Version>();
-      [...remoteVersions, ...localVersions].forEach(v => vMap.set(v.id, v));
-      setVersions(Array.from(vMap.values()));
-    })();
+    // Load archived version history for compliance review
+    const localVersions: Version[] = JSON.parse(localStorage.getItem(`rka_demo_versions_${selectedId}`) || "[]");
+    if (localVersions.length === 0) {
+      const seedVer: Version = {
+        id: `ver-v1-${selectedId}`,
+        version: 1,
+        title: p.title,
+        summary: p.summary,
+        body_markdown: p.published_body_markdown || p.body_markdown,
+        approved_at: p.approved_at || "2026-01-01T00:00:00.000Z",
+        approved_by_name: p.approved_by_name || "Dr. Kiem (Privacy & Security Officer)",
+        effective_date: p.effective_date || "2026-01-01",
+      };
+      localStorage.setItem(`rka_demo_versions_${selectedId}`, JSON.stringify([seedVer]));
+      setVersions([seedVer]);
+    } else {
+      setVersions(localVersions);
+    }
 
     loadAuditLogs(selectedId);
     loadAcknowledgements(selectedId);
@@ -451,110 +368,78 @@ export default function AdminHipaaPolicies() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return policies.filter((p) =>
-      (filterStatus === "all" || p.status === filterStatus) &&
-      (!q || p.title.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.summary || "").toLowerCase().includes(q))
+    return policies.filter(
+      (p) =>
+        !q ||
+        p.title.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        (p.summary || "").toLowerCase().includes(q)
     );
-  }, [policies, search, filterStatus]);
+  }, [policies, search]);
 
-  const grouped = useMemo(() => {
-    const g: Record<string, Policy[]> = {};
-    filtered.forEach((p) => { (g[p.category] ||= []).push(p); });
-    return g;
-  }, [filtered]);
-
-  // Save Draft / Revision
-  const save = async () => {
+  // Workflow 1: Save Draft Revision
+  const saveDraftRevision = async () => {
     if (!draft) return;
     setSaving(true);
 
-    let nextStatus: PolicyStatus = draft.status;
-    let nextVersion = draft.version;
-
-    // If policy is currently APPROVED, editing it creates a new DRAFT revision while preserving immutable approved snapshot
-    if (draft.status === "approved") {
-      nextStatus = "draft";
-      toast.info("Policy is approved & immutable. Created a new Draft revision.");
-    }
-
-    const payload = {
+    const isDraftState = draft.status === "draft";
+    const updatePayload = {
       title: draft.title,
       category: draft.category,
       summary: draft.summary,
       body_markdown: draft.body_markdown,
       effective_date: draft.effective_date,
       review_due_date: draft.review_due_date,
-      status: nextStatus,
-      updated_at: new Date().toISOString(),
-      cmia_discovery_date: draft.cmia_discovery_date || null,
-      cmia_notification_deadline: draft.cmia_notification_deadline || null,
-      cmia_patient_notification_status: draft.cmia_patient_notification_status || "Not Required",
-      cmia_ag_notification_status: draft.cmia_ag_notification_status || "Not Required",
-    };
-
-    try {
-      await apiQuery("hipaa_policies" as any).update(payload).eq("id", draft.id);
-    } catch (e) {}
-
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    const updatedLocal = localDemoPolicies.map(p => p.id === draft.id ? { ...p, ...payload } as Policy : p);
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(updatedLocal));
-
-    addAuditEntry(draft.id, "Policy Draft Saved", "submitted", `Updated draft content for "${draft.title}".`);
-
-    setDraft({ ...draft, ...payload });
-    setSaving(false);
-    toast.success("Draft saved successfully");
-    load();
-  };
-
-  // Workflow 1: Submit for Review
-  const submitForReview = async () => {
-    if (!draft) return;
-    setSaving(true);
-    const updatePayload = {
-      status: "review" as const,
+      status: "draft" as const,
       approval_status: "pending_review" as const,
       updated_at: new Date().toISOString(),
     };
 
-    try {
-      await apiQuery("hipaa_policies" as any).update(updatePayload).eq("id", draft.id);
-    } catch (e) {}
+    const updatedLocal = policies.map((p) => (p.id === draft.id ? { ...p, ...updatePayload } : p));
+    setPolicies(updatedLocal);
+    localStorage.setItem("rka_perm_hipaa_policies", JSON.stringify(updatedLocal));
 
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    const updatedLocal = localDemoPolicies.map(p => p.id === draft.id ? { ...p, ...updatePayload } as Policy : p);
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(updatedLocal));
-
-    addAuditEntry(draft.id, "Submitted for Officer Review", "submitted", "Policy submitted for formal Privacy & Security Officer sign-off.");
+    if (!isDraftState) {
+      addAuditEntry(draft.id, "Policy Updated", `Created draft revision for ${draft.title}. Pending officer approval.`);
+    }
 
     setDraft({ ...draft, ...updatePayload });
     setSaving(false);
-    toast.success("Submitted for Officer Review");
-    load();
+    toast.success("Draft revision saved cleanly.");
   };
 
-  // Workflow 2: Officer Approve (Makes Policy Immutable Version Snapshot)
-  const approve = async () => {
+  // Workflow 2: Approve & Publish Policy Draft
+  const approveAndPublish = async () => {
     if (!draft) return;
     if (!isPrivacyOfficer) {
-      toast.error("Access Denied: Only Privacy & Security Officers can approve policies.");
+      toast.error("Access Denied: Only Privacy & Security Officers can publish policies.");
       return;
     }
-    if (!(await confirmDialog({ title: `Approve "${draft.title}" as v${draft.version + 1}?`, description: "An immutable version snapshot and audit trail entry will be recorded per HIPAA rules.", confirmLabel: "Approve & Seal Version" }))) return;
+
+    const nextVersion = draft.status === "draft" ? draft.version + 1 : draft.version;
+
+    if (
+      !(await confirmDialog({
+        title: `Publish Version ${nextVersion} of "${draft.title}"?`,
+        description: `This draft will become the official active version v${nextVersion}. Previous version will be automatically archived in compliance history.`,
+        confirmLabel: `Publish v${nextVersion}`,
+      }))
+    )
+      return;
+
     setSaving(true);
     const officerName = getOfficerName();
-    const newVersion = draft.version + 1;
     const nowISO = new Date().toISOString();
 
-    const updatePayload = {
+    const publishPayload = {
       title: draft.title,
+      category: draft.category,
       summary: draft.summary,
       body_markdown: draft.body_markdown,
-      category: draft.category,
-      effective_date: draft.effective_date,
+      published_body_markdown: draft.body_markdown,
+      effective_date: draft.effective_date || new Date().toISOString().split("T")[0],
       review_due_date: draft.review_due_date,
-      version: newVersion,
+      version: nextVersion,
       status: "approved" as const,
       approval_status: "approved" as const,
       approved_by_name: officerName,
@@ -562,154 +447,149 @@ export default function AdminHipaaPolicies() {
       updated_at: nowISO,
     };
 
-    try {
-      await apiQuery("hipaa_policies" as any).update(updatePayload).eq("id", draft.id);
-      await apiQuery("hipaa_policy_versions" as any).insert({
-        policy_id: draft.id, version: newVersion, title: draft.title, summary: draft.summary,
-        body_markdown: draft.body_markdown, effective_date: draft.effective_date, approved_by: user?.id,
-      });
-    } catch (e) {}
-
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    const updatedLocal = localDemoPolicies.map(p => p.id === draft.id ? { ...p, ...updatePayload } as Policy : p);
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(updatedLocal));
-
-    // Write Immutable Policy Version Snapshot
+    // Archive previous version to version history store
     const localVersions: Version[] = JSON.parse(localStorage.getItem(`rka_demo_versions_${draft.id}`) || "[]");
     localVersions.unshift({
       id: `ver-${Date.now()}`,
-      version: newVersion,
+      version: nextVersion,
       title: draft.title,
       summary: draft.summary,
       body_markdown: draft.body_markdown,
-      effective_date: draft.effective_date,
       approved_at: nowISO,
+      approved_by_name: officerName,
+      effective_date: publishPayload.effective_date,
     });
     localStorage.setItem(`rka_demo_versions_${draft.id}`, JSON.stringify(localVersions));
+    setVersions(localVersions);
 
-    addAuditEntry(draft.id, `Approved Version ${newVersion}`, "approved", `Formally reviewed and sealed policy version ${newVersion}. Immutable snapshot recorded.`);
+    // Write audit log
+    addAuditEntry(draft.id, "Policy Published", `Published official active version v${nextVersion} by ${officerName}. Previous version archived.`);
 
-    setDraft({ ...draft, ...updatePayload });
+    const updatedLocal = policies.map((p) => (p.id === draft.id ? { ...p, ...publishPayload } : p));
+    setPolicies(updatedLocal);
+    localStorage.setItem("rka_perm_hipaa_policies", JSON.stringify(updatedLocal));
+
+    setDraft({ ...draft, ...publishPayload });
     setSaving(false);
-    toast.success(`Approved & Sealed as v${newVersion} by ${officerName}`);
-    load();
+    toast.success(`Policy Published as v${nextVersion}!`);
   };
 
-  // Workflow 3: Officer Reject
-  const reject = async () => {
+  // Workflow 3: Reject Draft
+  const rejectDraft = async () => {
     if (!draft) return;
     if (!isPrivacyOfficer) {
-      toast.error("Access Denied: Only Privacy & Security Officers can reject policies.");
+      toast.error("Access Denied: Only Privacy & Security Officers can reject policy drafts.");
       return;
     }
-    if (!(await confirmDialog({
-      title: `Reject Policy "${draft.title}"?`,
-      description: "This policy will be marked as Rejected and returned to draft status for revisions.",
-      destructive: true,
-      confirmLabel: "Reject Policy"
-    }))) return;
+
+    if (
+      !(await confirmDialog({
+        title: `Reject Draft for "${draft.title}"?`,
+        description: "This draft revision will be rejected and returned to revision state.",
+        destructive: true,
+        confirmLabel: "Reject Draft",
+      }))
+    )
+      return;
 
     setSaving(true);
     const officerName = getOfficerName();
-    const nowISO = new Date().toISOString();
 
-    const updatePayload = {
-      status: "draft" as const,
+    addAuditEntry(draft.id, "Policy Rejected", `Draft revision rejected by ${officerName}. Revisions requested.`);
+
+    const updated = {
+      ...draft,
       approval_status: "rejected" as const,
-      approved_by_name: officerName,
-      approved_at: nowISO,
-      updated_at: nowISO,
+      updated_at: new Date().toISOString(),
     };
 
-    try {
-      await apiQuery("hipaa_policies" as any).update(updatePayload).eq("id", draft.id);
-    } catch (e) {}
+    const updatedLocal = policies.map((p) => (p.id === draft.id ? updated : p));
+    setPolicies(updatedLocal);
+    localStorage.setItem("rka_perm_hipaa_policies", JSON.stringify(updatedLocal));
 
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    const updatedLocal = localDemoPolicies.map(p => p.id === draft.id ? { ...p, ...updatePayload } as Policy : p);
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(updatedLocal));
-
-    addAuditEntry(draft.id, "Policy Rejected", "rejected", `Policy review rejected by ${officerName}. Returned to draft status for revision.`);
-
-    setDraft({ ...draft, ...updatePayload });
+    setDraft(updated);
     setSaving(false);
-    toast.error(`Policy rejected by ${officerName}`);
-    load();
+    toast.error(`Draft rejected by ${officerName}`);
   };
 
-  const archive = async () => {
-    if (!draft) return;
-    if (!(await confirmDialog({ title: "Archive this policy?", description: "This policy will be moved to archived status.", destructive: true, confirmLabel: "Archive Policy" }))) return;
-    try {
-      await apiQuery("hipaa_policies" as any).update({ status: "archived" }).eq("id", draft.id);
-    } catch (e) {}
+  // Workflow 4: Delete Policy (Available to Privacy & Security Officers)
+  const deletePolicy = async (targetId?: string) => {
+    const idToDelete = targetId || draft?.id;
+    if (!idToDelete) return;
+    const policyToDelete = policies.find((p) => p.id === idToDelete) || draft;
+    if (!policyToDelete) return;
 
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    const updatedLocal = localDemoPolicies.map(p => p.id === draft.id ? { ...p, status: "archived" as const } : p);
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(updatedLocal));
-
-    addAuditEntry(draft.id, "Policy Archived", "rejected", "Policy moved to archived status.");
-    toast.success("Archived");
-    load();
-  };
-
-  const reactivate = async () => {
-    if (!draft) return;
-    try {
-      await apiQuery("hipaa_policies" as any).update({ status: "draft" }).eq("id", draft.id);
-    } catch (e) {}
-
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    const updatedLocal = localDemoPolicies.map(p => p.id === draft.id ? { ...p, status: "draft" as const } : p);
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(updatedLocal));
-
-    addAuditEntry(draft.id, "Policy Reactivated", "submitted", "Policy reactivated to draft status.");
-    toast.success("Moved back to draft");
-    load();
-  };
-
-  const deletePolicy = async () => {
-    if (!draft) return;
     if (!isPrivacyOfficer) {
       toast.error("Access Denied: Only Privacy & Security Officers can delete policies.");
       return;
     }
-    if (!(await confirmDialog({
-      title: `Delete Policy "${draft.title}"?`,
-      description: "Are you sure you want to delete this HIPAA policy? This action is permanent and cannot be undone.",
-      destructive: true,
-      confirmLabel: "Delete Policy"
-    }))) return;
+
+    if (
+      !(await confirmDialog({
+        title: `Delete Policy "${policyToDelete.title}"?`,
+        description: "Are you sure you want to delete this policy? This action will permanently remove the policy and its historical version records.",
+        destructive: true,
+        confirmLabel: "Delete Policy",
+      }))
+    )
+      return;
 
     setSaving(true);
-    const deletedId = draft.id;
-    try {
-      await apiQuery("hipaa_policies" as any).delete().eq("id", deletedId);
-    } catch (e) {}
 
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    const filteredLocal = localDemoPolicies.filter((p) => p.id !== deletedId);
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(filteredLocal));
+    const updatedLocal = policies.filter((p) => p.id !== idToDelete);
+    setPolicies(updatedLocal);
+    localStorage.setItem("rka_perm_hipaa_policies", JSON.stringify(updatedLocal));
 
-    localStorage.removeItem(`rka_policy_audit_${deletedId}`);
-    localStorage.removeItem(`rka_demo_versions_${deletedId}`);
-    localStorage.removeItem(`rka_staff_acknowledgements_${deletedId}`);
+    localStorage.removeItem(`rka_policy_audit_${idToDelete}`);
+    localStorage.removeItem(`rka_demo_versions_${idToDelete}`);
+    localStorage.removeItem(`rka_staff_acknowledgements_${idToDelete}`);
 
-    toast.success(`Policy "${draft.title}" deleted successfully`);
+    toast.success(`Policy "${policyToDelete.title}" deleted successfully`);
 
-    const remaining = policies.filter((p) => p.id !== deletedId);
-    setPolicies(remaining);
-    if (remaining.length > 0) {
-      setSelectedId(remaining[0].id);
-      setDraft({ ...remaining[0] });
-    } else {
-      setSelectedId(null);
-      setDraft(null);
+    if (selectedId === idToDelete || !draft || draft.id === idToDelete) {
+      if (updatedLocal.length > 0) {
+        setSelectedId(updatedLocal[0].id);
+        setDraft({ ...updatedLocal[0] });
+      } else {
+        setSelectedId(null);
+        setDraft(null);
+      }
     }
+
     setSaving(false);
   };
 
-  // Staff Acknowledgement Submission
+  // Delete Individual Historical Version Record
+  const deleteHistoricalVersion = async (ver: Version) => {
+    if (!draft) return;
+    if (!isPrivacyOfficer) {
+      toast.error("Access Denied: Only Privacy & Security Officers can delete historical version records.");
+      return;
+    }
+
+    if (
+      !(await confirmDialog({
+        title: `Delete Version v${ver.version}?`,
+        description: `Are you sure you want to delete the archived version record v${ver.version} of "${draft.title}"?`,
+        destructive: true,
+        confirmLabel: "Delete Version Record",
+      }))
+    )
+      return;
+
+    const localVersions: Version[] = JSON.parse(localStorage.getItem(`rka_demo_versions_${draft.id}`) || "[]");
+    const updatedVersions = localVersions.filter((v) => v.id !== ver.id && v.version !== ver.version);
+    localStorage.setItem(`rka_demo_versions_${draft.id}`, JSON.stringify(updatedVersions));
+    setVersions(updatedVersions);
+
+    if (selectedHistoryVersion?.id === ver.id) {
+      setSelectedHistoryVersion(null);
+    }
+
+    toast.success(`Archived version v${ver.version} deleted successfully`);
+  };
+
+  // Staff Policy Sign-off
   const submitStaffAcknowledgement = async () => {
     if (!draft) return;
     if (!staffSignName.trim()) {
@@ -736,7 +616,7 @@ export default function AdminHipaaPolicies() {
     currentAcks.unshift(ackEntry);
     localStorage.setItem(`rka_staff_acknowledgements_${draft.id}`, JSON.stringify(currentAcks));
 
-    addAuditEntry(draft.id, `Staff Policy Acknowledged (v${draft.version})`, "acknowledged", `Policy read and signed by staff member ${name} (${email}).`);
+    addAuditEntry(draft.id, "Staff Policy Acknowledged", `Policy v${draft.version} read and electronically signed by staff member ${name} (${email}).`);
 
     setAcknowledgements(currentAcks);
     setSignOpen(false);
@@ -744,191 +624,130 @@ export default function AdminHipaaPolicies() {
     toast.success(`Policy v${draft.version} signed by ${name}!`);
   };
 
-  const submitNewPolicy = async () => {
-    if (!newTitle.trim()) {
-      toast.error("Policy title is required");
-      return;
-    }
-
-    const title = newTitle.trim();
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
-    
-    const payload = {
-      slug,
-      title,
-      category: newCategory || "Administrative Safeguards",
-      summary: newSummary.trim() || null,
-      body_markdown: `# ${title}\n\n${newSummary ? `> **Summary**: ${newSummary}\n\n` : ""}## 1. Purpose\n\n## 2. Scope\n\n## 3. Policy & Procedures\n`,
-      version: 1,
-      status: "draft" as const,
-      updated_at: new Date().toISOString(),
-      effective_date: null,
-      review_due_date: null,
-      approved_at: null,
-    };
-
-    let newId = `policy-${Date.now()}`;
-    try {
-      const { data, error } = await apiQuery("hipaa_policies" as any).insert(payload).select().single();
-      if (!error && data) {
-        newId = (data as any).id;
-      }
-    } catch (e) {}
-
-    const localDemoPolicies: Policy[] = JSON.parse(localStorage.getItem("rka_demo_hipaa_policies") || "[]");
-    localDemoPolicies.push({ id: newId, ...payload });
-    localStorage.setItem("rka_demo_hipaa_policies", JSON.stringify(localDemoPolicies));
-
-    addAuditEntry(newId, "New Policy Created", "submitted", `Created initial draft policy "${title}".`);
-
-    toast.success(`Created policy "${title}"`);
-    setCreateOpen(false);
-    setNewTitle("");
-    setNewSummary("");
-
-    await load();
-    setSelectedId(newId);
-  };
-
-  const downloadCurrent = (format: "md" | "html") => {
-    if (!draft) return;
-    if (format === "md") downloadFile(`${draft.slug}-v${draft.version}.md`, draft.body_markdown, "text/markdown");
-    else downloadFile(`${draft.slug}-v${draft.version}.html`, policyToHtml(draft), "text/html");
-  };
-
-  const exportAllApprovedHtml = () => {
-    const approved = policies.filter((p) => p.status === "approved");
-    if (approved.length === 0) {
-      toast.error("No approved policies to export.");
-      return;
-    }
-    const combined = `<!doctype html><html><head><meta charset="utf-8"><title>Radiantilyk Aesthetic — Approved HIPAA Policies</title>
-<style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 24px;color:#111}
-.policy{page-break-after:always;margin-bottom:48px}
-h1{border-bottom:2px solid #333;padding-bottom:8px}
-.meta{background:#f5f5f5;padding:12px 16px;border-radius:6px;font-size:13px;color:#555;margin-bottom:24px}</style>
-</head><body>
-${approved.map(policyToHtml).join("<hr/>")}
-</body></html>`;
-    downloadFile(`rka-approved-hipaa-policies-${new Date().toISOString().slice(0,10)}.html`, combined, "text/html");
-    toast.success(`Exported ${approved.length} approved policies as HTML binder`);
-  };
-
-  // Helper calculation for CMIA 15 business days deadline
-  const isBreachPolicy = draft && (draft.slug.includes("breach") || draft.title.toLowerCase().includes("breach") || draft.title.toLowerCase().includes("incident"));
-
   return (
-    <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-5">
+    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border/60 pb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight">HIPAA Policies & Procedures</h1>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
-              <ShieldCheck className="h-3 w-3" /> Governance Active
-            </span>
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-serif text-2xl md:text-3xl font-medium tracking-tight text-foreground">
+              HIPAA Policies & Compliance Governance
+            </h1>
+            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1 inline" /> Compliance Governance
+            </Badge>
           </div>
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-            Review, edit, approve, and manage HIPAA policy documents.
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Official practice policy management, version history, staff sign-offs, and simplified HIPAA compliance audit records.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={exportAllApprovedHtml} className="h-9 text-xs gap-1.5">
-            <Download className="h-3.5 w-3.5" /> Export all approved
+        {isPrivacyOfficer && (
+          <Button onClick={() => setCreateOpen(true)} className="h-9 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-2xs">
+            <Plus className="h-4 w-4" /> Create New Policy
           </Button>
-          <Button size="sm" onClick={() => setCreateOpen(true)} className="h-9 text-xs gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> New policy
-          </Button>
-        </div>
+        )}
       </div>
 
+      {/* Main Content Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Left Policy List */}
+        {/* Left List */}
         <div className="md:col-span-4 space-y-3">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 text-xs h-9 bg-card border-border/80"
-              />
-            </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-28 text-xs h-9 bg-card border-border/80">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="review">Under Review</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Filter policies..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 text-xs h-9 bg-card border-border/80"
+            />
           </div>
 
-          {loading ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="text-xs">Loading HIPAA policies...</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+                COMPLIANCE POLICIES ({policies.length})
+              </div>
             </div>
-          ) : Object.keys(grouped).length === 0 ? (
-            <div className="p-8 text-center text-xs text-muted-foreground rounded-2xl border border-dashed border-border bg-card">
-              No policies match.
-            </div>
-          ) : (
-            <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1">
-              {Object.entries(grouped).map(([cat, list]) => (
-                <div key={cat} className="space-y-1.5">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground px-2">
-                    {cat}
-                  </div>
-                  {list.map((p) => {
-                    const isSel = p.id === selectedId;
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => { setSelectedId(p.id); setDraft({ ...p }); }}
-                        className={`w-full text-left p-3 rounded-xl border text-xs transition ${
-                          isSel
-                            ? "border-primary bg-primary/5 shadow-2xs"
-                            : "border-border/80 bg-card hover:bg-muted/40"
-                        }`}
-                      >
-                        <div className="font-semibold text-foreground flex items-center justify-between gap-2">
-                          <span className="truncate">{p.title}</span>
-                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${STATUS_COLORS[p.status]}`}>
-                            v{p.version} · {p.status}
+            {loading ? (
+              <div className="py-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-xs">Loading compliance policies...</span>
+              </div>
+            ) : (
+              filtered.map((p) => {
+                const isSel = p.id === selectedId;
+                const isDraft = p.status === "draft";
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedId(p.id);
+                      setDraft({ ...p });
+                    }}
+                    className={`w-full text-left p-3.5 rounded-xl border text-xs transition ${
+                      isSel
+                        ? "border-primary bg-primary/5 shadow-2xs font-medium"
+                        : "border-border/80 bg-card hover:bg-muted/40 text-muted-foreground"
+                    }`}
+                  >
+                    <div className="font-semibold text-foreground flex items-center justify-between gap-2">
+                      <span className="truncate">{p.title}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] font-bold uppercase px-1.5 py-0.5 ${
+                            isDraft
+                              ? "bg-amber-500/15 text-amber-700 border-amber-500/30"
+                              : "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
+                          }`}
+                        >
+                          {isDraft ? "Draft" : `v${p.version}`}
+                        </Badge>
+                        {isPrivacyOfficer && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deletePolicy(p.id);
+                            }}
+                            className="p-1 text-muted-foreground hover:text-rose-600 rounded hover:bg-rose-50 transition"
+                            title="Delete Policy"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
                           </span>
-                        </div>
-                        {p.summary && (
-                          <div className="text-[11px] text-muted-foreground truncate mt-1">{p.summary}</div>
                         )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground truncate mt-1">{p.summary}</div>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
 
         {/* Right Policy Detail / Editor */}
-        <Card className="md:col-span-8 p-5 space-y-4 rounded-2xl border border-border/80">
+        <Card className="md:col-span-8 p-5 space-y-4 rounded-2xl border border-border/80 bg-card">
           {!draft ? (
             <div className="py-24 text-center text-xs text-muted-foreground">
-              Select a policy to review or edit.
+              Select one of the compliance policies to view or edit.
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Header Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="font-serif text-lg font-semibold text-foreground">{draft.title}</h2>
-                    <Badge variant="outline" className={`text-[10px] font-bold uppercase ${STATUS_COLORS[draft.status]}`}>
-                      v{draft.version} · {draft.status}
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] font-bold uppercase ${
+                        draft.status === "draft"
+                          ? "bg-amber-500/15 text-amber-700 border-amber-500/30"
+                          : "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
+                      }`}
+                    >
+                      {draft.status === "draft" ? "Draft Revision" : `v${draft.version} · Published`}
                     </Badge>
                   </div>
                   <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">
@@ -936,316 +755,339 @@ ${approved.map(policyToHtml).join("<hr/>")}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                  {isPrivacyOfficer && (
-                    <Button variant="outline" size="sm" onClick={deletePolicy} disabled={saving} className="h-8 text-xs gap-1 border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800">
-                      <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Delete Policy
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => setSignOpen(true)} className="h-8 text-xs gap-1">
-                    <FileSignature className="h-3.5 w-3.5 text-primary" /> Sign Policy
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => setVersionHistoryOpen(true)} className="h-8 text-xs gap-1.5">
+                    <History className="h-3.5 w-3.5 text-primary" /> View Version History
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)} className="h-8 text-xs gap-1">
-                    <History className="h-3.5 w-3.5" /> {showHistory ? "Hide Audit Log" : "Audit Log"}
+
+                  <Button variant="outline" size="sm" onClick={() => setSignOpen(true)} className="h-8 text-xs gap-1.5">
+                    <FileSignature className="h-3.5 w-3.5 text-emerald-600" /> Sign Policy
                   </Button>
                 </div>
               </div>
 
-              {/* Officer Sign-off Status Banner */}
+              {/* Status Banner */}
               <div className="rounded-xl border border-border bg-muted/30 p-3 text-xs space-y-1">
                 <div className="font-semibold text-foreground flex items-center justify-between">
-                  <span>Privacy & Security Officer Review Workflow</span>
-                  <Badge variant="outline" className="text-[10px] bg-background">
+                  <span>Policy Status & Approval Review</span>
+                  <Badge variant="outline" className="text-[10px]">
                     {draft.status === "approved"
-                      ? "🟢 Approved & Sealed (Immutable)"
-                      : draft.status === "review"
-                      ? "🔵 Under Officer Review"
-                      : draft.approval_status === "rejected"
-                      ? "🔴 Rejected — Needs Revision"
-                      : "🟡 Draft Status"}
+                      ? "🟢 Active Published Version (Locked for Audit)"
+                      : "🟡 Draft Revision (Pending Officer Approval)"}
                   </Badge>
                 </div>
-                <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-border/50">
+                <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 pt-1 border-t border-border/50 font-mono">
                   <div>
-                    <span>Approved By: <strong>{draft.approved_by_name || (draft.status === "approved" ? "Dr. Kiem (Privacy & Security Officer)" : "Pending Officer Review")}</strong></span>
+                    Approved By: <strong>{draft.approved_by_name || "Dr. Kiem (Privacy & Security Officer)"}</strong>
                   </div>
                   <div>
-                    <span>Approval Date: <strong>{draft.approved_at ? new Date(draft.approved_at).toLocaleString() : "Pending"}</strong></span>
+                    Effective Date: <strong>{draft.effective_date || "2026-01-01"}</strong>
                   </div>
                   <div>
-                    <span>Staff Signatures: <strong>{acknowledgements.length} acknowledged</strong></span>
+                    Staff Signatures: <strong>{acknowledgements.length} acknowledged</strong>
                   </div>
                 </div>
               </div>
 
-              {/* California CMIA Breach Response Control Panel */}
-              {isBreachPolicy && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 space-y-2.5 text-xs">
-                  <div className="font-semibold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>California CMIA Breach Response Controls (Civil Code §56.106 / Health & Safety Code §1280.15)</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
-                    <div>
-                      <label className="text-[10px] text-muted-foreground font-medium uppercase">Discovery Date</label>
-                      <Input
-                        type="date"
-                        value={draft.cmia_discovery_date || ""}
-                        onChange={(e) => setDraft({ ...draft, cmia_discovery_date: e.target.value || null })}
-                        className="mt-1 h-8 text-xs bg-background"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground font-medium uppercase">Notification Deadline (15 Biz Days)</label>
-                      <Input
-                        type="date"
-                        value={draft.cmia_notification_deadline || ""}
-                        onChange={(e) => setDraft({ ...draft, cmia_notification_deadline: e.target.value || null })}
-                        className="mt-1 h-8 text-xs bg-background font-mono font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground font-medium uppercase">Patient Notification Status</label>
-                      <Select
-                        value={draft.cmia_patient_notification_status || "Not Required"}
-                        onValueChange={(v: any) => setDraft({ ...draft, cmia_patient_notification_status: v })}
-                      >
-                        <SelectTrigger className="mt-1 h-8 text-xs bg-background">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Not Required">Not Required</SelectItem>
-                          <SelectItem value="Pending">Pending</SelectItem>
-                          <SelectItem value="Sent">Sent</SelectItem>
-                          <SelectItem value="Completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground font-medium uppercase">AG Notification Status</label>
-                      <Select
-                        value={draft.cmia_ag_notification_status || "Not Required"}
-                        onValueChange={(v: any) => setDraft({ ...draft, cmia_ag_notification_status: v })}
-                      >
-                        <SelectTrigger className="mt-1 h-8 text-xs bg-background">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Not Required">Not Required</SelectItem>
-                          <SelectItem value="Pending">Pending</SelectItem>
-                          <SelectItem value="Submitted">Submitted</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!isPrivacyOfficer && (
-                <div className="flex items-center gap-2 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 text-xs">
-                  <Lock className="h-4 w-4 shrink-0" />
-                  <span>You are viewing in Read-Only mode. Only assigned <strong>Privacy & Security Officers</strong> can approve or reject policies.</span>
-                </div>
-              )}
-
+              {/* Content Form */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">Summary</label>
-                  <Input value={draft.summary || ""} onChange={(e) => setDraft({ ...draft, summary: e.target.value })} className="mt-1 text-xs" />
+                  <label className="text-xs text-muted-foreground font-medium">Summary</label>
+                  <Input
+                    value={draft.summary || ""}
+                    onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
+                    className="mt-1 text-xs"
+                  />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Effective date</label>
-                  <Input type="date" value={draft.effective_date || ""} onChange={(e) => setDraft({ ...draft, effective_date: e.target.value || null })} className="mt-1 text-xs" />
+                  <label className="text-xs text-muted-foreground font-medium">Effective Date</label>
+                  <Input
+                    type="date"
+                    value={draft.effective_date || ""}
+                    onChange={(e) => setDraft({ ...draft, effective_date: e.target.value || null })}
+                    className="mt-1 text-xs font-mono"
+                  />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Review due</label>
-                  <Input type="date" value={draft.review_due_date || ""} onChange={(e) => setDraft({ ...draft, review_due_date: e.target.value || null })} className="mt-1 text-xs" />
+                  <label className="text-xs text-muted-foreground font-medium font-mono">Next Annual Review</label>
+                  <Input
+                    type="date"
+                    value={draft.review_due_date || ""}
+                    onChange={(e) => setDraft({ ...draft, review_due_date: e.target.value || null })}
+                    className="mt-1 text-xs font-mono"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground">Policy Content</label>
+                <label className="text-xs text-muted-foreground font-medium">Policy Markdown Content</label>
                 <Textarea
                   value={draft.body_markdown}
                   onChange={(e) => setDraft({ ...draft, body_markdown: e.target.value })}
-                  className="font-mono text-xs min-h-[380px] mt-1 bg-background border-border/80"
+                  className="font-mono text-xs min-h-[360px] mt-1 bg-background border-border/80"
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2 pt-2 border-t items-center justify-between">
+              {/* Action Toolbar */}
+              <div className="flex flex-wrap gap-2 pt-3 border-t items-center justify-between">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Button onClick={save} disabled={saving || (!isPrivacyOfficer && draft.status === "approved")} variant="outline" size="sm" className="h-9 text-xs">
-                    <Save className="h-3.5 w-3.5 mr-1.5" />
-                    Save
+                  <Button onClick={saveDraftRevision} disabled={saving} variant="outline" size="sm" className="h-9 text-xs">
+                    <Save className="h-3.5 w-3.5 mr-1.5" /> Save Draft
                   </Button>
-
-                  {draft.status === "draft" && (
-                    <Button onClick={submitForReview} disabled={saving} size="sm" variant="secondary" className="h-9 text-xs">
-                      <Send className="h-3.5 w-3.5 mr-1.5" />Submit for Review
-                    </Button>
-                  )}
 
                   {isPrivacyOfficer ? (
                     <>
-                      <Button onClick={approve} disabled={saving} size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700">
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Approve
+                      <Button onClick={approveAndPublish} disabled={saving} size="sm" className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700">
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Approve & Publish
                       </Button>
-                      <Button onClick={reject} disabled={saving} size="sm" variant="outline" className="h-9 text-xs border-amber-300 text-amber-800 hover:bg-amber-50">
-                        <XCircle className="h-3.5 w-3.5 mr-1.5 text-amber-600" />Reject Policy
-                      </Button>
-                      <Button onClick={deletePolicy} disabled={saving} size="sm" variant="destructive" className="h-9 text-xs">
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />Delete Policy
+
+                      {draft.status === "draft" && (
+                        <Button onClick={rejectDraft} disabled={saving} size="sm" variant="outline" className="h-9 text-xs border-amber-300 text-amber-800 hover:bg-amber-50">
+                          <XCircle className="h-3.5 w-3.5 mr-1.5 text-amber-600" /> Reject Draft
+                        </Button>
+                      )}
+
+                      <Button onClick={() => deletePolicy()} disabled={saving} size="sm" variant="destructive" className="h-9 text-xs">
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Policy
                       </Button>
                     </>
                   ) : (
                     <Button disabled variant="outline" size="sm" className="h-9 text-xs opacity-60 cursor-not-allowed">
-                      <Lock className="h-3.5 w-3.5 mr-1.5" />Approval Restricted to Officer
+                      <Lock className="h-3.5 w-3.5 mr-1.5" /> Approval & Publishing Restricted to Security Officer
                     </Button>
                   )}
                 </div>
+
+                {draft.status === "approved" && (
+                  <span className="text-[11px] text-muted-foreground italic flex items-center gap-1">
+                    <Lock className="h-3 w-3 text-emerald-600" /> Published policy is locked. Edits create a new draft.
+                  </span>
+                )}
               </div>
 
-              {showHistory && (
-                <div className="pt-4 border-t space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <History className="h-4 w-4 text-primary" /> Audit Trail & Staff Signatures
-                    </h3>
-                    <Badge variant="outline" className="text-[10px]">{auditLogs.length} audit events · {acknowledgements.length} staff signs</Badge>
-                  </div>
-
-                  {/* Staff Acknowledgements List */}
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Staff Signatures & Acknowledgements</div>
-                    {acknowledgements.length === 0 ? (
-                      <div className="text-xs text-muted-foreground italic">No staff signatures recorded for this policy version yet.</div>
-                    ) : (
-                      <div className="rounded-xl border border-border overflow-hidden bg-card shadow-2xs">
-                        <table className="w-full text-xs text-left">
-                          <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border">
-                            <tr>
-                              <th className="p-2.5">Staff Member</th>
-                              <th className="p-2.5">Version</th>
-                              <th className="p-2.5">Signature Text</th>
-                              <th className="p-2.5 text-right">Timestamp</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border">
-                            {acknowledgements.map((ack) => (
-                              <tr key={ack.id} className="hover:bg-muted/30 transition">
-                                <td className="p-2.5 font-medium text-foreground">
-                                  {ack.staff_name}
-                                  <div className="text-[10px] text-muted-foreground font-mono">{ack.staff_email}</div>
-                                </td>
-                                <td className="p-2.5 font-mono">v{ack.version}</td>
-                                <td className="p-2.5 text-muted-foreground italic">{ack.signature_text}</td>
-                                <td className="p-2.5 text-right font-mono text-[11px] text-muted-foreground">{new Date(ack.acknowledged_at).toLocaleString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Audit Log Table */}
-                  <div className="space-y-2 pt-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Policy Audit Trail Log</div>
-                    <div className="rounded-xl border border-border overflow-hidden bg-card shadow-2xs">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border">
-                          <tr>
-                            <th className="p-2.5">Action Event</th>
-                            <th className="p-2.5">Officer / User</th>
-                            <th className="p-2.5">Timestamp</th>
-                            <th className="p-2.5 text-right">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {auditLogs.map((log) => (
-                            <tr key={log.id} className="hover:bg-muted/30 transition">
-                              <td className="p-2.5">
-                                <div className="font-medium text-foreground">{log.action}</div>
-                                <div className="text-[11px] text-muted-foreground mt-0.5">{log.notes}</div>
-                              </td>
-                              <td className="p-2.5 text-muted-foreground font-medium">{log.officer_name}</td>
-                              <td className="p-2.5 text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</td>
-                              <td className="p-2.5 text-right">
-                                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${STATUS_COLORS[log.status] || "bg-muted"}`}>
-                                  {log.status}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Version Snapshots (Immutable) */}
-                  <div className="space-y-2 pt-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Approved Immutable Version Snapshots</div>
-                    {versions.length === 0 ? (
-                      <div className="text-xs text-muted-foreground italic">No approved version snapshots recorded yet.</div>
-                    ) : (
-                      versions.map((v) => (
-                        <div key={v.id} className="rounded-xl border border-border p-3 text-xs flex items-center justify-between gap-2 bg-muted/20">
-                          <div>
-                            <div className="font-medium text-foreground">v{v.version} — {v.title}</div>
-                            <div className="text-muted-foreground mt-0.5">Approved {new Date(v.approved_at).toLocaleString()}{v.effective_date ? ` • Effective ${v.effective_date}` : ""}</div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+              {/* Simplified Audit History */}
+              <div className="pt-4 border-t space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5 text-primary" /> Simplified Audit Log ({auditLogs.length} events)
+                  </h3>
+                  <span className="text-[11px] text-muted-foreground font-mono">{acknowledgements.length} staff signatures</span>
                 </div>
-              )}
+
+                {auditLogs.length === 0 ? (
+                  <div className="text-xs text-muted-foreground italic">No audit events recorded yet.</div>
+                ) : (
+                  <div className="rounded-xl border border-border overflow-hidden bg-card text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] tracking-wider border-b border-border font-mono">
+                        <tr>
+                          <th className="p-2.5">Event Action</th>
+                          <th className="p-2.5">Officer / User</th>
+                          <th className="p-2.5">Details</th>
+                          <th className="p-2.5 text-right">Timestamp</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {auditLogs.map((log) => (
+                          <tr key={log.id} className="hover:bg-muted/30">
+                            <td className="p-2.5 font-medium text-foreground">
+                              <Badge variant="outline" className="text-[9px] font-semibold">
+                                {log.action}
+                              </Badge>
+                            </td>
+                            <td className="p-2.5 text-muted-foreground">{log.officer_name}</td>
+                            <td className="p-2.5 text-muted-foreground">{log.notes}</td>
+                            <td className="p-2.5 text-right font-mono text-[10px] text-muted-foreground">
+                              {new Date(log.timestamp).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Card>
       </div>
 
-      {/* New Policy Modal */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+      {/* Modal: View Version History */}
+      <Dialog open={versionHistoryOpen} onOpenChange={setVersionHistoryOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Create New HIPAA Policy</DialogTitle>
-            <DialogDescription className="text-xs">
-              Add a new HIPAA policy document for administrative, technical, or physical compliance.
+            <DialogTitle className="font-serif text-lg font-semibold flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" /> Historical Published Versions — {draft?.title}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Complete HIPAA compliance version history stored for audit inspection.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {versions.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">No historical versions archived yet.</div>
+            ) : (
+              versions.map((ver) => (
+                <div key={ver.id} className="p-3.5 rounded-xl border border-border bg-card space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30 text-[10px] font-bold">
+                        v{ver.version} · Published
+                      </Badge>
+                      <span className="font-semibold text-foreground">{ver.title}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-muted-foreground">{new Date(ver.approved_at).toLocaleDateString()}</span>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground">{ver.summary || "No summary provided."}</p>
+
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 border-t border-border/50 font-mono">
+                    <span>Approved By: {ver.approved_by_name || "Privacy & Security Officer"}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedHistoryVersion(ver)}
+                        className="h-7 text-[11px] gap-1 text-primary"
+                      >
+                        <Eye className="h-3 w-3" /> View Markdown
+                      </Button>
+                      {isPrivacyOfficer && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteHistoricalVersion(ver)}
+                          className="h-7 text-[11px] gap-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                        >
+                          <Trash2 className="h-3 w-3" /> Delete Version
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: View Specific Version Content */}
+      <Dialog open={!!selectedHistoryVersion} onOpenChange={() => setSelectedHistoryVersion(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg font-semibold flex items-center justify-between">
+              <span>{selectedHistoryVersion?.title} (Version v{selectedHistoryVersion?.version})</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  downloadFile(
+                    `${selectedHistoryVersion?.title.replace(/[^a-z0-9]/gi, "_")}_v${selectedHistoryVersion?.version}.md`,
+                    selectedHistoryVersion?.body_markdown || "",
+                    "text/markdown"
+                  )
+                }
+                className="h-8 text-xs gap-1"
+              >
+                <Download className="h-3.5 w-3.5" /> Download Markdown
+              </Button>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground font-mono">
+              Published on {selectedHistoryVersion?.approved_at ? new Date(selectedHistoryVersion.approved_at).toLocaleString() : ""} by {selectedHistoryVersion?.approved_by_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-4 rounded-xl border border-border bg-muted/20 font-mono text-xs whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+            {selectedHistoryVersion?.body_markdown}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Staff Policy E-Signature */}
+      <Dialog open={signOpen} onOpenChange={setSignOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg font-semibold flex items-center gap-2">
+              <FileSignature className="h-5 w-5 text-emerald-600" /> Sign Policy Acknowledgement
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Electronically sign and confirm that you have read and agree to comply with <strong>{draft?.title} (v{draft?.version})</strong>.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-xs">Policy Title</Label>
+              <label className="text-xs font-semibold text-foreground">Your Full Legal Name</label>
               <Input
-                placeholder="e.g. Data Retention & Destruction Policy"
+                placeholder="e.g., Kiem Vukadinovic, NP"
+                value={staffSignName}
+                onChange={(e) => setStaffSignName(e.target.value)}
+                className="mt-1 text-xs h-9"
+              />
+            </div>
+            <div className="p-3 rounded-xl bg-muted/40 text-[11px] text-muted-foreground space-y-1 font-mono">
+              <div>Policy Title: {draft?.title}</div>
+              <div>Policy Version: v{draft?.version}</div>
+              <div>Timestamp: {new Date().toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" size="sm" onClick={() => setSignOpen(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={submitStaffAcknowledgement} className="bg-emerald-600 hover:bg-emerald-700 text-xs">
+              Electronically Sign & Submit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Create New Policy */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg font-semibold flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" /> Create New HIPAA Policy
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Add a new practice policy to the HIPAA compliance registry.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs font-semibold text-foreground">Policy Title</label>
+              <Input
+                placeholder="e.g., Device Encryption & Remote Access Policy"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                className="mt-1 text-xs"
+                className="mt-1 text-xs h-9"
               />
             </div>
 
             <div>
-              <Label className="text-xs">Category</Label>
+              <label className="text-xs font-semibold text-foreground">Category</label>
               <Select value={newCategory} onValueChange={setNewCategory}>
-                <SelectTrigger className="mt-1 text-xs">
+                <SelectTrigger className="mt-1 h-9 text-xs bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Administrative Safeguards">Administrative Safeguards</SelectItem>
                   <SelectItem value="Technical Safeguards">Technical Safeguards</SelectItem>
                   <SelectItem value="Physical Safeguards">Physical Safeguards</SelectItem>
-                  <SelectItem value="Privacy Rules">Privacy Rules</SelectItem>
-                  <SelectItem value="Custom">Custom</SelectItem>
+                  <SelectItem value="Privacy & Clinical Safeguards">Privacy & Clinical Safeguards</SelectItem>
+                  <SelectItem value="Workforce & System Security">Workforce & System Security</SelectItem>
+                  <SelectItem value="Administrative & Ethical Governance">Administrative & Ethical Governance</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label className="text-xs">Short Summary / Overview</Label>
+              <label className="text-xs font-semibold text-foreground">Summary (Optional)</label>
               <Textarea
-                placeholder="Brief summary of policy purpose and scope..."
+                placeholder="Brief summary of policy requirements..."
                 value={newSummary}
                 onChange={(e) => setNewSummary(e.target.value)}
                 className="mt-1 text-xs min-h-[80px]"
@@ -1253,57 +1095,14 @@ ${approved.map(policyToHtml).join("<hr/>")}
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
+          <div className="flex items-center justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button size="sm" onClick={submitNewPolicy}>
-              Create Policy
+            <Button size="sm" onClick={submitNewPolicy} className="bg-primary text-xs">
+              Create Policy Draft
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Staff Sign & Acknowledge Modal */}
-      <Dialog open={signOpen} onOpenChange={setSignOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl flex items-center gap-2">
-              <FileSignature className="h-5 w-5 text-primary" /> Sign & Acknowledge Policy
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Confirm that you have read, understood, and agree to abide by <strong>{draft?.title} (v{draft?.version})</strong>.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="p-3 rounded-xl bg-muted/40 border text-xs space-y-1">
-              <div className="font-semibold text-foreground">{draft?.title}</div>
-              <div className="text-[11px] text-muted-foreground font-mono">Version: v{draft?.version} · Effective: {draft?.effective_date || "Current"}</div>
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold">Staff Member Full Name</Label>
-              <Input
-                placeholder="Enter your full legal name to sign..."
-                value={staffSignName}
-                onChange={(e) => setStaffSignName(e.target.value)}
-                className="mt-1 text-xs"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                By typing your name, you are applying a legal electronic signature under federal ESIGN & HIPAA rules.
-              </p>
-            </div>
           </div>
-
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setSignOpen(false)}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={submitStaffAcknowledgement} className="bg-emerald-600 hover:bg-emerald-700">
-              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Confirm & Sign Policy
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
