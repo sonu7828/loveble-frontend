@@ -204,8 +204,8 @@ const App = () => (
                   <Route path="vendors" element={<AdminOrPrivacyOnly><AdminVendors /></AdminOrPrivacyOnly>} />
                   <Route path="reports" element={<AdminOrDirectorOnly><AdminReports /></AdminOrDirectorOnly>} />
                   <Route path="me" element={<StaffMyProfile />} />
-                  <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
-                  <Route path="profile" element={<Navigate to="/staff/me" replace />} />
+                  <Route path="my-profile" element={<Navigate to="/admin/me" replace />} />
+                  <Route path="profile" element={<Navigate to="/admin/me" replace />} />
                   <Route path="help" element={<StaffHelp />} />
                   <Route path="compliance" element={<MyCompliance />} />
                 </Route>

@@ -71,6 +71,15 @@
 - Action: Verified zero syntax or compilation errors by running `npx tsc --noEmit`.
 
 
+9. RUNTIME ROUTING & SESSION CACHE FIXES
+--------------------------------------------------------------------------------
+- Action: Updated `AuthContext.tsx` `refreshCurrentUser(forceFresh?: boolean)` to bypass `rka_tab_session_user` when `forceFresh` is true and purge stale session storage on login/session failures.
+- Action: Updated `AdminLogin.tsx` to clear `rka_tab_session_user` and invoke `refreshCurrentUser(true)` on successful authentication so fresh login user object always takes precedence over cached tab data.
+- Action: Fixed `/admin/my-profile` and `/admin/profile` redirects in `App.tsx` to point to `/admin/me` instead of cross-boundary `/staff/me`.
+- Action: Expanded `isSharedAdminRoute` in `AdminLayout.tsx` to include `/admin/me`, `/admin/help`, and `/admin/compliance`, enabling Privacy Officers to navigate shared pages without fallback redirects.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
 ================================================================================
                               SUMMARY OF FILES MODIFIED / CREATED
 ================================================================================
@@ -86,10 +95,12 @@ MODIFIED FILES:
 1. `src/App.tsx`
 2. `src/layouts/AdminLayout.tsx`
 3. `src/layouts/StaffLayout.tsx`
-4. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
-5. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
-6. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
-7. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
+4. `src/context/AuthContext.tsx`
+5. `src/pages/admin/auth/AdminLogin.tsx`
+6. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
+7. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
+8. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
+9. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
 
 VERIFICATION STATUS:
 - `npx tsc --noEmit`: 0 Errors (Clean TypeScript compilation).

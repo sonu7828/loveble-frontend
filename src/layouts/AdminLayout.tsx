@@ -40,7 +40,12 @@ export default function AdminLayout() {
     location.pathname.includes("breach-report") ||
     location.pathname.includes("vendors");
 
-  const canAccessAdminLayout = isAdmin || (isPrivacyOfficer && isSecurityRoute);
+  const isSharedAdminRoute =
+    location.pathname.endsWith("/me") ||
+    location.pathname.endsWith("/help") ||
+    location.pathname.includes("compliance");
+
+  const canAccessAdminLayout = isAdmin || (isPrivacyOfficer && (isSecurityRoute || isSharedAdminRoute));
   const [open, setOpen] = useState(false);
 
   const [mfaOk, setMfaOk] = useState(true);

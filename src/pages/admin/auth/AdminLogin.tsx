@@ -105,7 +105,8 @@ export default function AdminLogin() {
     const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password: targetPassword });
 
     if (data?.user) {
-      await refreshCurrentUser();
+      try { sessionStorage.removeItem("rka_tab_session_user"); } catch (e) {}
+      await refreshCurrentUser(true);
       setLoading(false);
       setPassword("");
       await beginMfa();

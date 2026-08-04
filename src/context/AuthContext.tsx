@@ -86,25 +86,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toastInFlightRef = useRef<boolean>(false);
   const logoutInFlightRef = useRef<boolean>(false);
 
-  const refreshCurrentUser = useCallback(async () => {
-    if (fetchInFlightRef.current) return;
+  const refreshCurrentUser = useCallback(async (forceFresh?: boolean) => {
+    if (fetchInFlightRef.current && !forceFresh) return;
     fetchInFlightRef.current = true;
 
     try {
-      // 1. Check tab-isolated session in sessionStorage first for multi-tab independence
-      const tabUserRaw = sessionStorage.getItem("rka_tab_session_user");
-      if (tabUserRaw) {
-        try {
-          const tabUser = JSON.parse(tabUserRaw);
-          if (tabUser && tabUser.id && tabUser.roles) {
-            setUser(tabUser);
-            setRoles(tabUser.roles || []);
-            setStaffId(tabUser.staff_id || tabUser.id);
-            setLoading(false);
-            fetchInFlightRef.current = false;
-            return;
-          }
-        } catch (e) {}
+      // 1. Check tab-isolated session in sessionStorage first for multi-tab independence (skip if forceFresh)
+      if (!forceFresh) {
+        const tabUserRaw = sessionStorage.getItem("rka_tab_session_user");
+        if (tabUserRaw) {
+          try {
+            const tabUser = JSON.parse(tabUserRaw);
+            if (tabUser && tabUser.id && tabUser.roles) {
+              setUser(tabUser);
+              setRoles(tabUser.roles || []);
+              setStaffId(tabUser.staff_id || tabUser.id);
+              setLoading(false);
+              fetchInFlightRef.current = false;
+              return;
+            }
+          } catch (e) {}
+        }
       }
 
       // 2. Otherwise query backend getSession()
@@ -117,11 +119,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           sessionStorage.setItem("rka_tab_session_user", JSON.stringify(result.user));
         } catch (e) {}
       } else {
+        try { sessionStorage.removeItem("rka_tab_session_user"); } catch (e) {}
         setUser(null);
         setRoles([]);
         setStaffId(null);
       }
     } catch {
+      try { sessionStorage.removeItem("rka_tab_session_user"); } catch (e) {}
       setUser(null);
       setRoles([]);
       setStaffId(null);
