@@ -62,8 +62,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_CHANNEL = "rka_auth_channel";
 
 export function resolveLandingRoute(roles: AppRole[]): string {
-  if (roles.includes("admin")) return "/staff/admin";
-  if (roles.includes("privacy_officer")) return "/staff/security-officer";
+  if (roles.includes("admin")) return "/admin/hub";
+  if (roles.includes("privacy_officer")) return "/admin/security-officer";
   if (
     roles.includes("nurse_practitioner") ||
     roles.includes("medical_director") ||
@@ -168,12 +168,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!toastInFlightRef.current) {
         toastInFlightRef.current = true;
         const currentPath = window.location.pathname;
-        if (currentPath.includes("/staff/login") || currentPath.includes("/account/auth")) {
+        if (currentPath.includes("/staff/login") || currentPath.includes("/account/auth") || currentPath.includes("/admin/login")) {
           return;
         }
 
         // Context-aware redirection & toast message
-        if (currentPath.startsWith("/staff")) {
+        if (currentPath.startsWith("/admin")) {
+          toast.error("Your admin session has expired. Please sign in again.");
+          window.location.href = "/admin/login";
+        } else if (currentPath.startsWith("/staff")) {
           toast.error("Your staff session has expired. Please sign in again.");
           window.location.href = "/staff/login";
         } else if (currentPath.startsWith("/account")) {
@@ -205,7 +208,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setStaffId(null);
 
           const currentPath = window.location.pathname;
-          if (currentPath.startsWith("/staff") && !currentPath.includes("/staff/login")) {
+          if (currentPath.startsWith("/admin") && !currentPath.includes("/admin/login")) {
+            window.location.href = "/admin/login";
+          } else if (currentPath.startsWith("/staff") && !currentPath.includes("/staff/login")) {
             window.location.href = "/staff/login";
           } else if (currentPath.startsWith("/account") && !currentPath.includes("/account/auth")) {
             window.location.href = "/account/auth";

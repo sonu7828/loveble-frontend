@@ -651,7 +651,7 @@ export default function AdminAuditReport() {
         doc.setTextColor(30, 41, 59);
       }
 
-      const timeStr = format(new Date(e.when), "MM/dd/yy HH:mm:ss");
+      const timeStr = isNaN(new Date(e.when).getTime()) ? String(e.when) : format(new Date(e.when), "MM/dd/yy HH:mm:ss");
       const categoryStr = CATEGORY_LABEL[e.category] || e.category;
       const actionStr = e.action || "view";
       const actorStr = doc.splitTextToSize(e.actor || "System", colWidths[3] - 5)[0];
@@ -866,7 +866,7 @@ export default function AdminAuditReport() {
                   {pageEvents.map((e) => (
                     <tr key={e.id} className="hover:bg-muted/20 transition-colors">
                       <td className="py-3 px-4 font-mono text-[11px] whitespace-nowrap text-muted-foreground">
-                        {format(new Date(e.when), "MMM d, yyyy · HH:mm:ss")}
+                        {isNaN(new Date(e.when).getTime()) ? String(e.when) : format(new Date(e.when), "MMM d, yyyy · HH:mm:ss")}
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border ${CATEGORY_BADGE[e.category]}`}>

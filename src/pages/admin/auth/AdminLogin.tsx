@@ -37,7 +37,7 @@ function errorMessage(error: unknown, fallback: string) {
 
 
 
-export default function StaffLogin() {
+export default function AdminLogin() {
   const navigate = useNavigate();
   const { refreshCurrentUser } = useAuth();
   const [sp] = useSearchParams();
@@ -217,7 +217,7 @@ export default function StaffLogin() {
     setFactorId(null); setChallengeId(null); setQrSvg(""); setSecret(""); setErrMsg("");
   };
 
-  const activeRole = "staff";
+  const activeRole = "admin";
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-between">
@@ -227,7 +227,7 @@ export default function StaffLogin() {
           <div className="text-center mb-2.5">
             <h1 className="font-serif text-xl sm:text-2xl font-normal tracking-tight">Radiantilyk Aesthetic</h1>
             <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground mt-0.5">
-              Staff & Provider Portal
+              Admin & Management Portal
             </p>
           </div>
 
@@ -295,57 +295,19 @@ export default function StaffLogin() {
                 <div className="font-semibold text-foreground mb-0.5 text-[11px]">⚡ Quick Demo Credentials</div>
                 <div className="text-muted-foreground text-[10px] mb-1.5">Click below to auto-fill demo login (password: <code className="bg-muted px-1 rounded text-foreground font-mono">12345678</code>):</div>
                 
-
-
-                {activeRole === "staff" && (() => {
-                  const defaultStaffList = [
-                    { email: "medicaldirector@gmail.com", full_name: "Dr. Sarah (MD)", role: "medical_director" },
-                    { email: "nurseprectitioner@gmail.com", full_name: "Nurse Practitioner", role: "nurse_practitioner" },
-                    { email: "injector@gmail.com", full_name: "RN Injector", role: "rn_injector" },
-                    { email: "securityofficer@gmail.com", full_name: "Security Officer", role: "privacy_officer" },
-                    { email: "scheduler@gmail.com", full_name: "Front Desk Coordinator", role: "front_desk" },
-                  ];
-                  const approvedStaff: Array<{ email: string; full_name?: string; role: string }> =
-                    JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-                  
-                  const combined = [...defaultStaffList];
-                  approvedStaff.forEach((a) => {
-                    if (a.role === "admin") return; // Filter out admin accounts
-                    if (a.email && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
-                      combined.push(a);
-                    }
-                  });
-
-                  const roleEmoji: Record<string, string> = {
-                    admin: "👑", medical_director: "🩺", privacy_officer: "🛡️",
-                    nurse_practitioner: "💊", rn_injector: "💉", front_desk: "🏥",
-                  };
-                  const roleColor: Record<string, string> = {
-                    medical_director: "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-900 dark:text-purple-300",
-                    privacy_officer: "border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300",
-                    nurse_practitioner: "border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-300",
-                    rn_injector: "border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300",
-                    front_desk: "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-300",
-                  };
-
-                  return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
-                      {combined.map((s) => (
-                        <button
-                          key={s.email}
-                          type="button"
-                          onClick={() => fillDemoCredentials(s.email)}
-                          className={`p-1.5 rounded-lg border transition text-left text-[11px] font-medium cursor-pointer flex flex-col justify-between ${
-                            roleColor[s.role] || "border-border bg-background hover:bg-secondary/60"
-                          }`}
-                        >
-                          <div className="truncate">{roleEmoji[s.role] || "👤"} <strong>{s.full_name || s.email.split("@")[0]}</strong></div>
-                          <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">{s.email}</span>
-                        </button>
-                      ))}
+                {activeRole === "admin" && (
+                  <button
+                    type="button"
+                    onClick={() => fillDemoCredentials("admin@gmail.com")}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background hover:bg-secondary/60 transition text-left text-xs font-medium cursor-pointer flex items-center justify-between"
+                  >
+                    <div>
+                      👑 <strong>Admin Account</strong>
+                      <span className="text-[10px] text-muted-foreground ml-1.5 font-mono">admin@gmail.com</span>
                     </div>
-                  );
-                })()}
+                    <span className="text-[9px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded">Admin</span>
+                  </button>
+                )}
 
 
               </div>

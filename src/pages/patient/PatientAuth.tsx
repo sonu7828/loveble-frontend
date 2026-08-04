@@ -172,13 +172,13 @@ export default function PatientAuth() {
           {/* Portal Switcher Tabs */}
           <div className="flex items-center justify-between p-1 mb-3 rounded-xl bg-muted/60 border border-border text-[11px] font-medium">
             <Link
-              to="/staff/login?role=admin"
+              to="/admin/login"
               className="flex-1 py-1 rounded-lg text-muted-foreground hover:text-foreground transition text-center"
             >
               Admin Login
             </Link>
             <Link
-              to="/staff/login?role=staff"
+              to="/staff/login"
               className="flex-1 py-1 rounded-lg text-muted-foreground hover:text-foreground transition text-center"
             >
               Staff Login

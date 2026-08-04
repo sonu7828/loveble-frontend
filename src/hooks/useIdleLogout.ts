@@ -22,7 +22,7 @@ const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes = 900,000 ms
 const WARNING_THRESHOLD_MS = 14 * 60 * 1000; // 14 minutes = 840,000 ms
 const THROTTLE_MS = 2000; // Throttle activity updates to once every 2s
 
-export function useIdleLogout(enabled: boolean) {
+export function useIdleLogout(enabled: boolean, redirectPath: string = "/staff/login") {
   const navigate = useNavigate();
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(60);
@@ -64,9 +64,9 @@ export function useIdleLogout(enabled: boolean) {
       );
 
       toast.error("Session timed out due to 15 minutes of inactivity. Please sign in again.");
-      navigate("/staff/login", { replace: true });
+      navigate(redirectPath, { replace: true });
     }
-  }, [navigate]);
+  }, [navigate, redirectPath]);
 
   const staySignedIn = useCallback(async () => {
     try {

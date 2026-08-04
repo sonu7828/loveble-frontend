@@ -126,7 +126,7 @@ export default function StaffLayout() {
           icon: Users,
           show: true,
           children: [
-            { to: "/staff/team?tab=providers", label: "Providers", icon: Users },
+            { to: "/admin/team?tab=providers", label: "Providers", icon: Users },
           ],
         },
         {
@@ -135,7 +135,7 @@ export default function StaffLayout() {
           icon: BarChart3,
           show: true,
           children: [
-            { to: "/staff/reports", label: "Reports", icon: BarChart3 },
+            { to: "/admin/reports", label: "Reports", icon: BarChart3 },
           ],
         },
       ];
@@ -149,7 +149,7 @@ export default function StaffLayout() {
           icon: LayoutDashboard,
           show: true,
           children: [
-            { to: "/staff/security-officer", label: "Dashboard", icon: LayoutDashboard },
+            { to: "/admin/security-officer", label: "Dashboard", icon: LayoutDashboard },
           ],
         },
         {
@@ -158,10 +158,10 @@ export default function StaffLayout() {
           icon: ShieldAlert,
           show: true,
           children: [
-            { to: "/staff/audit-report", label: "PHI Access Audit", icon: FileText },
-            { to: "/staff/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
-            { to: "/staff/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
-            { to: "/staff/vendors", label: "BAA & Vendors", icon: Building2 },
+            { to: "/admin/audit-report", label: "PHI Access Audit", icon: FileText },
+            { to: "/admin/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
+            { to: "/admin/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
+            { to: "/admin/vendors", label: "BAA & Vendors", icon: Building2 },
           ],
         },
       ];
@@ -307,9 +307,9 @@ export default function StaffLayout() {
               icon: Tag,
               show: true,
               children: [
-                { to: "/staff/services", label: "Services & Pricing", icon: Tag },
-                { to: "/staff/admin", label: "Admin Overview", icon: LayoutDashboard },
-                { to: "/staff/team", label: "Staff Management", icon: Users },
+                { to: "/admin/services", label: "Services & Pricing", icon: Tag },
+                { to: "/admin/hub", label: "Admin Overview", icon: LayoutDashboard },
+                { to: "/admin/team", label: "Staff Management", icon: Users },
               ],
             },
           ]
@@ -499,7 +499,7 @@ export default function StaffLayout() {
             </Sheet>
           </div>
 
-          <Link to={roles.includes("privacy_officer") ? "/staff/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
+          <Link to={roles.includes("privacy_officer") ? "/admin/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
             <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover shadow-soft" />
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>

@@ -71,7 +71,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
                 <NavLink to="/" end className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Home</NavLink>
                 <NavLink to="/services" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Services & Pricing</NavLink>
                 <NavLink to="/model" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>Model Application</NavLink>
-                <NavLink to="/staff/login" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>My Account</NavLink>
+                <NavLink to="/account/auth" className={({ isActive }) => isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground transition"}>My Account</NavLink>
               </>
             )}
             <ThemeToggle />
@@ -99,7 +99,7 @@ export const SiteHeader = ({ isPortal = false }: { isPortal?: boolean }) => {
                 <>
                   <NavLink to="/" end className="py-3 border-b border-border">Home</NavLink>
                   <NavLink to="/services" className="py-3 border-b border-border">Services & Pricing</NavLink>
-                  <NavLink to="/staff/login" className="py-3 border-b border-border">My Account</NavLink>
+                  <NavLink to="/account/auth" className="py-3 border-b border-border">My Account</NavLink>
                   <NavLink to="/model" className="py-3 border-b border-border">Become a Model</NavLink>
                   <NavLink to="/faq" className="py-3 border-b border-border">FAQ</NavLink>
                 </>

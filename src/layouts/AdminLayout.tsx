@@ -38,7 +38,7 @@ export default function AdminLayout() {
   const [mfaOk, setMfaOk] = useState(true);
   const [mfaChecked, setMfaChecked] = useState(false);
 
-  const { showWarning, countdown, staySignedIn } = useIdleLogout(!!user);
+  const { showWarning, countdown, staySignedIn } = useIdleLogout(!!user, "/admin/login");
 
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
@@ -52,17 +52,17 @@ export default function AdminLayout() {
 
   const adminNavItems: NavItem[] = useMemo(() => [
     ...(isAdmin ? [
-      { to: "/staff/admin", label: "Admin Overview", icon: ShieldCheck },
-      { to: "/staff/model-applications", label: "Model Applications", icon: Star },
-      { to: "/staff/team", label: "Staff Management", icon: Users },
-      { to: "/staff/services", label: "Services & Pricing", icon: Tag },
-      { to: "/staff/device-presets", label: "Device Inventory", icon: Laptop },
+      { to: "/admin/hub", label: "Admin Overview", icon: ShieldCheck },
+      { to: "/admin/model-applications", label: "Model Applications", icon: Star },
+      { to: "/admin/team", label: "Staff Management", icon: Users },
+      { to: "/admin/services", label: "Services & Pricing", icon: Tag },
+      { to: "/admin/device-inventory", label: "Device Inventory", icon: Laptop },
     ] : []),
-    { to: "/staff/security-officer", label: "Compliance Overview", icon: ShieldCheck },
-    { to: "/staff/audit-report", label: "PHI Access Audit", icon: HistoryIcon },
-    { to: "/staff/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
-    { to: "/staff/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
-    { to: "/staff/vendors", label: "BAA & Vendors", icon: Building2 },
+    { to: "/admin/security-officer", label: "Compliance Overview", icon: ShieldCheck },
+    { to: "/admin/audit-report", label: "PHI Access Audit", icon: HistoryIcon },
+    { to: "/admin/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
+    { to: "/admin/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
+    { to: "/admin/vendors", label: "BAA & Vendors", icon: Building2 },
   ], [isAdmin]);
 
   if (loading || (user && !mfaChecked)) {
@@ -73,7 +73,7 @@ export default function AdminLayout() {
     );
   }
 
-  if (!user) return <Navigate to="/staff/login" replace />;
+  if (!user) return <Navigate to="/admin/login" replace />;
   if (isPrivileged && !mfaOk) return <Navigate to="/staff/mfa" replace />;
 
   if (!canAccessAdminLayout) {
@@ -159,7 +159,7 @@ export default function AdminLayout() {
                     className="w-full justify-start text-xs"
                     onClick={async () => {
                       await authService.logout();
-                      navigate("/staff/login");
+                      navigate("/admin/login");
                     }}
                   >
                     <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
@@ -169,7 +169,7 @@ export default function AdminLayout() {
             </Sheet>
           </div>
 
-          <Link to="/staff/admin" className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
+          <Link to={resolveLandingRoute(roles)} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
             <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover shadow-soft" />
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>
@@ -201,7 +201,7 @@ export default function AdminLayout() {
               className="w-full justify-start text-xs text-muted-foreground hover:text-foreground"
               onClick={async () => {
                 await authService.logout();
-                navigate("/staff/login");
+                navigate("/admin/login");
               }}
             >
               <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
