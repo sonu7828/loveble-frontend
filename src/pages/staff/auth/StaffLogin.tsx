@@ -244,14 +244,9 @@ export default function StaffLogin() {
           {/* Portal Switcher Tabs */}
           <div className="grid grid-cols-3 gap-1 p-1 mb-4 rounded-xl bg-muted/50 border border-border/80 text-[11px] font-medium select-none">
             <Link
-<<<<<<< HEAD
               to="/admin/login"
               className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
                 activeRole === "admin"
-=======
-              to="/staff/login?role=admin"
-              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${activeRole === "admin"
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                   ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
@@ -260,14 +255,9 @@ export default function StaffLogin() {
               <span>Admin</span>
             </Link>
             <Link
-<<<<<<< HEAD
               to="/staff/login"
               className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
                 activeRole === "staff"
-=======
-              to="/staff/login?role=staff"
-              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${activeRole === "staff"
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                   ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
@@ -276,14 +266,9 @@ export default function StaffLogin() {
               <span>Staff</span>
             </Link>
             <Link
-<<<<<<< HEAD
               to="/account/auth"
               className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
                 activeRole === "user"
-=======
-              to="/staff/login?role=user"
-              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${activeRole === "user"
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                   ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
@@ -319,28 +304,8 @@ export default function StaffLogin() {
               <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 p-2.5 text-xs">
                 <div className="font-semibold text-foreground mb-0.5 text-[11px]">⚡ Quick Demo Credentials</div>
                 <div className="text-muted-foreground text-[10px] mb-1.5">Click below to auto-fill demo login (password: <code className="bg-muted px-1 rounded text-foreground font-mono">12345678</code>):</div>
-<<<<<<< HEAD
                 
 
-=======
-
-                {activeRole === "admin" && (() => {
-                  const adminName = getDynamicProfileName("admin@gmail.com", "System Admin");
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => fillDemoCredentials("admin@gmail.com")}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background hover:bg-secondary/60 transition text-left text-xs font-medium cursor-pointer flex items-center justify-between"
-                    >
-                      <div>
-                        👑 <strong>{adminName}</strong>
-                        <span className="text-[10px] text-muted-foreground ml-1.5 font-mono">admin@gmail.com</span>
-                      </div>
-                      <span className="text-[9px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded">Admin</span>
-                    </button>
-                  );
-                })()}
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
 
                 {activeRole === "staff" && (() => {
                   const defaultStaffList = [
@@ -355,14 +320,9 @@ export default function StaffLogin() {
 
                   const combined: Array<{ email: string; defaultName?: string; full_name?: string; role: string }> = [...defaultStaffList];
                   approvedStaff.forEach((a) => {
-<<<<<<< HEAD
-                    if (a.role === "admin") return; // Filter out admin accounts
+                    if (a.role === "admin" || (a.email && a.email.toLowerCase() === "admin@gmail.com")) return; // Filter out admin accounts
                     if (a.email && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
-                      combined.push(a);
-=======
-                    if (a.email && a.email.toLowerCase() !== "admin@gmail.com" && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
                       combined.push({ email: a.email, defaultName: a.full_name, role: a.role });
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                     }
                   });
 
@@ -381,7 +341,7 @@ export default function StaffLogin() {
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
                       {combined.map((s) => {
-                        const displayName = getDynamicProfileName(s.email, s.defaultName || s.full_name || s.email.split("@")[0]);
+                        const displayName = s.defaultName || s.full_name || s.email.split("@")[0];
                         return (
                           <button
                             key={s.email}

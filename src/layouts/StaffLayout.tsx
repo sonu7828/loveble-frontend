@@ -499,11 +499,7 @@ export default function StaffLayout() {
             </Sheet>
           </div>
 
-<<<<<<< HEAD
           <Link to={roles.includes("privacy_officer") ? "/admin/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
-=======
-          <Link to={isAdmin ? "/staff/admin" : isPrivacyOfficer && !isMedicalDirector ? "/staff/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
             <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover shadow-soft" />
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>

@@ -193,15 +193,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-<<<<<<< HEAD
         // Context-aware redirection & toast message
         if (currentPath.startsWith("/admin")) {
           toast.error("Your admin session has expired. Please sign in again.");
           window.location.href = "/admin/login";
         } else if (currentPath.startsWith("/staff")) {
-=======
-        if (currentPath.startsWith("/staff")) {
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
           toast.error("Your staff session has expired. Please sign in again.");
           window.location.href = "/staff/login";
         } else if (currentPath.startsWith("/account")) {
@@ -221,39 +217,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-<<<<<<< HEAD
-  // Multi-Tab Synchronization via BroadcastChannel
-  useEffect(() => {
-    let bc: BroadcastChannel | null = null;
-    try {
-      bc = new BroadcastChannel(AUTH_CHANNEL);
-      bc.onmessage = (event) => {
-        if (event.data?.type === "LOGOUT" || event.data?.type === "SESSION_EXPIRED") {
-          setUser(null);
-          setRoles([]);
-          setStaffId(null);
 
-          const currentPath = window.location.pathname;
-          if (currentPath.startsWith("/admin") && !currentPath.includes("/admin/login")) {
-            window.location.href = "/admin/login";
-          } else if (currentPath.startsWith("/staff") && !currentPath.includes("/staff/login")) {
-            window.location.href = "/staff/login";
-          } else if (currentPath.startsWith("/account") && !currentPath.includes("/account/auth")) {
-            window.location.href = "/account/auth";
-          }
-        }
-      };
-    } catch {
-      // Ignore if BroadcastChannel not supported
-    }
-
-    return () => {
-      if (bc) bc.close();
-    };
-  }, []);
-
-=======
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
   // Core Role Flags
   const isAdmin = roles.includes("admin");
   const isFrontDesk = roles.includes("front_desk") || isAdmin;

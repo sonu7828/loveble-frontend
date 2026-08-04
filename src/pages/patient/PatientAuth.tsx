@@ -170,25 +170,28 @@ export default function PatientAuth() {
           </div>
 
           {/* Portal Switcher Tabs */}
-          <div className="flex items-center justify-between p-1 mb-3 rounded-xl bg-muted/60 border border-border text-[11px] font-medium">
+          <div className="grid grid-cols-3 gap-1 p-1 mb-4 rounded-xl bg-muted/50 border border-border/80 text-[11px] font-medium select-none">
             <Link
               to="/admin/login"
-              className="flex-1 py-1 rounded-lg text-muted-foreground hover:text-foreground transition text-center"
+              className="py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary/50"
             >
-              Admin Login
+              <span className="text-[11px]">👑</span>
+              <span>Admin</span>
             </Link>
             <Link
               to="/staff/login"
-              className="flex-1 py-1 rounded-lg text-muted-foreground hover:text-foreground transition text-center"
+              className="py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary/50"
             >
-              Staff Login
+              <span className="text-[11px]">🩺</span>
+              <span>Staff</span>
             </Link>
-            <button
-              type="button"
-              className="flex-1 py-1 rounded-lg bg-background text-foreground shadow-xs transition text-center font-semibold"
+            <Link
+              to="/account/auth"
+              className="py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 bg-primary text-primary-foreground shadow-xs font-semibold"
             >
-              User Login
-            </button>
+              <span className="text-[11px]">👤</span>
+              <span>User</span>
+            </Link>
           </div>
 
           {mode === "signin" && (

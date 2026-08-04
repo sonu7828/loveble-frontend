@@ -32,7 +32,7 @@ export default function AdminLayout() {
   const { user, roles, loading, isAdmin, isPrivacyOfficer, isMedicalDirector, isPrivileged, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   const isSecurityRoute =
     location.pathname.includes("security-officer") ||
     location.pathname.includes("audit-report") ||
@@ -136,8 +136,8 @@ export default function AdminLayout() {
       </div>
 
       <div className="pt-3 mt-4 border-t border-border space-y-1">
-        <NavLink to="/staff/me" className={footerLinkCls} onClick={() => setOpen(false)}><UserCircle2 className="h-4 w-4" />My Profile</NavLink>
-        <NavLink to="/staff/help" className={footerLinkCls} onClick={() => setOpen(false)}><BookOpen className="h-4 w-4" />Help / Handbook</NavLink>
+        <NavLink to="/admin/me" className={footerLinkCls} onClick={() => setOpen(false)}><UserCircle2 className="h-4 w-4" />My Profile</NavLink>
+        <NavLink to="/admin/help" className={footerLinkCls} onClick={() => setOpen(false)}><BookOpen className="h-4 w-4" />Help / Handbook</NavLink>
         <div className="flex items-center justify-between px-3 py-1.5 text-xs font-medium text-muted-foreground rounded-lg">
           <span>Appearance</span>
           <ThemeToggle className="h-7 w-7 border border-border bg-background/80 hover:bg-accent rounded-full" />
@@ -178,11 +178,7 @@ export default function AdminLayout() {
             </Sheet>
           </div>
 
-<<<<<<< HEAD
           <Link to={resolveLandingRoute(roles)} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
-=======
-          <Link to={isAdmin ? "/staff/admin" : isMedicalDirector ? "/staff/today" : "/staff/security-officer"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
->>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
             <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover shadow-soft" />
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>
