@@ -193,13 +193,17 @@ const App = () => (
                 <Route path="device-presets" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
                 <Route path="device-inventory" element={<AdminOnly><AdminDevicePresets /></AdminOnly>} />
                 <Route path="treatment-plans" element={<AdminTreatmentPlans />} />
-                <Route path="team" element={<AdminTeam />} />
                 <Route path="security-officer" element={<AdminSecurityOfficer />} />
                 <Route path="audit-report" element={<AdminAuditReport />} />
                 <Route path="hipaa-policies" element={<AdminHipaaPolicies />} />
                 <Route path="compliance/admin" element={<ComplianceAdmin />} />
                 <Route path="breach-report" element={<AdminBreachReport />} />
                 <Route path="vendors" element={<AdminVendors />} />
+                <Route path="me" element={<StaffMyProfile />} />
+                <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
+                <Route path="profile" element={<Navigate to="/staff/me" replace />} />
+                <Route path="help" element={<StaffHelp />} />
+                <Route path="compliance" element={<MyCompliance />} />
               </Route>
 
               <Route element={<StaffLayout />}>
@@ -233,6 +237,7 @@ const App = () => (
                 <Route path="help" element={<StaffHelp />} />
                 <Route path="time-clock" element={<StaffTimeClock />} />
                 <Route path="me" element={<StaffMyProfile />} />
+                <Route path="team" element={<AdminTeam />} />
                 <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
                 <Route path="profile" element={<Navigate to="/staff/me" replace />} />
                 <Route path="schedule" element={<Navigate to="/staff/my-schedule" replace />} />

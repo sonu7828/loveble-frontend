@@ -14,6 +14,7 @@ import { Loader2, Mail, CheckCircle2, Plus, MoreHorizontal, UserX, UserCheck, Tr
 import { toast } from "sonner";
 import { format } from "date-fns";
 import ChartNotesIndex from "../staff/clinical/ChartNotesIndex";
+import { getDynamicProfileName } from "@/lib/userProfile";
 
 interface Member {
   id: string; full_name: string; title: string; email: string | null;
@@ -28,9 +29,9 @@ const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin (full system access)",
   privacy_officer: "Privacy & Security Officer (HIPAA policies, audit, compliance)",
   medical_director: "Medical Director (supervising physician — sign & co-sign notes)",
-  nurse_practitioner: "Nurse Practitioner (clinical provider — GFE, SOAP, prescriptions)",
-  rn_injector: "RN / Injector (treatments, clinical notes, submit for cosign)",
-  front_desk: "Front Desk / Scheduler (booking, check-in, calendar)",
+  nurse_practitioner: "Nurse Practitioner (independent/collaborative provider)",
+  rn_injector: "RN Injector (clinical aesthetics injector)",
+  front_desk: "Front Desk Coordinator (scheduler, check-in, patient intake)",
 };
 
 interface PendingRequest {
@@ -45,6 +46,45 @@ interface PendingRequest {
 }
 
 const PALETTE = ["#c97c5d", "#7c9dd1", "#a8c084", "#d4a3c4", "#e8b94b", "#8b7ec4", "#d97c7c", "#5db8a8"];
+
+const DEFAULT_STAFF_MEMBERS: Member[] = [
+  {
+    id: "staff-md-1", user_id: "user-md-1",
+    full_name: getDynamicProfileName("medicaldirector@gmail.com", "Dr. Dhruva (MD)"),
+    title: "Medical Director & Supervising Physician", email: "medicaldirector@gmail.com",
+    is_active: true, is_owner: false, color: "#8b7ec4", hourly_rate_cents: null, commission_percent: null, pending_role: "medical_director"
+  },
+  {
+    id: "staff-np-1", user_id: "user-np-1",
+    full_name: getDynamicProfileName("nurseprectitioner@gmail.com", "Kiem Vukadinovic, NP"),
+    title: "Nurse Practitioner & Lead Injector", email: "nurseprectitioner@gmail.com",
+    is_active: true, is_owner: false, color: "#7c9dd1", hourly_rate_cents: null, commission_percent: null, pending_role: "nurse_practitioner"
+  },
+  {
+    id: "staff-rn-1", user_id: "user-rn-1",
+    full_name: getDynamicProfileName("injector@gmail.com", "Girish, RN Injector"),
+    title: "Registered Nurse Injector", email: "injector@gmail.com",
+    is_active: true, is_owner: false, color: "#5db8a8", hourly_rate_cents: null, commission_percent: null, pending_role: "rn_injector"
+  },
+  {
+    id: "staff-po-1", user_id: "user-po-1",
+    full_name: getDynamicProfileName("securityofficer@gmail.com", "Bob Stane (Security Officer)"),
+    title: "Privacy & Security Officer & Founder", email: "securityofficer@gmail.com",
+    is_active: true, is_owner: false, color: "#a8c084", hourly_rate_cents: null, commission_percent: null, pending_role: "privacy_officer"
+  },
+  {
+    id: "staff-fd-1", user_id: "user-fd-1",
+    full_name: getDynamicProfileName("scheduler@gmail.com", "Front Desk Coordinator"),
+    title: "Front Desk Coordinator & Scheduler", email: "scheduler@gmail.com",
+    is_active: true, is_owner: false, color: "#e8b94b", hourly_rate_cents: null, commission_percent: null, pending_role: "front_desk"
+  },
+  {
+    id: "staff-admin-1", user_id: "user-admin-1",
+    full_name: getDynamicProfileName("admin@gmail.com", "Buccky Barnz (Admin)"),
+    title: "System Administrator & Owner", email: "admin@gmail.com",
+    is_active: true, is_owner: true, color: "#c97c5d", hourly_rate_cents: null, commission_percent: null, pending_role: "admin"
+  }
+];
 
 const getInitials = (name?: string | null): string => {
   if (!name) return "??";
@@ -64,7 +104,7 @@ export default function AdminTeam() {
   const canAccessTeam = isAdmin || isMedicalDirector || isPrivacyOfficer || isStaff || isNP || isPrivileged;
   const [sp, setSp] = useSearchParams();
   const isMDOnly = !isAdmin && isMedicalDirector;
-  const roleFilter = isMDOnly ? "clinical" : (sp.get("role") || (sp.get("tab") === "providers" ? "clinical" : "all"));
+  const roleFilter = sp.get("role") || "all";
   const currentTab = sp.get("tab");
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -122,7 +162,7 @@ export default function AdminTeam() {
         return {
           id: x.id,
           user_id: x.userId || x.user_id || x.user?.id || null,
-          full_name: x.fullName || x.full_name || resolveName(x),
+          full_name: getDynamicProfileName(x.email || x.user?.email, x.fullName || x.full_name || resolveName(x)),
           title: x.title || "Team Member",
           email: x.email || x.user?.email || "",
           is_active: x.isActive !== undefined ? x.isActive : true,
@@ -132,6 +172,16 @@ export default function AdminTeam() {
           commission_percent: x.commissionPercent || null,
           pending_role: primaryRole as Role,
         };
+      });
+
+      // Merge default staff members if not present
+      DEFAULT_STAFF_MEMBERS.forEach((d) => {
+        if (d.email && !fetchedMembers.some((m) => m.email?.toLowerCase() === d.email.toLowerCase())) {
+          fetchedMembers.push({
+            ...d,
+            full_name: getDynamicProfileName(d.email, d.full_name)
+          });
+        }
       });
 
       setMembers(fetchedMembers);
@@ -443,6 +493,7 @@ export default function AdminTeam() {
 
   const getMemberRoleFilterCount = (filter: string) => {
     return members.filter((m) => {
+      if (!m.email || !m.email.trim() || m.email.toLowerCase().includes("no email")) return false;
       if (filter === "all") return true;
       const r = resolveMemberRole(m);
       if (filter === "admin") return r === "admin";
@@ -456,6 +507,10 @@ export default function AdminTeam() {
 
   const filteredMembers = members
     .filter((m) => {
+      // Exclude all staff members without a valid email address
+      if (!m.email || !m.email.trim() || m.email.toLowerCase().includes("no email")) {
+        return false;
+      }
       if (roleFilter === "all") return true;
       const primaryRole = resolveMemberRole(m);
 

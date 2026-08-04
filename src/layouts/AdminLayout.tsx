@@ -78,7 +78,6 @@ export default function AdminLayout() {
 
   if (!canAccessAdminLayout) {
     const landing = resolveLandingRoute(roles);
-    if (landing === location.pathname) return <StaffLayout />;
     return <Navigate to={landing} replace />;
   }
 
@@ -103,7 +102,9 @@ export default function AdminLayout() {
   const NavInner = (
     <>
       <div className="space-y-1.5">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-3 mb-2">Admin Modules</div>
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-3 mb-2">
+          {isAdmin ? "Admin Modules" : isPrivacyOfficer ? "Security & Governance" : "Compliance Modules"}
+        </div>
         {adminNavItems.map((item) => {
           const Icon = item.icon;
           const active = isSubActive(item.to);
@@ -169,12 +170,18 @@ export default function AdminLayout() {
             </Sheet>
           </div>
 
-          <Link to="/staff/admin" className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
+          <Link to={isAdmin ? "/staff/admin" : isMedicalDirector ? "/staff/today" : "/staff/security-officer"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
             <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover shadow-soft" />
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Admin Dashboard
+                {isAdmin
+                  ? "Admin Dashboard"
+                  : location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || isPrivacyOfficer
+                    ? "Security Officer Hub"
+                    : isMedicalDirector
+                      ? "Medical Director Hub"
+                      : "Compliance Portal"}
               </div>
             </div>
           </Link>
@@ -182,10 +189,27 @@ export default function AdminLayout() {
 
         {/* Right Corner: Active Portal Name Badge */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-xs">
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-            <span>Admin Portal</span>
-          </div>
+          {isAdmin ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-xs">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              <span>Admin Portal</span>
+            </div>
+          ) : location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || isPrivacyOfficer ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-xs">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              <span>Security & Privacy Officer Portal</span>
+            </div>
+          ) : isMedicalDirector ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30 shadow-xs">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              <span>Medical Director Portal</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 shadow-xs">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              <span>Compliance Portal</span>
+            </div>
+          )}
         </div>
       </header>
 

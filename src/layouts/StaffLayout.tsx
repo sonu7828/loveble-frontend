@@ -499,15 +499,15 @@ export default function StaffLayout() {
             </Sheet>
           </div>
 
-          <Link to={roles.includes("privacy_officer") ? "/staff/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
+          <Link to={isPrivacyOfficer && !isMedicalDirector ? "/staff/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
             <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover shadow-soft" />
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                {roles.includes("medical_director")
-                  ? "Medical Director Hub"
-                  : roles.includes("privacy_officer")
+                {location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || (isPrivacyOfficer && !isMedicalDirector)
                   ? "Security Officer Hub"
+                  : isMedicalDirector
+                  ? "Medical Director Hub"
                   : "Staff Hub"}
               </div>
             </div>
@@ -516,23 +516,23 @@ export default function StaffLayout() {
 
         {/* Right Corner: Active Portal Name Badge */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shadow-xs ${roles.includes("medical_director")
-              ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30"
-              : roles.includes("privacy_officer")
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shadow-xs ${location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || (isPrivacyOfficer && !isMedicalDirector)
+              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+              : isMedicalDirector
+                ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30"
                 : "bg-primary/10 text-primary border border-primary/20"
             }`}>
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
             <span>
-              {roles.includes("medical_director")
-                ? "Medical Director Portal"
-                : roles.includes("privacy_officer")
-                  ? "Privacy & Security Officer Portal"
-                  : roles.includes("nurse_practitioner")
+              {location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || (isPrivacyOfficer && !isMedicalDirector)
+                ? "Privacy & Security Officer Portal"
+                : isMedicalDirector
+                  ? "Medical Director Portal"
+                  : isNP
                     ? "Nurse Practitioner Portal"
-                    : roles.includes("rn_injector")
+                    : isRNInjector
                       ? "RN Injector Portal"
-                      : roles.includes("front_desk")
+                      : isFrontDesk
                         ? "Front Desk Receptionist Portal"
                         : "Staff Portal"}
             </span>
