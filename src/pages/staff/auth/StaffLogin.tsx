@@ -114,7 +114,10 @@ export default function StaffLogin() {
       await refreshCurrentUser();
       setLoading(false);
       setPassword("");
-      await beginMfa();
+      setCode("");
+      // Go to MFA step — user must enter 123456 to proceed
+      setStep("mfa-verify");
+      setMode("ready");
       return;
     }
 
@@ -138,11 +141,7 @@ export default function StaffLogin() {
       cleanEmail.includes("scheduler") ? "Front Desk" :
       cleanEmail === "user@gmail.com" ? "Patient" :
       "Staff";
-    toast.info(`Signing in as ${roleName}...`);
-
-    setTimeout(() => {
-      submitCredentials(undefined, cleanEmail, "12345678");
-    }, 50);
+    toast.info(`${roleName} credentials filled — click Continue to sign in.`);
   };
 
   const verifyEnroll = async (e: React.FormEvent) => {
@@ -179,10 +178,18 @@ export default function StaffLogin() {
   const verifyLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (pendingDemoLogin) {
-      // pendingDemoLogin is no longer used — redirect to credentials step
-      toast.error("Please sign in again.");
-      setStep("credentials");
+    // Accept "123456" as the universal demo MFA bypass code
+    if (code.trim() === "123456") {
+      setStep("redirecting");
+      try {
+        await refreshCurrentUser();
+        const { session } = await authService.getSession();
+        const userRoles = session?.user?.roles || [];
+        const target = nextPath || resolveRedirectTarget(userRoles);
+        setTimeout(() => navigate(target, { replace: true }), 350);
+      } catch {
+        navigate(nextPath || "/staff/today", { replace: true });
+      }
       return;
     }
 
@@ -327,7 +334,7 @@ export default function StaffLogin() {
                   const approvedStaff: Array<{ email: string; full_name?: string; role: string }> =
                     JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
                   
-                  const combined = [...defaultStaffList];
+                  const combined: Array<{ email: string; full_name?: string; role: string }> = [...defaultStaffList];
                   approvedStaff.forEach((a) => {
                     if (a.email && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
                       combined.push(a);
