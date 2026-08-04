@@ -105,10 +105,16 @@ export default function StaffLogin() {
     const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password: targetPassword });
 
     if (data?.user) {
+      try {
+        sessionStorage.setItem("rka_tab_session_user", JSON.stringify(data.user));
+      } catch (e) { }
       await refreshCurrentUser();
       setLoading(false);
       setPassword("");
-      await beginMfa();
+      setCode("");
+      // Go to MFA step — user must enter 123456 to proceed
+      setStep("mfa-verify");
+      setMode("ready");
       return;
     }
 
@@ -125,18 +131,14 @@ export default function StaffLogin() {
     setCode("");
     const roleName =
       cleanEmail === "admin@gmail.com" ? "Admin" :
-      cleanEmail.includes("medical") ? "Medical Director" :
-      cleanEmail.includes("nurse") || cleanEmail.includes("prectitioner") ? "Nurse Practitioner" :
-      cleanEmail.includes("injector") ? "RN Injector" :
-      cleanEmail.includes("security") || cleanEmail.includes("officer") ? "Security Officer" :
-      cleanEmail.includes("scheduler") ? "Front Desk" :
-      cleanEmail === "user@gmail.com" ? "Patient" :
-      "Staff";
-    toast.info(`Signing in as ${roleName}...`);
-
-    setTimeout(() => {
-      submitCredentials(undefined, cleanEmail, "12345678");
-    }, 50);
+        cleanEmail.includes("medical") ? "Medical Director" :
+          cleanEmail.includes("nurse") || cleanEmail.includes("prectitioner") ? "Nurse Practitioner" :
+            cleanEmail.includes("injector") ? "RN Injector" :
+              cleanEmail.includes("security") || cleanEmail.includes("officer") ? "Security Officer" :
+                cleanEmail.includes("scheduler") ? "Front Desk" :
+                  cleanEmail === "user@gmail.com" ? "Patient" :
+                    "Staff";
+    toast.info(`${roleName} credentials filled — click Continue to sign in.`);
   };
 
   const verifyEnroll = async (e: React.FormEvent) => {
@@ -173,10 +175,18 @@ export default function StaffLogin() {
   const verifyLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (pendingDemoLogin) {
-      // pendingDemoLogin is no longer used — redirect to credentials step
-      toast.error("Please sign in again.");
-      setStep("credentials");
+    // Accept "123456" as the universal demo MFA bypass code
+    if (code.trim() === "123456") {
+      setStep("redirecting");
+      try {
+        await refreshCurrentUser();
+        const { session } = await authService.getSession();
+        const userRoles = session?.user?.roles || [];
+        const target = nextPath || resolveRedirectTarget(userRoles);
+        setTimeout(() => navigate(target, { replace: true }), 350);
+      } catch {
+        navigate(nextPath || "/staff/today", { replace: true });
+      }
       return;
     }
 
@@ -234,34 +244,49 @@ export default function StaffLogin() {
           {/* Portal Switcher Tabs */}
           <div className="grid grid-cols-3 gap-1 p-1 mb-4 rounded-xl bg-muted/50 border border-border/80 text-[11px] font-medium select-none">
             <Link
+<<<<<<< HEAD
               to="/admin/login"
               className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
                 activeRole === "admin"
+=======
+              to="/staff/login?role=admin"
+              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${activeRole === "admin"
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                   ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-              }`}
+                }`}
             >
               <span className="text-[11px]">👑</span>
               <span>Admin</span>
             </Link>
             <Link
+<<<<<<< HEAD
               to="/staff/login"
               className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
                 activeRole === "staff"
+=======
+              to="/staff/login?role=staff"
+              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${activeRole === "staff"
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                   ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-              }`}
+                }`}
             >
               <span className="text-[11px]">🩺</span>
               <span>Staff</span>
             </Link>
             <Link
+<<<<<<< HEAD
               to="/account/auth"
               className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${
                 activeRole === "user"
+=======
+              to="/staff/login?role=user"
+              className={`py-1.5 px-2 rounded-lg transition text-center flex items-center justify-center gap-1.5 ${activeRole === "user"
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                   ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-              }`}
+                }`}
             >
               <span className="text-[11px]">👤</span>
               <span>User</span>
@@ -294,25 +319,50 @@ export default function StaffLogin() {
               <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 p-2.5 text-xs">
                 <div className="font-semibold text-foreground mb-0.5 text-[11px]">⚡ Quick Demo Credentials</div>
                 <div className="text-muted-foreground text-[10px] mb-1.5">Click below to auto-fill demo login (password: <code className="bg-muted px-1 rounded text-foreground font-mono">12345678</code>):</div>
+<<<<<<< HEAD
                 
 
+=======
+
+                {activeRole === "admin" && (() => {
+                  const adminName = getDynamicProfileName("admin@gmail.com", "System Admin");
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => fillDemoCredentials("admin@gmail.com")}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background hover:bg-secondary/60 transition text-left text-xs font-medium cursor-pointer flex items-center justify-between"
+                    >
+                      <div>
+                        👑 <strong>{adminName}</strong>
+                        <span className="text-[10px] text-muted-foreground ml-1.5 font-mono">admin@gmail.com</span>
+                      </div>
+                      <span className="text-[9px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded">Admin</span>
+                    </button>
+                  );
+                })()}
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
 
                 {activeRole === "staff" && (() => {
                   const defaultStaffList = [
-                    { email: "medicaldirector@gmail.com", full_name: "Dr. Sarah (MD)", role: "medical_director" },
-                    { email: "nurseprectitioner@gmail.com", full_name: "Nurse Practitioner", role: "nurse_practitioner" },
-                    { email: "injector@gmail.com", full_name: "RN Injector", role: "rn_injector" },
-                    { email: "securityofficer@gmail.com", full_name: "Security Officer", role: "privacy_officer" },
-                    { email: "scheduler@gmail.com", full_name: "Front Desk Coordinator", role: "front_desk" },
+                    { email: "medicaldirector@gmail.com", defaultName: "Dr. Dhruva (MD)", role: "medical_director" },
+                    { email: "nurseprectitioner@gmail.com", defaultName: "Kiem Vukadinovic, NP", role: "nurse_practitioner" },
+                    { email: "injector@gmail.com", defaultName: "Girish, RN Injector", role: "rn_injector" },
+                    { email: "securityofficer@gmail.com", defaultName: "Bob Stane (Security Officer)", role: "privacy_officer" },
+                    { email: "scheduler@gmail.com", defaultName: "Front Desk Coordinator", role: "front_desk" },
                   ];
                   const approvedStaff: Array<{ email: string; full_name?: string; role: string }> =
                     JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-                  
-                  const combined = [...defaultStaffList];
+
+                  const combined: Array<{ email: string; defaultName?: string; full_name?: string; role: string }> = [...defaultStaffList];
                   approvedStaff.forEach((a) => {
+<<<<<<< HEAD
                     if (a.role === "admin") return; // Filter out admin accounts
                     if (a.email && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
                       combined.push(a);
+=======
+                    if (a.email && a.email.toLowerCase() !== "admin@gmail.com" && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
+                      combined.push({ email: a.email, defaultName: a.full_name, role: a.role });
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                     }
                   });
 
@@ -330,19 +380,21 @@ export default function StaffLogin() {
 
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
-                      {combined.map((s) => (
-                        <button
-                          key={s.email}
-                          type="button"
-                          onClick={() => fillDemoCredentials(s.email)}
-                          className={`p-1.5 rounded-lg border transition text-left text-[11px] font-medium cursor-pointer flex flex-col justify-between ${
-                            roleColor[s.role] || "border-border bg-background hover:bg-secondary/60"
-                          }`}
-                        >
-                          <div className="truncate">{roleEmoji[s.role] || "👤"} <strong>{s.full_name || s.email.split("@")[0]}</strong></div>
-                          <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">{s.email}</span>
-                        </button>
-                      ))}
+                      {combined.map((s) => {
+                        const displayName = getDynamicProfileName(s.email, s.defaultName || s.full_name || s.email.split("@")[0]);
+                        return (
+                          <button
+                            key={s.email}
+                            type="button"
+                            onClick={() => fillDemoCredentials(s.email)}
+                            className={`p-1.5 rounded-lg border transition text-left text-[11px] font-medium cursor-pointer flex flex-col justify-between ${roleColor[s.role] || "border-border bg-background hover:bg-secondary/60"
+                              }`}
+                          >
+                            <div className="truncate">{roleEmoji[s.role] || "👤"} <strong>{displayName}</strong></div>
+                            <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">{s.email}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -493,13 +545,12 @@ function Stepper({ step }: { step: Step }) {
           return (
             <div key={s.id} className="flex flex-col items-center gap-1 z-10 bg-card px-1">
               <div
-                className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-semibold border transition ${
-                  isDone
+                className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-semibold border transition ${isDone
                     ? "bg-primary text-primary-foreground border-primary"
                     : isActive
-                    ? "bg-primary/10 border-primary text-primary ring-2 ring-primary/20 font-bold"
-                    : "border-border bg-background text-muted-foreground"
-                }`}
+                      ? "bg-primary/10 border-primary text-primary ring-2 ring-primary/20 font-bold"
+                      : "border-border bg-background text-muted-foreground"
+                  }`}
               >
                 {isDone ? <Check className="h-3 w-3" /> : i + 1}
               </div>

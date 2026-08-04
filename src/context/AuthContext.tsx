@@ -91,11 +91,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchInFlightRef.current = true;
 
     try {
+      // 1. Check tab-isolated session in sessionStorage first for multi-tab independence
+      const tabUserRaw = sessionStorage.getItem("rka_tab_session_user");
+      if (tabUserRaw) {
+        try {
+          const tabUser = JSON.parse(tabUserRaw);
+          if (tabUser && tabUser.id && tabUser.roles) {
+            setUser(tabUser);
+            setRoles(tabUser.roles || []);
+            setStaffId(tabUser.staff_id || tabUser.id);
+            setLoading(false);
+            fetchInFlightRef.current = false;
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 2. Otherwise query backend getSession()
       const result = await authService.getSession();
       if (result.session && result.user) {
         setUser(result.user);
         setRoles(result.user.roles || []);
         setStaffId(result.user.staff_id || result.user.id);
+        try {
+          sessionStorage.setItem("rka_tab_session_user", JSON.stringify(result.user));
+        } catch (e) {}
       } else {
         setUser(null);
         setRoles([]);
@@ -119,6 +139,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(result.user);
         setRoles(result.user.roles || []);
         setStaffId(result.user.staff_id || result.user.id);
+        try {
+          sessionStorage.setItem("rka_tab_session_user", JSON.stringify(result.user));
+        } catch (e) {}
       } else {
         await refreshCurrentUser();
       }
@@ -141,15 +164,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRoles([]);
       setStaffId(null);
       logoutInFlightRef.current = false;
-
-      // Broadcast logout to other open tabs
       try {
-        const bc = new BroadcastChannel(AUTH_CHANNEL);
-        bc.postMessage({ type: "LOGOUT", time: Date.now() });
-        bc.close();
-      } catch {
-        // BroadcastChannel fallback ignore
-      }
+        sessionStorage.removeItem("rka_tab_session_user");
+      } catch (e) {}
     }
   }, []);
 
@@ -161,6 +178,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Session Expired Event Listener (from client.ts 401 interceptor)
   useEffect(() => {
     const handleSessionExpired = (event: Event) => {
+      // Only clear if no tab session override is active
+      const tabUserRaw = sessionStorage.getItem("rka_tab_session_user");
+      if (tabUserRaw) return;
+
       setUser(null);
       setRoles([]);
       setStaffId(null);
@@ -172,11 +193,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
+<<<<<<< HEAD
         // Context-aware redirection & toast message
         if (currentPath.startsWith("/admin")) {
           toast.error("Your admin session has expired. Please sign in again.");
           window.location.href = "/admin/login";
         } else if (currentPath.startsWith("/staff")) {
+=======
+        if (currentPath.startsWith("/staff")) {
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
           toast.error("Your staff session has expired. Please sign in again.");
           window.location.href = "/staff/login";
         } else if (currentPath.startsWith("/account")) {
@@ -196,6 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+<<<<<<< HEAD
   // Multi-Tab Synchronization via BroadcastChannel
   useEffect(() => {
     let bc: BroadcastChannel | null = null;
@@ -226,6 +252,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+=======
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
   // Core Role Flags
   const isAdmin = roles.includes("admin");
   const isFrontDesk = roles.includes("front_desk") || isAdmin;

@@ -60,6 +60,14 @@ const downloadBlob = (content: string, filename: string, mime = "text/csv;charse
   URL.revokeObjectURL(url);
 };
 
+/** Safely format a date string — returns "—" for null/undefined/invalid values */
+const safeFormatDate = (value: string | null | undefined, fmt: string): string => {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return format(d, fmt);
+};
+
 export default function AdminAuditReport() {
   const { isAdmin, isMedicalDirector, isPrivacyOfficer, loading: authLoading } = useAuth();
 
@@ -866,7 +874,11 @@ export default function AdminAuditReport() {
                   {pageEvents.map((e) => (
                     <tr key={e.id} className="hover:bg-muted/20 transition-colors">
                       <td className="py-3 px-4 font-mono text-[11px] whitespace-nowrap text-muted-foreground">
+<<<<<<< HEAD
                         {isNaN(new Date(e.when).getTime()) ? String(e.when) : format(new Date(e.when), "MMM d, yyyy · HH:mm:ss")}
+=======
+                        {safeFormatDate(e.when, "MMM d, yyyy · HH:mm:ss")}
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border ${CATEGORY_BADGE[e.category]}`}>

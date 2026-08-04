@@ -110,8 +110,9 @@ function MedicalDirectorDashboard() {
         type: "Medical Assessment",
         date: new Date(g.created_at).toLocaleDateString(),
       }));
-      setReviews([...notes, ...gfes]);
-      setActiveStaffCount((staffRes?.data ?? []).length || 2);
+      const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+      const validApproved = approvedList.filter((a) => a.email && a.email.toLowerCase() !== "admin@gmail.com" && !a.email.toLowerCase().includes("no email"));
+      setActiveStaffCount(Math.max(validApproved.length, (staffRes?.data ?? []).length));
     })();
   }, []);
 

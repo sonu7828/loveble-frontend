@@ -499,16 +499,22 @@ export default function StaffLayout() {
             </Sheet>
           </div>
 
+<<<<<<< HEAD
           <Link to={roles.includes("privacy_officer") ? "/admin/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
+=======
+          <Link to={isAdmin ? "/staff/admin" : isPrivacyOfficer && !isMedicalDirector ? "/staff/security-officer" : "/staff/today"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition">
+>>>>>>> 7664e94a8662e922f63e2779df1ffb488b32b2fa
             <img src={rkaLogo} alt="Radiantilyk Aesthetic" className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover shadow-soft" />
             <div className="text-left hidden sm:block">
               <div className="font-serif text-sm leading-tight font-medium">Radiantilyk Aesthetic</div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                {roles.includes("medical_director")
-                  ? "Medical Director Hub"
-                  : roles.includes("privacy_officer")
-                  ? "Security Officer Hub"
-                  : "Staff Hub"}
+                {isAdmin
+                  ? "Admin Dashboard"
+                  : location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || (isPrivacyOfficer && !isMedicalDirector)
+                    ? "Security Officer Hub"
+                    : isMedicalDirector
+                    ? "Medical Director Hub"
+                    : "Staff Hub"}
               </div>
             </div>
           </Link>
@@ -516,25 +522,29 @@ export default function StaffLayout() {
 
         {/* Right Corner: Active Portal Name Badge */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shadow-xs ${roles.includes("medical_director")
-              ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30"
-              : roles.includes("privacy_officer")
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider shadow-xs ${isAdmin
+              ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+              : location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || (isPrivacyOfficer && !isMedicalDirector)
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                : "bg-primary/10 text-primary border border-primary/20"
+                : isMedicalDirector
+                  ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30"
+                  : "bg-primary/10 text-primary border border-primary/20"
             }`}>
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
             <span>
-              {roles.includes("medical_director")
-                ? "Medical Director Portal"
-                : roles.includes("privacy_officer")
+              {isAdmin
+                ? "Admin Portal"
+                : location.pathname.includes("security-officer") || location.pathname.includes("audit-report") || location.pathname.includes("hipaa-policies") || location.pathname.includes("breach-report") || location.pathname.includes("vendors") || (isPrivacyOfficer && !isMedicalDirector)
                   ? "Privacy & Security Officer Portal"
-                  : roles.includes("nurse_practitioner")
-                    ? "Nurse Practitioner Portal"
-                    : roles.includes("rn_injector")
-                      ? "RN Injector Portal"
-                      : roles.includes("front_desk")
-                        ? "Front Desk Receptionist Portal"
-                        : "Staff Portal"}
+                  : isMedicalDirector
+                    ? "Medical Director Portal"
+                    : (isNP && !isAdmin)
+                      ? "Nurse Practitioner Portal"
+                      : (isRNInjector && !isAdmin)
+                        ? "RN Injector Portal"
+                        : (isFrontDesk && !isAdmin)
+                          ? "Front Desk Receptionist Portal"
+                          : "Staff Portal"}
             </span>
           </div>
         </div>

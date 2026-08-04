@@ -40,11 +40,14 @@ export default function AdminHub() {
           apiQuery("phi_access_log" as any).select("id, action, resource, created_at, user_id").order("created_at", { ascending: false }).limit(5),
         ]);
 
-        if (!isMounted) return;
+        const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        const validApproved = approvedList.filter((a) => a.email && a.email.toLowerCase() !== "admin@gmail.com" && !a.email.toLowerCase().includes("no email"));
+        const dbCount = Array.isArray(staffData) ? staffData.length : 0;
+        const totalStaff = Math.max(validApproved.length, dbCount);
 
         setCounts({
           modelApps: 0,
-          staffCount: Array.isArray(staffData) ? staffData.length : 3,
+          staffCount: totalStaff,
           servicesCount: Array.isArray(servicesData) ? servicesData.length : 60,
           auditLogCount: Array.isArray(phiLogs) ? phiLogs.length : 0,
         });
