@@ -10,7 +10,17 @@
  * - 429 exponential backoff retry
  */
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:5000/api";
+function getApiBaseUrl(): string {
+  const envUrl = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    // On localhost, route through relative /api to ensure Vite dev server proxies requests and preserves HttpOnly cookies
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "/api";
+    }
+  }
+  return envUrl || "/api";
+}
 
 export interface ApiResponse<T = any> {
   data: T | null;
@@ -60,7 +70,7 @@ async function silentRefresh(): Promise<boolean> {
   _isRefreshing = true;
   _refreshPromise = (async () => {
     try {
-      const normalizedBase = API_BASE_URL.replace(/\/$/, "");
+      const normalizedBase = getApiBaseUrl().replace(/\/$/, "");
       const resp = await fetch(`${normalizedBase}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
@@ -109,7 +119,7 @@ export class ApiClient {
     };
 
     const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-    const url = `${API_BASE_URL.replace(/\/$/, "")}${normalizedEndpoint}`;
+    const url = `${getApiBaseUrl().replace(/\/$/, "")}${normalizedEndpoint}`;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {

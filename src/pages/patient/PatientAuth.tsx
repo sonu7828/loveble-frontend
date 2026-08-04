@@ -35,18 +35,22 @@ export default function PatientAuth() {
 
   const fillClientDemoCredentials = () => {
     setForm((f) => ({ ...f, email: "user@gmail.com", password: "12345678" }));
-    toast.info("Demo User credentials populated in Email & Password fields. Click Sign in to proceed.");
+    toast.info("Signing in as Demo User...");
+    setTimeout(() => {
+      submit(undefined, "user@gmail.com", "12345678");
+    }, 50);
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: React.FormEvent, overrideEmail?: string, overridePassword?: string) => {
+    if (e?.preventDefault) e.preventDefault();
     setLoading(true);
 
     if (mode === "signin") {
-      const cleanEmail = form.email.trim().toLowerCase();
+      const cleanEmail = (overrideEmail || form.email).trim().toLowerCase();
+      const pass = overridePassword || form.password;
 
       const { error } = await authService.signInWithPassword({
-        email: cleanEmail, password: form.password,
+        email: cleanEmail, password: pass,
       });
 
       setLoading(false);

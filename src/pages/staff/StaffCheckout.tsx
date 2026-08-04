@@ -137,7 +137,7 @@ export default function StaffCheckout() {
           .order("is_default", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(1),
-        apiQuery("get_points_balance" as any, { _client_email: s.client_email }),
+        apiQuery.functions.invoke("get_points_balance", { body: { _client_email: s.client_email } }),
       ]);
       setCreditBalanceCents(Math.max(0, (bal as any)?.balance_cents ?? 0));
       setServiceCredits((svcCreds as any) ?? []);

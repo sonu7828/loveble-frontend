@@ -87,10 +87,10 @@ export function ReceiveLotDialog({
 
       // Also try to call the API (best-effort, won't block on failure)
       try {
-        const { data: session } = await authService.getSession();
+        const { user } = await authService.getSession();
         await ApiClient.post("/inventory/receive", {
           ...lotData,
-          received_by: session?.user?.id ?? null,
+          received_by: user?.id ?? null,
         });
       } catch {
         /* API unavailable — local storage is the source of truth */

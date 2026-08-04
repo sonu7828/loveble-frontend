@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { inventoryService, ProductLot as Lot } from "@/services/api";
+import { inventoryService, ProductLot } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Plus, AlertTriangle, PackageX, PackageSearch, Boxes, Flame, Pencil } from "lucide-react";

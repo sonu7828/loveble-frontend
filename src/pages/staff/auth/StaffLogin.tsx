@@ -99,28 +99,16 @@ export default function StaffLogin() {
 
   const [pendingDemoLogin, setPendingDemoLogin] = useState<{ cleanEmail: string; roles: AppRole[]; isAd: boolean } | null>(null);
 
-  const fillDemoCredentials = (targetEmail: string) => {
-    const cleanEmail = targetEmail.trim().toLowerCase();
-    setEmail(cleanEmail);
-    setPassword("12345678");
-    setCode("");
-    const roleName =
-      cleanEmail === "admin@gmail.com" ? "Admin" :
-      cleanEmail.includes("medical") ? "Medical Director" :
-      cleanEmail.includes("security") || cleanEmail.includes("officer") ? "Security Officer" :
-      cleanEmail === "user@gmail.com" ? "Patient" :
-      "Staff";
-    toast.info(`${roleName} credentials populated into Email & Password. Click Continue to proceed.`);
-  };
-
-  const submitCredentials = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitCredentials = async (e?: React.FormEvent, overrideEmail?: string, overridePassword?: string) => {
+    if (e?.preventDefault) e.preventDefault();
     setLoading(true);
     setErrMsg("");
-    const cleanEmail = email.trim().toLowerCase();
+    const targetEmail = overrideEmail || email;
+    const targetPassword = overridePassword || password;
+    const cleanEmail = targetEmail.trim().toLowerCase();
 
     // Authenticate via backend API
-    const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password });
+    const { data, error } = await authService.signInWithPassword({ email: cleanEmail, password: targetPassword });
 
     if (data?.user) {
       await refreshCurrentUser();
@@ -134,6 +122,27 @@ export default function StaffLogin() {
     const err = error?.message || "Invalid email or password. Access denied.";
     setErrMsg(err);
     toast.error(err);
+  };
+
+  const fillDemoCredentials = (targetEmail: string) => {
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    setEmail(cleanEmail);
+    setPassword("12345678");
+    setCode("");
+    const roleName =
+      cleanEmail === "admin@gmail.com" ? "Admin" :
+      cleanEmail.includes("medical") ? "Medical Director" :
+      cleanEmail.includes("nurse") || cleanEmail.includes("prectitioner") ? "Nurse Practitioner" :
+      cleanEmail.includes("injector") ? "RN Injector" :
+      cleanEmail.includes("security") || cleanEmail.includes("officer") ? "Security Officer" :
+      cleanEmail.includes("scheduler") ? "Front Desk" :
+      cleanEmail === "user@gmail.com" ? "Patient" :
+      "Staff";
+    toast.info(`Signing in as ${roleName}...`);
+
+    setTimeout(() => {
+      submitCredentials(undefined, cleanEmail, "12345678");
+    }, 50);
   };
 
   const verifyEnroll = async (e: React.FormEvent) => {
@@ -308,23 +317,23 @@ export default function StaffLogin() {
                 )}
 
                 {activeRole === "staff" && (() => {
+                  const defaultStaffList = [
+                    { email: "medicaldirector@gmail.com", full_name: "Dr. Sarah (MD)", role: "medical_director" },
+                    { email: "nurseprectitioner@gmail.com", full_name: "Nurse Practitioner", role: "nurse_practitioner" },
+                    { email: "injector@gmail.com", full_name: "RN Injector", role: "rn_injector" },
+                    { email: "securityofficer@gmail.com", full_name: "Security Officer", role: "privacy_officer" },
+                    { email: "scheduler@gmail.com", full_name: "Front Desk Coordinator", role: "front_desk" },
+                  ];
                   const approvedStaff: Array<{ email: string; full_name?: string; role: string }> =
                     JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-                  const staffList = approvedStaff.filter(
-                    (a) => a.email && a.email !== "admin@gmail.com" && a.email !== "user@gmail.com" && a.role !== "patient"
-                  );
-                  if (staffList.length === 0) {
-                    // fallback if no staff in localStorage yet
-                    return (
-                      <div className="grid grid-cols-1 gap-1.5">
-                        <button type="button" onClick={() => fillDemoCredentials("staff@gmail.com")}
-                          className="p-1.5 rounded-lg border border-border bg-background hover:bg-secondary/60 transition text-left text-[11px] font-medium cursor-pointer">
-                          <div>💉 <strong>Staff</strong></div>
-                          <span className="text-[9px] text-muted-foreground font-mono block mt-0.5">staff@gmail.com</span>
-                        </button>
-                      </div>
-                    );
-                  }
+                  
+                  const combined = [...defaultStaffList];
+                  approvedStaff.forEach((a) => {
+                    if (a.email && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
+                      combined.push(a);
+                    }
+                  });
+
                   const roleEmoji: Record<string, string> = {
                     admin: "👑", medical_director: "🩺", privacy_officer: "🛡️",
                     nurse_practitioner: "💊", rn_injector: "💉", front_desk: "🏥",
@@ -334,12 +343,12 @@ export default function StaffLogin() {
                     privacy_officer: "border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300",
                     nurse_practitioner: "border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-800 dark:text-blue-300",
                     rn_injector: "border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300",
-                    front_desk: "border-border bg-muted/50 hover:bg-muted text-foreground",
+                    front_desk: "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-300",
                   };
-                  const cols = staffList.length <= 2 ? `grid-cols-1 sm:grid-cols-${staffList.length}` : "grid-cols-1 sm:grid-cols-3";
+
                   return (
-                    <div className={`grid ${cols} gap-1.5`}>
-                      {staffList.map((s) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+                      {combined.map((s) => (
                         <button
                           key={s.email}
                           type="button"
@@ -348,7 +357,7 @@ export default function StaffLogin() {
                             roleColor[s.role] || "border-border bg-background hover:bg-secondary/60"
                           }`}
                         >
-                          <div>{roleEmoji[s.role] || "👤"} <strong>{s.full_name || s.email.split("@")[0]}</strong></div>
+                          <div className="truncate">{roleEmoji[s.role] || "👤"} <strong>{s.full_name || s.email.split("@")[0]}</strong></div>
                           <span className="text-[9px] opacity-80 font-mono block mt-0.5 truncate">{s.email}</span>
                         </button>
                       ))}

@@ -114,13 +114,13 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       }
       if (p.data) setProviders(p.data as any);
 
-      if (sess?.data?.user) {
+      const currentUser = sess?.user || sess?.session?.user;
+      if (currentUser) {
         setClient(prev => ({
           ...prev,
-          email: sess.data.user.email ?? "",
-          firstName: sess.data.user.user_metadata?.first_name ?? prev.firstName,
-          lastName: sess.data.user.user_metadata?.last_name ?? prev.lastName,
-          phone: sess.data.user.user_metadata?.phone ?? prev.phone,
+          email: currentUser.email ?? "",
+          firstName: currentUser.first_name ?? prev.firstName,
+          lastName: currentUser.last_name ?? prev.lastName,
         }));
       }
       setLoading(false);

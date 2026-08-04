@@ -309,8 +309,8 @@ export default function StaffClients() {
     if (!importPreview?.rows.length) return;
     setImporting(true);
     try {
-      const { data: u } = await authService.getSession();
-      const payload = importPreview.rows.map((r) => ({ ...r, imported_by: u.user?.id ?? null }));
+      const { user } = await authService.getSession();
+      const payload = importPreview.rows.map((r) => ({ ...r, imported_by: user?.id ?? null }));
       const { error, count } = await apiQuery
         .from("imported_clients")
         .upsert(payload, { onConflict: "email", ignoreDuplicates: false, count: "exact" });
@@ -417,9 +417,9 @@ export default function StaffClients() {
     if (reason === null) return;
     setBusyEmail(c.email);
     try {
-      const { data: u } = await authService.getSession();
+      const { user } = await authService.getSession();
       const { error } = await apiQuery("blocked_clients").upsert(
-        { email: c.email.toLowerCase(), reason: reason || null, blocked_by: u.user?.id ?? null },
+        { email: c.email.toLowerCase(), reason: reason || null, blocked_by: user?.id ?? null },
         { onConflict: "email" },
       );
       if (error) throw error;
