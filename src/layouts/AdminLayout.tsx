@@ -29,8 +29,8 @@ interface NavItem {
 }
 
 export default function AdminLayout() {
-  const { user, roles, loading, isAdmin, isPrivileged, logout } = useAuth();
-  const canAccessAdminLayout = isAdmin;
+  const { user, roles, loading, isAdmin, isPrivacyOfficer, isMedicalDirector, isPrivileged, logout } = useAuth();
+  const canAccessAdminLayout = isAdmin || isPrivacyOfficer || isMedicalDirector;
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);

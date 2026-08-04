@@ -88,6 +88,7 @@ export default function AdminAuditReport() {
   const toIso = useMemo(() => endOfDay(new Date(to + "T00:00:00")).toISOString(), [to]);
 
   const load = async () => {
+    if (authLoading) return;
     if (!isAdmin && !isMedicalDirector && !isPrivacyOfficer) return;
     setLoading(true);
     setPage(0);
@@ -496,9 +497,9 @@ export default function AdminAuditReport() {
   };
 
   useEffect(() => {
-    if (isAdmin || isMedicalDirector || isPrivacyOfficer) load();
+    if (!authLoading && (isAdmin || isMedicalDirector || isPrivacyOfficer)) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, isMedicalDirector, isPrivacyOfficer, from, to]);
+  }, [authLoading, isAdmin, isMedicalDirector, isPrivacyOfficer, from, to]);
 
   // Filtered Events with robust Date Range comparison
   const filteredEvents = useMemo(() => {
