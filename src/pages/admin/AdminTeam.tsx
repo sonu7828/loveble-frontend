@@ -77,12 +77,6 @@ const DEFAULT_STAFF_MEMBERS: Member[] = [
     full_name: getDynamicProfileName("scheduler@gmail.com", "Front Desk Coordinator"),
     title: "Front Desk Coordinator & Scheduler", email: "scheduler@gmail.com",
     is_active: true, is_owner: false, color: "#e8b94b", hourly_rate_cents: null, commission_percent: null, pending_role: "front_desk"
-  },
-  {
-    id: "staff-admin-1", user_id: "user-admin-1",
-    full_name: getDynamicProfileName("admin@gmail.com", "Buccky Barnz (Admin)"),
-    title: "System Administrator & Owner", email: "admin@gmail.com",
-    is_active: true, is_owner: true, color: "#c97c5d", hourly_rate_cents: null, commission_percent: null, pending_role: "admin"
   }
 ];
 
@@ -318,6 +312,26 @@ export default function AdminTeam() {
           roleName: draft.role,
           color: draft.color,
         });
+
+        const newMember: Member = {
+          id: `staff-new-${Date.now()}`,
+          user_id: `user-new-${Date.now()}`,
+          full_name: draft.full_name.trim(),
+          title,
+          email,
+          is_active: true,
+          is_owner: false,
+          color: draft.color || PALETTE[0],
+          hourly_rate_cents: null,
+          commission_percent: null,
+          pending_role: draft.role,
+        };
+
+        setMembers((prev) => {
+          const filtered = prev.filter((m) => m.email?.toLowerCase() !== email);
+          return [newMember, ...filtered];
+        });
+
         toast.success(`Team member ${draft.full_name.trim()} created successfully!`);
       } catch (e: any) {
         const rawErr = e?.message || e?.error?.message || (typeof e === "string" ? e : "");
@@ -349,11 +363,11 @@ export default function AdminTeam() {
       const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
       const sanitizedDeleted = deletedEmails.filter((e) => e.toLowerCase() !== email);
       localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitizedDeleted));
-
-
     } catch (_err) {}
 
     setAddBusy(false);
+    loadInProgress.current = false;
+    setTimeout(() => { load(); }, 200);
     setAddOpen(false);
     setDraft({ id: "", full_name: "", title: "", email: "", password: "", color: PALETTE[0], role: "" as Role, sendInvite: true });
     ApiClient.clearCache("/staff");
@@ -491,12 +505,19 @@ export default function AdminTeam() {
 
   if (!canAccessTeam) return <div className="p-8 text-sm text-muted-foreground">Access Restricted.</div>;
 
+  const isExcludedStaff = (m: Member) => {
+    if (!m.email || !m.email.trim()) return true;
+    const em = m.email.toLowerCase().trim();
+    if (em.includes("no email")) return true;
+    if (em === "admin@gmail.com") return true;
+    return false;
+  };
+
   const getMemberRoleFilterCount = (filter: string) => {
     return members.filter((m) => {
-      if (!m.email || !m.email.trim() || m.email.toLowerCase().includes("no email")) return false;
+      if (isExcludedStaff(m)) return false;
       if (filter === "all") return true;
       const r = resolveMemberRole(m);
-      if (filter === "admin") return r === "admin";
       if (filter === "clinical") return r === "nurse_practitioner" || r === "rn_injector";
       if (filter === "md") return r === "medical_director";
       if (filter === "np") return r === "nurse_practitioner";
@@ -507,14 +528,10 @@ export default function AdminTeam() {
 
   const filteredMembers = members
     .filter((m) => {
-      // Exclude all staff members without a valid email address
-      if (!m.email || !m.email.trim() || m.email.toLowerCase().includes("no email")) {
-        return false;
-      }
+      if (isExcludedStaff(m)) return false;
       if (roleFilter === "all") return true;
       const primaryRole = resolveMemberRole(m);
 
-      if (roleFilter === "admin") return primaryRole === "admin";
       if (roleFilter === "md") return primaryRole === "medical_director";
       if (roleFilter === "clinical") return primaryRole === "nurse_practitioner" || primaryRole === "rn_injector";
       if (roleFilter === "np") return primaryRole === "nurse_practitioner";
@@ -725,7 +742,7 @@ export default function AdminTeam() {
             onClick={() => setSp({})}
             className={`px-3.5 py-2 rounded-lg transition shrink-0 ${roleFilter === "all" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
           >
-            All Staff ({members.length})
+            All Staff ({getMemberRoleFilterCount("all")})
           </button>
           <button
             onClick={() => setSp({ role: "clinical" })}

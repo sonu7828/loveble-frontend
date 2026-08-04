@@ -22,7 +22,7 @@ export function getDynamicProfileName(user?: any, fallbackTitle?: string): strin
       const emailOverrideRaw = localStorage.getItem(`rka_user_profile_override_${email}`);
       if (emailOverrideRaw) {
         const parsed = JSON.parse(emailOverrideRaw);
-        if (parsed?.full_name && parsed.full_name.trim()) {
+        if (parsed?.full_name && parsed.full_name.trim() && !parsed.full_name.includes("Dr. M")) {
           return parsed.full_name.trim();
         }
       }
@@ -31,7 +31,7 @@ export function getDynamicProfileName(user?: any, fallbackTitle?: string): strin
       const emailSavedRaw = localStorage.getItem(`rka_demo_profile_${email}`);
       if (emailSavedRaw) {
         const parsed = JSON.parse(emailSavedRaw);
-        if (parsed?.form?.full_name && parsed.form.full_name.trim()) {
+        if (parsed?.form?.full_name && parsed.form.full_name.trim() && !parsed.form.full_name.includes("Dr. M")) {
           return parsed.form.full_name.trim();
         }
       }
@@ -41,7 +41,7 @@ export function getDynamicProfileName(user?: any, fallbackTitle?: string): strin
       if (approvedRaw) {
         const approvedList: any[] = JSON.parse(approvedRaw);
         const match = approvedList.find((a) => a.email && a.email.toLowerCase() === email);
-        if (match?.full_name && match.full_name.trim()) {
+        if (match?.full_name && match.full_name.trim() && !match.full_name.includes("Dr. M")) {
           return match.full_name.trim();
         }
       }

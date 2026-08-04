@@ -85,30 +85,125 @@ export function formatStaffDisplayName(rawName?: string | null): string {
   return name;
 }
 
+/** Role → default title mapping for fallback members */
+const ROLE_TITLE_MAP: Record<string, string> = {
+  medical_director: "Medical Director & Supervising Physician",
+  nurse_practitioner: "Nurse Practitioner & Lead Injector",
+  rn_injector: "Registered Nurse Injector",
+  privacy_officer: "Privacy & Security Officer",
+  front_desk: "Front Desk Coordinator & Scheduler",
+  admin: "System Administrator",
+};
+
+/** Hardcoded fallback clinical providers used when API + localStorage are both empty */
+const FALLBACK_PROVIDERS: UnifiedStaffMember[] = [
+  {
+    id: "staff-md-1",
+    full_name: "Dr. Dhruva (MD)",
+    title: "Medical Director & Supervising Physician",
+    email: "medicaldirector@gmail.com",
+    role: "medical_director",
+    is_active: true,
+    is_provider: true,
+  },
+  {
+    id: "staff-np-1",
+    full_name: "Kiem Vukadinovic, NP",
+    title: "Nurse Practitioner & Lead Injector",
+    email: "nurseprectitioner@gmail.com",
+    role: "nurse_practitioner",
+    is_active: true,
+    is_provider: true,
+  },
+  {
+    id: "staff-rn-1",
+    full_name: "Girish, RN Injector",
+    title: "Registered Nurse Injector",
+    email: "injector@gmail.com",
+    role: "rn_injector",
+    is_active: true,
+    is_provider: true,
+  },
+];
+
 export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> {
+  // ── Step 1: Read rka_approved_staff_accounts from localStorage (always available, set by AdminTeam) ──
+  const localStaff: UnifiedStaffMember[] = [];
+  const seenEmails = new Set<string>();
+
+  try {
+    const approved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+    approved.forEach((a: any) => {
+      const emailKey = (a.email || "").toLowerCase();
+      if (!emailKey || seenEmails.has(emailKey)) return;
+      seenEmails.add(emailKey);
+      // Skip admin accounts from provider list
+      const role = (a.role || "front_desk").toLowerCase().trim();
+      if (role === "admin" || role === "system_admin") return;
+      const title = a.title || ROLE_TITLE_MAP[role] || "Team Member";
+      localStaff.push({
+        id: a.id || `local-${emailKey}`,
+        full_name: a.full_name || a.fullName || "Staff Member",
+        title,
+        email: a.email || null,
+        role,
+        is_active: true,
+        is_provider: CLINICAL_PROVIDER_ROLES.has(role),
+      });
+    });
+  } catch (e) {
+    console.error("Failed to load staff from localStorage:", e);
+  }
+
+  // ── Step 2: Try API and merge (deduped by email) ──
   try {
     const data = await staffService.getStaffProfiles(false);
     if (Array.isArray(data) && data.length > 0) {
-      return data.map((s: any) => {
+      const apiStaff: UnifiedStaffMember[] = data.map((s: any) => {
         const roles = s.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
-        const primaryRole = roles.find((r: string) => r !== "staff" && r !== "patient") || roles[0] || s.role || "front_desk";
+        const primaryRole =
+          roles.find((r: string) => r !== "staff" && r !== "patient") ||
+          roles[0] ||
+          s.role ||
+          "front_desk";
         const rawName = s.fullName || s.full_name || "Staff Member";
+        const emailKey = (s.email || s.user?.email || "").toLowerCase();
         return {
           id: s.id,
-          full_name: formatStaffDisplayName(rawName),
-          title: s.title || (primaryRole ? primaryRole.replace("_", " ").toUpperCase() : "Staff Provider"),
-          email: s.email || s.user?.email || null,
+          full_name: rawName,
+          title:
+            s.title ||
+            ROLE_TITLE_MAP[primaryRole] ||
+            primaryRole.replace(/_/g, " "),
+          email: emailKey || null,
           role: primaryRole,
           is_active: s.isActive !== undefined ? s.isActive : true,
-          is_provider: s.isProvider ?? s.is_provider ?? CLINICAL_PROVIDER_ROLES.has(primaryRole),
+          is_provider:
+            s.isProvider ??
+            s.is_provider ??
+            CLINICAL_PROVIDER_ROLES.has(primaryRole),
         };
       });
+
+      // Merge: prefer API data but add any local-only entries not in API
+      const apiEmails = new Set(apiStaff.map((s) => (s.email || "").toLowerCase()));
+      const localOnly = localStaff.filter(
+        (s) => s.email && !apiEmails.has(s.email.toLowerCase())
+      );
+      const merged = [...apiStaff, ...localOnly].filter(
+        (s) => (s.role || "") !== "admin" && (s.role || "") !== "system_admin"
+      );
+      if (merged.length > 0) return merged;
     }
   } catch (e) {
     console.error("Failed to fetch staff members from DB:", e);
   }
 
-  return [];
+  // ── Step 3: Return local staff if API empty or failed ──
+  if (localStaff.length > 0) return localStaff;
+
+  // ── Step 4: Absolute fallback — hardcoded demo clinical providers ──
+  return FALLBACK_PROVIDERS;
 }
 
 export async function fetchClinicalProviders(): Promise<UnifiedStaffMember[]> {
