@@ -30,9 +30,17 @@ interface NavItem {
 
 export default function AdminLayout() {
   const { user, roles, loading, isAdmin, isPrivacyOfficer, isMedicalDirector, isPrivileged, logout } = useAuth();
-  const canAccessAdminLayout = isAdmin || isPrivacyOfficer || isMedicalDirector;
   const location = useLocation();
   const navigate = useNavigate();
+  
+  const isSecurityRoute =
+    location.pathname.includes("security-officer") ||
+    location.pathname.includes("audit-report") ||
+    location.pathname.includes("hipaa-policies") ||
+    location.pathname.includes("breach-report") ||
+    location.pathname.includes("vendors");
+
+  const canAccessAdminLayout = isAdmin || (isPrivacyOfficer && isSecurityRoute);
   const [open, setOpen] = useState(false);
 
   const [mfaOk, setMfaOk] = useState(true);

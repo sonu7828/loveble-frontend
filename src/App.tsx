@@ -203,6 +203,7 @@ const App = () => (
                 <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
                 <Route path="profile" element={<Navigate to="/staff/me" replace />} />
                 <Route path="help" element={<StaffHelp />} />
+                <Route path="team" element={<AdminTeam />} />
                 <Route path="compliance" element={<MyCompliance />} />
               </Route>
 
