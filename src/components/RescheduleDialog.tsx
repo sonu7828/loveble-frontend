@@ -96,7 +96,7 @@ export function RescheduleDialog({ open, onOpenChange, appointmentId, serviceId,
     if (!date) { setSlots([]); return; }
     setLoadingSlots(true);
     ApiClient.post("get-availability", {
-      body: { serviceIds: effectiveServiceIds, staffId: selectedStaffId, locationId: selectedLocationId, date: format(date, "yyyy-MM-dd"), includeConflicts: canOverride && overrideConflict },
+      serviceIds: effectiveServiceIds, staffId: selectedStaffId, locationId: selectedLocationId, date: format(date, "yyyy-MM-dd"), includeConflicts: canOverride && overrideConflict
     }).then(({ data }) => {
       setSlots(data?.slots ?? []);
       setLoadingSlots(false);

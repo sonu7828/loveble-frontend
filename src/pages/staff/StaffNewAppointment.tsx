@@ -118,7 +118,7 @@ export default function StaffNewAppointment() {
     setLoadingSlots(true);
     const dateStr = format(pickedDate, "yyyy-MM-dd");
     ApiClient.post("get-availability", {
-      body: { serviceIds, staffId: staffIdSel, locationId, date: dateStr, includeConflicts: canOverride && overrideConflict },
+      serviceIds, staffId: staffIdSel, locationId, date: dateStr, includeConflicts: canOverride && overrideConflict
     }).then(({ data }) => {
       const returned: string[] = data?.slots ?? [];
       // If no slots came back (demo/local staff with no DB schedule), generate fallback clinic hours
@@ -369,7 +369,17 @@ export default function StaffNewAppointment() {
             <div><Label>Last name</Label><Input required value={client.lastName} onChange={(e) => setClient({ ...client, lastName: e.target.value })} className="mt-1.5 h-11" autoComplete="family-name" /></div>
             <div><Label>Email</Label><Input type="email" required value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} className="mt-1.5 h-11" autoComplete="email" inputMode="email" /></div>
             <div><Label>Phone (10 digits)</Label><Input required type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 000-0000" maxLength={14} value={client.phone} onChange={(e) => setClient({ ...client, phone: formatPhone10(e.target.value) })} className="mt-1.5 h-11" /></div>
-            <div><Label>Date of birth</Label><Input type="date" value={client.dob} onChange={(e) => setClient({ ...client, dob: e.target.value })} className="mt-1.5 h-11" /></div>
+            <div><Label>Date of birth</Label><Input type="date" max={new Date().toISOString().split("T")[0]} min="1900-01-01" value={client.dob} onChange={(e) => {
+              let val = e.target.value;
+              if (val) {
+                const parts = val.split("-");
+                if (parts[0] && parts[0].length > 4) {
+                  parts[0] = parts[0].slice(0, 4);
+                  val = parts.join("-");
+                }
+              }
+              setClient({ ...client, dob: val });
+            }} className="mt-1.5 h-11" /></div>
           </div>
           <div>
             <Label>Notes</Label>

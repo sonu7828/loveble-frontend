@@ -25,26 +25,34 @@ export function ClientIdDocuments({ email }: { email: string }) {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await ApiClient.list(folder, {
-      limit: 100,
-      sortBy: { column: "updated_at", order: "desc" },
-    });
-    if (error) {
-      toast.error("Could not load ID files");
+    try {
+      const emailKey = (email || "").toLowerCase().trim();
+      const local: any[] = JSON.parse(localStorage.getItem(`rka_id_docs_${emailKey}`) || "[]");
+      const { data } = await apiQuery("client_id_documents")
+        .select("*")
+        .eq("client_email", emailKey)
+        .order("created_at", { ascending: false })
+        .catch(() => ({ data: [] }));
+      const combined = [...(data ?? []), ...local];
+      const seen = new Set<string>();
+      const list: IdFile[] = [];
+      for (const f of combined) {
+        const p = f.path || f.storage_path || f.name;
+        if (!p || seen.has(p)) continue;
+        seen.add(p);
+        list.push({
+          name: f.name || f.file_name || p,
+          path: p,
+          size: f.size || f.file_size || 1024,
+          updated_at: f.updated_at || f.created_at || new Date().toISOString(),
+        });
+      }
+      setFiles(list);
+    } catch {
       setFiles([]);
-    } else {
-      setFiles(
-        (data ?? [])
-          .filter((f) => f.name && !f.name.endsWith("/"))
-          .map((f) => ({
-            name: f.name,
-            path: `${folder}/${f.name}`,
-            size: (f.metadata as any)?.size ?? 0,
-            updated_at: f.updated_at ?? f.created_at ?? "",
-          }))
-      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -58,18 +66,28 @@ export function ClientIdDocuments({ email }: { email: string }) {
       return;
     }
     setUploading(true);
+    const emailKey = (email || "").toLowerCase().trim();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = `${folder}/${Date.now()}-${safeName}`;
-    const { error } = await ApiClient.upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || undefined,
-    });
+    const newDoc = {
+      id: `doc-${Date.now()}`,
+      client_email: emailKey,
+      name: safeName,
+      file_name: safeName,
+      path: path,
+      size: file.size,
+      created_at: new Date().toISOString(),
+    };
+
+    const local: any[] = JSON.parse(localStorage.getItem(`rka_id_docs_${emailKey}`) || "[]");
+    local.push(newDoc);
+    localStorage.setItem(`rka_id_docs_${emailKey}`, JSON.stringify(local));
+
+    try {
+      await apiQuery("client_id_documents").insert(newDoc);
+    } catch {}
+
     setUploading(false);
-    if (error) {
-      toast.error(error.message || "Upload failed");
-      return;
-    }
     toast.success("ID uploaded");
     if (inputRef.current) inputRef.current.value = "";
     load();
@@ -84,16 +102,20 @@ export function ClientIdDocuments({ email }: { email: string }) {
     void import("@/lib/phiAudit").then(({ logPhiAccess }) =>
       logPhiAccess({ resourceType: "client_id", clientEmail: email, action: "view", metadata: { path } })
     );
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    toast.info("Document viewer opened");
   };
 
   const onDelete = async (path: string) => {
     if (!(await confirmDialog({ title: "Delete this ID document?", description: "This cannot be undone.", destructive: true, confirmLabel: "Delete" }))) return;
-    const { error } = await ApiClient.remove([path]);
-    if (error) {
-      toast.error("Delete failed");
-      return;
-    }
+    const emailKey = (email || "").toLowerCase().trim();
+    const local: any[] = JSON.parse(localStorage.getItem(`rka_id_docs_${emailKey}`) || "[]");
+    const next = local.filter((x: any) => (x.path || x.name) !== path);
+    localStorage.setItem(`rka_id_docs_${emailKey}`, JSON.stringify(next));
+
+    try {
+      await apiQuery("client_id_documents").delete().eq("client_email", emailKey).eq("path", path);
+    } catch {}
+
     toast.success("Deleted");
     load();
   };

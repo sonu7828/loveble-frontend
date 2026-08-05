@@ -594,13 +594,36 @@ export default function StaffClients() {
       toast.error("First name and email are required");
       return;
     }
+
+    if (addClientDraft.phone) {
+      const digits = addClientDraft.phone.replace(/\D/g, "");
+      if (digits.length > 0 && digits.length !== 10) {
+        toast.error("Phone number must be exactly 10 digits");
+        return;
+      }
+    }
+
+    if (addClientDraft.dob) {
+      const today = new Date().toISOString().slice(0, 10);
+      const yearStr = addClientDraft.dob.split("-")[0];
+      const year = parseInt(yearStr, 10);
+      if (addClientDraft.dob > today) {
+        toast.error("Date of birth cannot be in the future");
+        return;
+      }
+      if (isNaN(year) || yearStr.length !== 4 || year < 1900 || year > new Date().getFullYear()) {
+        toast.error("Please enter a valid 4-digit birth year (1900 - present)");
+        return;
+      }
+    }
+
     setAddClientBusy(true);
     const newClient = {
       id: `client-${Date.now()}`,
       first_name: addClientDraft.first_name.trim(),
       last_name: addClientDraft.last_name.trim(),
       email: addClientDraft.email.trim().toLowerCase(),
-      phone: addClientDraft.phone.trim() || null,
+      phone: addClientDraft.phone.replace(/\D/g, "").slice(0, 10) || null,
       dob: addClientDraft.dob.trim() || null,
       created_at: new Date().toISOString(),
     };
@@ -930,11 +953,16 @@ export default function StaffClients() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
+                <label className="text-xs font-medium text-muted-foreground">Phone Number (10 digits)</label>
                 <Input
+                  type="tel"
+                  maxLength={10}
                   value={addClientDraft.phone}
-                  onChange={(e) => setAddClientDraft((d) => ({ ...d, phone: e.target.value }))}
-                  placeholder="(555) 000-0000"
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setAddClientDraft((d) => ({ ...d, phone: digits }));
+                  }}
+                  placeholder="5550000000"
                   className="mt-1"
                 />
               </div>
@@ -942,8 +970,22 @@ export default function StaffClients() {
                 <label className="text-xs font-medium text-muted-foreground">Date of Birth</label>
                 <Input
                   type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  min="1900-01-01"
                   value={addClientDraft.dob}
-                  onChange={(e) => setAddClientDraft((d) => ({ ...d, dob: e.target.value }))}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val) {
+                      const parts = val.split("-");
+                      if (parts[0] && parts[0].length > 4) {
+                        parts[0] = parts[0].slice(0, 4);
+                        val = parts.join("-");
+                      }
+                      const today = new Date().toISOString().slice(0, 10);
+                      if (val > today) val = today;
+                    }
+                    setAddClientDraft((d) => ({ ...d, dob: val }));
+                  }}
                   className="mt-1"
                 />
               </div>

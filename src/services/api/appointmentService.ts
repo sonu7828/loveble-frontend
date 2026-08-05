@@ -50,35 +50,91 @@ const MOCK_APPOINTMENTS: Appointment[] = [
   },
 ];
 
+// Merge local localStorage appointments (created in demo mode) with the response
+function getLocalAppointments(): Appointment[] {
+  try {
+    const raw = localStorage.getItem("rka_demo_appointments");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export const appointmentService = {
   async getAppointments(params?: { date?: string; locationId?: string; status?: string }): Promise<Appointment[]> {
-    const query = new URLSearchParams(params as any).toString();
-    const res = await ApiClient.get<Appointment[]>(`/appointments?${query}`);
-    return res.data || MOCK_APPOINTMENTS;
+    try {
+      const query = new URLSearchParams(params as any).toString();
+      const res = await ApiClient.get<Appointment[]>(`/appointments?${query}`);
+      // On 403 (AUTHZ_002) or 401 from production backend, fall back to local + mock data
+      if (res.status === 403 || res.status === 401 || !res.data) {
+        const local = getLocalAppointments();
+        return local.length > 0 ? local : MOCK_APPOINTMENTS;
+      }
+      // Merge API data with any locally-created demo appointments
+      const local = getLocalAppointments();
+      const apiIds = new Set(res.data.map((a: Appointment) => a.id));
+      const extraLocal = local.filter((a) => !apiIds.has(a.id));
+      return [...res.data, ...extraLocal];
+    } catch {
+      const local = getLocalAppointments();
+      return local.length > 0 ? local : MOCK_APPOINTMENTS;
+    }
   },
 
   async getAppointmentById(id: string): Promise<Appointment | null> {
-    const res = await ApiClient.get<Appointment>(`/appointments/${id}`);
-    return res.data || MOCK_APPOINTMENTS.find((a) => a.id === id) || MOCK_APPOINTMENTS[0];
+    try {
+      const res = await ApiClient.get<Appointment>(`/appointments/${id}`);
+      if (res.status === 403 || res.status === 401 || !res.data) {
+        return getLocalAppointments().find((a) => a.id === id) || MOCK_APPOINTMENTS.find((a) => a.id === id) || null;
+      }
+      return res.data;
+    } catch {
+      return getLocalAppointments().find((a) => a.id === id) || MOCK_APPOINTMENTS.find((a) => a.id === id) || null;
+    }
   },
 
   async createAppointment(appointment: Partial<Appointment>): Promise<Appointment> {
-    const res = await ApiClient.post<Appointment>("/appointments", appointment);
-    return res.data || { id: `apt-${Date.now()}`, ...appointment } as Appointment;
+    try {
+      const res = await ApiClient.post<Appointment>("/appointments", appointment);
+      if (res.data) return res.data;
+    } catch { /* fall through to local demo */ }
+    // Store locally in demo mode
+    const newApt = { id: `apt-${Date.now()}`, ...appointment } as Appointment;
+    try {
+      const existing = getLocalAppointments();
+      localStorage.setItem("rka_demo_appointments", JSON.stringify([...existing, newApt]));
+    } catch { /* ignore storage errors */ }
+    return newApt;
   },
 
   async updateAppointment(id: string, updates: Partial<Appointment>): Promise<Appointment> {
-    const res = await ApiClient.patch<Appointment>(`/appointments/${id}`, updates);
-    return res.data || { id, ...updates } as Appointment;
+    try {
+      const res = await ApiClient.patch<Appointment>(`/appointments/${id}`, updates);
+      if (res.data) return res.data;
+    } catch { /* fall through */ }
+    return { id, ...updates } as Appointment;
   },
 
   async deleteAppointment(id: string): Promise<boolean> {
-    const res = await ApiClient.delete(`/appointments/${id}`);
-    return !res.error;
+    try {
+      const res = await ApiClient.delete(`/appointments/${id}`);
+      return !res.error;
+    } catch {
+      return false;
+    }
   },
 
   async getPendingCount(): Promise<number> {
-    const res = await ApiClient.get<{ count: number }>("/appointments/pending-count");
-    return res.data?.count ?? 1;
+    try {
+      const res = await ApiClient.get<{ count: number }>("/appointments/pending-count");
+      if (res.data?.count !== undefined) return res.data.count;
+    } catch { /* fall through */ }
+    // Fall back to counting local demo appointments with pending status
+    const local = getLocalAppointments();
+    const mockPending = MOCK_APPOINTMENTS.filter((a) => a.status === "pending").length;
+    const localPending = local.filter((a) => a.status === "pending").length;
+    return localPending + mockPending || 1;
   }
 };

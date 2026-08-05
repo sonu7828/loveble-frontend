@@ -796,12 +796,41 @@ export default function StaffClientDetail() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Phone</Label>
-                <Input className="mt-1.5" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                <Label>Phone (10 digits)</Label>
+                <Input
+                  className="mt-1.5"
+                  type="tel"
+                  maxLength={10}
+                  value={editForm.phone}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setEditForm({ ...editForm, phone: digits });
+                  }}
+                  placeholder="5550000000"
+                />
               </div>
               <div>
                 <Label>Date of birth</Label>
-                <Input className="mt-1.5" type="date" value={editForm.dob} onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })} />
+                <Input
+                  className="mt-1.5"
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  min="1900-01-01"
+                  value={editForm.dob}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val) {
+                      const parts = val.split("-");
+                      if (parts[0] && parts[0].length > 4) {
+                        parts[0] = parts[0].slice(0, 4);
+                        val = parts.join("-");
+                      }
+                      const today = new Date().toISOString().slice(0, 10);
+                      if (val > today) val = today;
+                    }
+                    setEditForm({ ...editForm, dob: val });
+                  }}
+                />
               </div>
             </div>
           </div>
