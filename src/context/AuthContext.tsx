@@ -63,7 +63,7 @@ const AUTH_CHANNEL = "rka_auth_channel";
 
 export function resolveLandingRoute(roles: AppRole[]): string {
   if (roles.includes("admin")) return "/admin/hub";
-  if (roles.includes("privacy_officer")) return "/admin/security-officer";
+  if (roles.includes("privacy_officer")) return "/staff/security-officer";
   if (
     roles.includes("nurse_practitioner") ||
     roles.includes("medical_director") ||

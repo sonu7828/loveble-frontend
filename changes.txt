@@ -80,6 +80,40 @@
 - Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
 
 
+10. PRIVACY OFFICER ROUTE MIGRATION TO /STAFF
+--------------------------------------------------------------------------------
+- Action: Updated `resolveLandingRoute` in `AuthContext.tsx` so `privacy_officer` lands on `/staff/security-officer`.
+- Action: Moved security/compliance routes (`security-officer`, `audit-report`, `hipaa-policies`, `breach-report`, `vendors`, `compliance/admin`) under `<StaffLayout>` in `/staff`.
+- Action: Added backward-compatibility redirects under `/admin` (`/admin/security-officer` -> `/staff/security-officer`, etc.) in `App.tsx`.
+- Action: Simplified `AdminLayout.tsx` so `canAccessAdminLayout` is strictly `isAdmin`.
+- Action: Updated `staffGroups` in `StaffLayout.tsx` and header logo navigation links for `isPrivacyOfficer` to point to `/staff/*`.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+11. ADMIN SIDEBAR OWNERSHIP & VENDOR NAMESPACE SEPARATION
+--------------------------------------------------------------------------------
+- Action: Removed Privacy Officer modules (`Compliance Overview`, `PHI Access Audit`, `HIPAA Policies`, `Breach Incident Logs`) from `adminNavItems` in `AdminLayout.tsx`.
+- Action: Set Admin sidebar items strictly to Admin modules (`Admin Overview`, `Model Applications`, `Staff Management`, `Services & Pricing`, `Device Inventory`, `Vendor Management`).
+- Action: Configured separate vendor namespace access: Admin accesses `/admin/vendors` inside `AdminLayout`, while Privacy Officer accesses `/staff/vendors` inside `StaffLayout`.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+12. MEDICAL DIRECTOR NAVIGATION & LAYOUT RENDER FIX
+--------------------------------------------------------------------------------
+- Action: Updated `canAccessAdminLayout` in `AdminLayout.tsx` to include `(isMedicalDirector && isDirectorRoute)` for approved director routes (`/admin/team`, `/admin/reports`, `/admin/clinical-templates`).
+- Action: Added conditional `if (isMedicalDirector && isDirectorRoute) return <StaffLayout />;` in `AdminLayout.tsx` so Medical Directors access their allowed management pages while remaining 100% inside the Staff portal visual UI.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+13. MEDICAL DIRECTOR ROUTE REFACTORING TO /STAFF NAMESPACE
+--------------------------------------------------------------------------------
+- Action: Removed Medical Director layout proxying from `AdminLayout.tsx` (`canAccessAdminLayout` set strictly to `isAdmin`).
+- Action: Refactored Medical Director routes in `App.tsx` so `/staff/team`, `/staff/reports`, `/staff/clinical-templates` render natively under `<StaffLayout>` for Medical Directors.
+- Action: Updated `AdminLayout` routes `/admin/team`, `/admin/reports`, `/admin/clinical-templates` to be strictly `AdminOnly`.
+- Action: Updated `staffGroups` in `StaffLayout.tsx` and shortcuts (`consents`, `post-op`, `pre-op`) to target `/staff/*` paths directly.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
 ================================================================================
                               SUMMARY OF FILES MODIFIED / CREATED
 ================================================================================

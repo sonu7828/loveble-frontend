@@ -33,19 +33,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isSecurityRoute =
-    location.pathname.includes("security-officer") ||
-    location.pathname.includes("audit-report") ||
-    location.pathname.includes("hipaa-policies") ||
-    location.pathname.includes("breach-report") ||
-    location.pathname.includes("vendors");
-
-  const isSharedAdminRoute =
-    location.pathname.endsWith("/me") ||
-    location.pathname.endsWith("/help") ||
-    location.pathname.includes("compliance");
-
-  const canAccessAdminLayout = isAdmin || (isPrivacyOfficer && (isSecurityRoute || isSharedAdminRoute));
+  const canAccessAdminLayout = isAdmin;
   const [open, setOpen] = useState(false);
 
   const [mfaOk, setMfaOk] = useState(true);
@@ -64,19 +52,13 @@ export default function AdminLayout() {
   }, [user]);
 
   const adminNavItems: NavItem[] = useMemo(() => [
-    ...(isAdmin ? [
-      { to: "/admin/hub", label: "Admin Overview", icon: ShieldCheck },
-      { to: "/admin/model-applications", label: "Model Applications", icon: Star },
-      { to: "/admin/team", label: "Staff Management", icon: Users },
-      { to: "/admin/services", label: "Services & Pricing", icon: Tag },
-      { to: "/admin/device-inventory", label: "Device Inventory", icon: Laptop },
-    ] : []),
-    { to: "/admin/security-officer", label: "Compliance Overview", icon: ShieldCheck },
-    { to: "/admin/audit-report", label: "PHI Access Audit", icon: HistoryIcon },
-    { to: "/admin/hipaa-policies", label: "HIPAA Policies", icon: BookOpen },
-    { to: "/admin/breach-report", label: "Breach Incident Logs", icon: ShieldAlert },
-    { to: "/admin/vendors", label: "BAA & Vendors", icon: Building2 },
-  ], [isAdmin]);
+    { to: "/admin/hub", label: "Admin Overview", icon: ShieldCheck },
+    { to: "/admin/model-applications", label: "Model Applications", icon: Star },
+    { to: "/admin/team", label: "Staff Management", icon: Users },
+    { to: "/admin/services", label: "Services & Pricing", icon: Tag },
+    { to: "/admin/device-inventory", label: "Device Inventory", icon: Laptop },
+    { to: "/admin/vendors", label: "Vendor Management", icon: Building2 },
+  ], []);
 
   if (loading || (user && !mfaChecked)) {
     return (
@@ -116,7 +98,7 @@ export default function AdminLayout() {
     <>
       <div className="space-y-1.5">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-3 mb-2">
-          {isAdmin ? "Admin Modules" : isPrivacyOfficer ? "Security & Governance" : "Compliance Modules"}
+          Admin Modules
         </div>
         {adminNavItems.map((item) => {
           const Icon = item.icon;

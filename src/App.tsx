@@ -175,7 +175,7 @@ const App = () => (
 
               <Route path="/admin">
                 <Route element={<AdminLayout />}>
-                  <Route path="clinical-templates" element={<AdminOrDirectorOnly><AdminClinicalTemplates /></AdminOrDirectorOnly>} />
+                  <Route path="clinical-templates" element={<AdminOnly><AdminClinicalTemplates /></AdminOnly>} />
                   <Route path="marketing-hub" element={<AdminOnly><AdminMarketingHub /></AdminOnly>} />
                   <Route path="payroll" element={<OwnerOnly><AdminPayroll /></OwnerOnly>} />
                   <Route path="services" element={<AdminOnly><AdminServices /></AdminOnly>} />
@@ -195,14 +195,14 @@ const App = () => (
                   <Route path="device-presets" element={<AdminOrPrivacyOnly><AdminDevicePresets /></AdminOrPrivacyOnly>} />
                   <Route path="device-inventory" element={<AdminOrPrivacyOnly><AdminDevicePresets /></AdminOrPrivacyOnly>} />
                   <Route path="treatment-plans" element={<AdminOnly><AdminTreatmentPlans /></AdminOnly>} />
-                  <Route path="team" element={<AdminOrDirectorOnly><AdminTeam /></AdminOrDirectorOnly>} />
-                  <Route path="security-officer" element={<AdminOrPrivacyOnly><AdminSecurityOfficer /></AdminOrPrivacyOnly>} />
-                  <Route path="audit-report" element={<AdminOrPrivacyOnly><AdminAuditReport /></AdminOrPrivacyOnly>} />
-                  <Route path="hipaa-policies" element={<AdminOrPrivacyOnly><AdminHipaaPolicies /></AdminOrPrivacyOnly>} />
-                  <Route path="compliance/admin" element={<AdminOrPrivacyOnly><ComplianceAdmin /></AdminOrPrivacyOnly>} />
-                  <Route path="breach-report" element={<AdminOrPrivacyOnly><AdminBreachReport /></AdminOrPrivacyOnly>} />
+                  <Route path="team" element={<AdminOnly><AdminTeam /></AdminOnly>} />
+                  <Route path="security-officer" element={<Navigate to="/staff/security-officer" replace />} />
+                  <Route path="audit-report" element={<Navigate to="/staff/audit-report" replace />} />
+                  <Route path="hipaa-policies" element={<Navigate to="/staff/hipaa-policies" replace />} />
+                  <Route path="compliance/admin" element={<Navigate to="/staff/compliance/admin" replace />} />
+                  <Route path="breach-report" element={<Navigate to="/staff/breach-report" replace />} />
                   <Route path="vendors" element={<AdminOrPrivacyOnly><AdminVendors /></AdminOrPrivacyOnly>} />
-                  <Route path="reports" element={<AdminOrDirectorOnly><AdminReports /></AdminOrDirectorOnly>} />
+                  <Route path="reports" element={<AdminOnly><AdminReports /></AdminOnly>} />
                   <Route path="me" element={<StaffMyProfile />} />
                   <Route path="my-profile" element={<Navigate to="/admin/me" replace />} />
                   <Route path="profile" element={<Navigate to="/admin/me" replace />} />
@@ -231,28 +231,28 @@ const App = () => (
                 <Route path="device-presets" element={<Navigate to="/admin/device-presets" replace />} />
                 <Route path="device-inventory" element={<Navigate to="/admin/device-inventory" replace />} />
                 <Route path="treatment-plans" element={<Navigate to="/admin/treatment-plans" replace />} />
-                <Route path="security-officer" element={<Navigate to="/admin/security-officer" replace />} />
-                <Route path="audit-report" element={<Navigate to="/admin/audit-report" replace />} />
-                <Route path="hipaa-policies" element={<Navigate to="/admin/hipaa-policies" replace />} />
-                <Route path="compliance/admin" element={<Navigate to="/admin/compliance/admin" replace />} />
-                <Route path="breach-report" element={<Navigate to="/admin/breach-report" replace />} />
-                <Route path="vendors" element={<Navigate to="/admin/vendors" replace />} />
 
                 <Route element={<StaffLayout />}>
                   <Route index element={<StaffToday />} />
                   <Route path="dashboard" element={<Navigate to="/staff/today" replace />} />
                   <Route path="today" element={<StaffToday />} />
+                  <Route path="security-officer" element={<AdminOrPrivacyOnly><AdminSecurityOfficer /></AdminOrPrivacyOnly>} />
+                  <Route path="audit-report" element={<AdminOrPrivacyOnly><AdminAuditReport /></AdminOrPrivacyOnly>} />
+                  <Route path="hipaa-policies" element={<AdminOrPrivacyOnly><AdminHipaaPolicies /></AdminOrPrivacyOnly>} />
+                  <Route path="compliance/admin" element={<AdminOrPrivacyOnly><ComplianceAdmin /></AdminOrPrivacyOnly>} />
+                  <Route path="breach-report" element={<AdminOrPrivacyOnly><AdminBreachReport /></AdminOrPrivacyOnly>} />
+                  <Route path="vendors" element={<AdminOrPrivacyOnly><AdminVendors /></AdminOrPrivacyOnly>} />
                   <Route path="clinical-reviews" element={<StaffClinicalReviews />} />
                   <Route path="orders" element={<StaffOrders />} />
-                  <Route path="reports" element={<AdminReports />} />
-                  <Route path="clinical-templates" element={<AdminClinicalTemplates />} />
+                  <Route path="reports" element={<AdminOrDirectorOnly><AdminReports /></AdminOrDirectorOnly>} />
+                  <Route path="clinical-templates" element={<AdminOrDirectorOnly><AdminClinicalTemplates /></AdminOrDirectorOnly>} />
                   <Route path="inbox" element={<StaffInbox />} />
                   <Route path="calendar" element={<StaffCalendar />} />
                   <Route path="messages" element={<StaffMessages />} />
                   <Route path="availability" element={<Navigate to="/staff/my-schedule?tab=availability" replace />} />
                   <Route path="time-off" element={<Navigate to="/staff/my-schedule?tab=time-off" replace />} />
                   <Route path="my-schedule" element={<StaffMySchedule />} />
-                  <Route path="consents" element={<Navigate to="/admin/clinical-templates?tab=consents" replace />} />
+                  <Route path="consents" element={<Navigate to="/staff/clinical-templates?tab=consents" replace />} />
                   <Route path="inventory" element={<StaffInventory />} />
                   <Route path="inventory/burn" element={<Navigate to="/staff/inventory?tab=burn" replace />} />
                   <Route path="appointments/new" element={<StaffNewAppointment />} />
@@ -261,16 +261,16 @@ const App = () => (
                   <Route path="clients/:email" element={<StaffClientDetail />} />
                   <Route path="waitlist" element={<Navigate to="/staff/inbox?tab=waitlist" replace />} />
                   <Route path="feedback" element={<StaffFeedback />} />
-                  <Route path="phi-audit" element={<Navigate to="/admin/audit-report" replace />} />
+                  <Route path="phi-audit" element={<Navigate to="/staff/audit-report" replace />} />
                   <Route path="marketing" element={<Navigate to="/admin/marketing-hub" replace />} />
                   <Route path="checkout" element={<StaffCheckout />} />
                   <Route path="checkout/:appointmentId" element={<StaffCheckout />} />
-                  <Route path="post-op" element={<Navigate to="/admin/clinical-templates?tab=post-op" replace />} />
-                  <Route path="pre-op" element={<Navigate to="/admin/clinical-templates?tab=pre-op" replace />} />
+                  <Route path="post-op" element={<Navigate to="/staff/clinical-templates?tab=post-op" replace />} />
+                  <Route path="pre-op" element={<Navigate to="/staff/clinical-templates?tab=pre-op" replace />} />
                   <Route path="help" element={<StaffHelp />} />
                   <Route path="time-clock" element={<StaffTimeClock />} />
                   <Route path="me" element={<StaffMyProfile />} />
-                  <Route path="team" element={<AdminTeam />} />
+                  <Route path="team" element={<AdminOrDirectorOnly><AdminTeam /></AdminOrDirectorOnly>} />
                   <Route path="my-profile" element={<Navigate to="/staff/me" replace />} />
                   <Route path="profile" element={<Navigate to="/staff/me" replace />} />
                   <Route path="schedule" element={<Navigate to="/staff/my-schedule" replace />} />
