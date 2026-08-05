@@ -133,11 +133,7 @@ export default function AdminLogin() {
       cleanEmail.includes("scheduler") ? "Front Desk" :
       cleanEmail === "user@gmail.com" ? "Patient" :
       "Staff";
-    toast.info(`Signing in as ${roleName}...`);
-
-    setTimeout(() => {
-      submitCredentials(undefined, cleanEmail, "12345678");
-    }, 50);
+    toast.info(`${roleName} credentials filled — click Continue to sign in.`);
   };
 
   const verifyEnroll = async (e: React.FormEvent) => {

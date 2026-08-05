@@ -5,6 +5,7 @@ import { Link, Navigate } from "react-router-dom";
 import { Loader2, ClipboardCheck, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 type Note = {
   id: string;
@@ -52,23 +53,30 @@ export default function StaffCosignQueue() {
 
   useEffect(() => {
     if (loading) return;
-    if (!isSupervising) { setBusy(false); return; }
     fetchQueue();
-  }, [loading, isSupervising]);
+  }, [loading]);
 
-  if (loading) return <div className="p-8"><Loader2 className="h-4 w-4 animate-spin" /></div>;
-  if (!isSupervising) return <Navigate to="/staff/today" replace />;
+  if (loading) return <div className="p-8"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      <header className="mb-5">
-        <h1 className="text-2xl font-serif flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6 text-primary" />
-          Co-sign queue
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Chart notes signed by RNs that require an NP / supervising provider co-signature.
-        </p>
+      <header className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-serif flex items-center gap-2">
+              <ClipboardCheck className="h-6 w-6 text-primary" />
+              Co-sign Queue
+            </h1>
+            <Badge variant="outline" className="text-[10px]">
+              {isSupervising ? "Supervising Provider View" : "RN Injector View"}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {isSupervising
+              ? "Review and e-sign clinical chart notes submitted by RN injectors."
+              : "Track your submitted chart notes awaiting NP / Medical Director co-signature."}
+          </p>
+        </div>
       </header>
 
       {busy ? (

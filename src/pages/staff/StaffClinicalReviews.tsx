@@ -36,12 +36,8 @@ export default function StaffClinicalReviews() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (isNP || isMedicalDirector) {
-      fetchQueue();
-    } else {
-      setLoading(false);
-    }
-  }, [authLoading, isNP, isMedicalDirector]);
+    fetchQueue();
+  }, [authLoading]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">

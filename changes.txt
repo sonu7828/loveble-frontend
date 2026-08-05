@@ -199,11 +199,11 @@
 - Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
 
 
-29. MODEL APPLICATION FORM PHONE NUMBER FORMATTING & VALIDATION
+34. RN INJECTOR COSIGN QUEUE REDIRECT FIX & EXPLANATION
 --------------------------------------------------------------------------------
-- Action: Applied `formatPhone10` helper to "PHONE NUMBER" field in `src/pages/public/Model.tsx` with `maxLength={14}` and auto-formatting `(XXX) XXX-XXXX`.
-- Action: Automatically strips all alphabetic characters and non-numeric input on typing.
-- Action: Added submission validation enforcing exactly 10 numeric digits before form submission.
+- Action: Removed hardcoded `<Navigate to="/staff/today" replace />` guard in `src/pages/staff/StaffCosignQueue.tsx`.
+- Action: Allowed RN Injector role (`rn_injector`) to access and view `/staff/clinical/cosign` to track submitted notes awaiting NP / Medical Director co-signature.
+- Action: Added role-aware header badges (`RN Injector View` vs `Supervising Provider View`) in `StaffCosignQueue.tsx`.
 - Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
 
 
@@ -233,21 +233,24 @@ MODIFIED FILES:
 12. `src/pages/staff/StaffClients.tsx`
 13. `src/pages/staff/StaffClientDetail.tsx`
 14. `src/pages/staff/StaffNewAppointment.tsx`
-15. `src/pages/book/StepDetails.tsx`
-16. `src/pages/patient/Book.tsx`
-17. `src/pages/public/Model.tsx`
-18. `src/components/RescheduleDialog.tsx`
-19. `src/components/ClientIdDocuments.tsx`
-20. `src/services/api/client.ts`
-21. `src/services/api/clinicalService.ts`
-22. `src/services/api/tableService.ts`
-23. `src/services/api/appointmentService.ts`
-24. `src/lib/toxGuardrails.ts`
-25. `sonu_lovable_backend/src/routes/clinical.routes.ts`
-26. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
-27. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
-28. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
-29. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
+15. `src/pages/staff/StaffClinicalReviews.tsx`
+16. `src/pages/staff/StaffCosignQueue.tsx`
+17. `src/pages/book/StepDetails.tsx`
+18. `src/pages/patient/Book.tsx`
+19. `src/pages/patient/PatientAuth.tsx`
+20. `src/pages/public/Model.tsx`
+21. `src/components/RescheduleDialog.tsx`
+22. `src/components/ClientIdDocuments.tsx`
+23. `src/services/api/client.ts`
+24. `src/services/api/clinicalService.ts`
+25. `src/services/api/tableService.ts`
+26. `src/services/api/appointmentService.ts`
+27. `src/lib/toxGuardrails.ts`
+28. `sonu_lovable_backend/src/routes/clinical.routes.ts`
+29. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
+30. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
+31. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
+32. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
 
 VERIFICATION STATUS:
 - `npx tsc --noEmit`: 0 Errors (Clean TypeScript compilation).

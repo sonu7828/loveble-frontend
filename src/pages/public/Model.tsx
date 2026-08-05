@@ -39,33 +39,36 @@ interface ModelFormData {
   signatureDate: string;
 }
 
+const INITIAL_FORM_DATA: ModelFormData = {
+  name: "",
+  email: "",
+  phone: "",
+  dob: "",
+  city: "",
+  instagram: "",
+  howDidYouHear: "",
+  ageConfirm: false,
+  skinType: "",
+  pregnancyStatus: "no",
+  medications: "",
+  allergies: "",
+  previousTreatments: "",
+  treatmentInterest: "",
+  availability: "",
+  reasonForModeling: "",
+  photoReleaseMain: false,
+  consentModelRelease: false,
+  consentFinancial: false,
+  consentRiskAndTerms: false,
+  consentHipaa: false,
+  signatureName: "",
+  signatureDate: "",
+};
+
 export default function Model() {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<ModelFormData>({
-    name: "",
-    email: "",
-    phone: "",
-    dob: "",
-    city: "",
-    instagram: "",
-    howDidYouHear: "",
-    ageConfirm: false,
-    skinType: "",
-    pregnancyStatus: "no",
-    medications: "",
-    allergies: "",
-    previousTreatments: "",
-    treatmentInterest: "",
-    availability: "",
-    reasonForModeling: "",
-    photoReleaseMain: false,
-    consentModelRelease: false,
-    consentFinancial: false,
-    consentRiskAndTerms: false,
-    consentHipaa: false,
-    signatureName: "",
-    signatureDate: "",
-  });
+  const [submitted, setSubmitted] = useState(false);
+  const [formData, setFormData] = useState<ModelFormData>(INITIAL_FORM_DATA);
 
   const updateField = (field: keyof ModelFormData, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -73,6 +76,7 @@ export default function Model() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
 
     if (formData.dob) {
       const parts = formData.dob.split("-");
@@ -129,7 +133,9 @@ export default function Model() {
       console.warn("Backend model application insert fallback to local storage");
     }
 
+    setFormData(INITIAL_FORM_DATA);
     setLoading(false);
+    setSubmitted(true);
     toast.success("Model application submitted successfully! Our team will review and reach out.");
   };
 
@@ -169,8 +175,24 @@ export default function Model() {
           </p>
         </div>
 
-        {/* Application Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Application Form or Success Card */}
+        {submitted ? (
+          <div className="bg-card border border-border/80 rounded-2xl p-8 sm:p-12 text-center max-w-xl mx-auto shadow-sm space-y-4">
+            <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <h2 className="font-serif text-2xl font-semibold text-foreground">Application Submitted Successfully!</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Thank you for applying to the Radiantilyk Aesthetic Model Program. Our clinical team will review your application details and reach out to you via email or phone.
+            </p>
+            <div className="pt-4 flex justify-center">
+              <Button onClick={() => setSubmitted(false)} variant="outline" className="rounded-full px-6">
+                Submit Another Application
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* 1. About You */}
           <section className="bg-card border border-border/80 rounded-2xl p-5 sm:p-6 shadow-2xs">
@@ -376,6 +398,7 @@ export default function Model() {
             </Button>
           </div>
         </form>
+        )}
       </main>
 
       <SiteFooter />

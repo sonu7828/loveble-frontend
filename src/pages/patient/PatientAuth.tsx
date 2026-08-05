@@ -10,12 +10,13 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { getClientSession } from "@/hooks/useClientAuth";
+import { formatPhone10 } from "@/lib/formatPhone";
 
 const signupSchema = z.object({
   firstName: z.string().trim().min(1, "Required").max(60),
   lastName: z.string().trim().min(1, "Required").max(60),
   email: z.string().trim().email().max(120),
-  phone: z.string().trim().min(7).max(20),
+  phone: z.string().trim().refine((v) => v.replace(/\D/g, "").length === 10, "Phone number must be 10 digits"),
   password: z.string().min(8, "At least 8 characters").max(72),
 });
 
@@ -35,10 +36,7 @@ export default function PatientAuth() {
 
   const fillClientDemoCredentials = () => {
     setForm((f) => ({ ...f, email: "user@gmail.com", password: "12345678" }));
-    toast.info("Signing in as Demo User...");
-    setTimeout(() => {
-      submit(undefined, "user@gmail.com", "12345678");
-    }, 50);
+    toast.info("Demo credentials filled — click Continue to sign in.");
   };
 
   const submit = async (e?: React.FormEvent, overrideEmail?: string, overridePassword?: string) => {
@@ -235,7 +233,18 @@ export default function PatientAuth() {
                   </div>
                   <div>
                     <Label htmlFor="phone" className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Phone</Label>
-                    <Input id="phone" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-0.5 h-8.5 text-xs" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      required
+                      maxLength={14}
+                      placeholder="(555) 000-0000"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: formatPhone10(e.target.value) })}
+                      className="mt-0.5 h-8.5 text-xs"
+                    />
                   </div>
                 </div>
               </>
