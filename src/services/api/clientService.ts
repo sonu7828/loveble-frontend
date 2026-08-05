@@ -107,5 +107,9 @@ export const clientService = {
       account_status: p.isActive === false ? "disabled" : "active",
       is_active: p.isActive !== false,
     };
+  },
+
+  async deleteClient(id: string): Promise<void> {
+    await ApiClient.delete(`/patients/${id}`);
   }
 };

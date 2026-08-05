@@ -444,7 +444,7 @@ export default function StaffClients() {
     } finally { setBusyEmail(null); }
   };
 
-  const deleteClient = async (c: { email: string; first_name: string; last_name: string; imported_id?: string | null }) => {
+  const deleteClient = async (c: { id?: string; email: string; first_name: string; last_name: string; imported_id?: string | null }) => {
     const name = `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.email;
     if (!(await confirmDialog({
       title: `Delete ${name}?`,
@@ -453,15 +453,19 @@ export default function StaffClients() {
       confirmLabel: "Delete client",
     }))) return;
 
-    const emailLower = (c.email || "").toLowerCase();
     setBusyEmail(c.email);
     try {
-      if (c.imported_id) {
-        await apiQuery("imported_clients").delete().eq("id", c.imported_id);
-      }
-      if (emailLower) {
-        await apiQuery("client_profiles").delete().eq("email", emailLower);
-        await apiQuery("appointments").delete().eq("client_email", emailLower);
+      if (c.id && !c.id.startsWith("client-")) {
+        await clientService.deleteClient(c.id);
+      } else {
+        const emailLower = (c.email || "").toLowerCase();
+        if (c.imported_id) {
+          await apiQuery("imported_clients").delete().eq("id", c.imported_id);
+        }
+        if (emailLower) {
+          await apiQuery("client_profiles").delete().eq("email", emailLower);
+          await apiQuery("appointments").delete().eq("client_email", emailLower);
+        }
       }
 
       await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
@@ -797,7 +801,7 @@ export default function StaffClients() {
                       )}
                       <DropdownMenuItem
                         disabled={busyEmail === c.email}
-                        onClick={() => deleteClient({ email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
+                        onClick={() => deleteClient({ id: c.id, email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
                         className="text-destructive focus:text-destructive text-destructive-soft-foreground"
                       >
                         <Trash2 className="h-3.5 w-3.5 mr-2" />
