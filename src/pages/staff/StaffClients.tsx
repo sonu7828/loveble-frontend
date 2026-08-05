@@ -112,14 +112,19 @@ export default function StaffClients() {
       const PAGE = 1000;
       for (let from = 0; from < 50000; from += PAGE) {
         let qy = apiQuery("appointments")
-          .select("id, client_first_name, client_last_name, client_email, client_phone, client_dob, status, start_at, service_id, staff_id")
+          .select("id, client_first_name, client_last_name, client_email, client_phone, client_dob, status, start_at, service_id, staff_id, staff_name")
           .order("start_at", { ascending: false })
           .range(from, from + PAGE - 1);
-        if (!canSeeAll && staffId) qy = qy.eq("staff_id", staffId);
         const { data, error } = await qy;
         if (error || !data || data.length === 0) break;
         all.push(...data);
         if (data.length < PAGE) break;
+      }
+      const localDemoAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      for (const la of localDemoAppts) {
+        if (la && la.id && !all.some((e) => e.id === la.id)) {
+          all.unshift(la);
+        }
       }
       return { data: all };
     };
@@ -505,17 +510,35 @@ export default function StaffClients() {
     sort_at: number;
   };
 
+  const isGarbageTestClient = (c: { email?: string; first_name?: string; last_name?: string }) => {
+    const email = (c.email || "").toLowerCase();
+    const fullName = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
+    if (email.includes("@example.com")) return true;
+    if (email.includes("phase2a") || fullName.includes("phase2a")) return true;
+    if (fullName.includes("testpatient") || fullName.includes("test patient")) return true;
+    if (fullName.includes("admin test") || fullName.includes("demo test")) return true;
+    return false;
+  };
+
   const allClients = useMemo<UnifiedClient[]>(() => {
     const map = new Map<string, UnifiedClient>();
+
     for (const a of items) {
+      if (isGarbageTestClient({ email: a.client_email, first_name: a.client_first_name, last_name: a.client_last_name })) {
+        continue;
+      }
       const email = (a.client_email || "").trim().toLowerCase();
-      const key = email || `__id_${a.id}`;
+      const fn = (a.client_first_name || "").trim();
+      const ln = (a.client_last_name || "").trim();
+      const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+      const key = (nameKey && nameKey.length > 1) ? nameKey : (email || `__id_${a.id}`);
+
       const existing = map.get(key);
       if (!existing) {
         map.set(key, {
           key,
-          first_name: a.client_first_name ?? "",
-          last_name: a.client_last_name ?? "",
+          first_name: fn || "Client",
+          last_name: ln,
           email: a.client_email ?? "",
           phone: a.client_phone ?? null,
           dob: a.client_dob ?? null,
@@ -523,21 +546,37 @@ export default function StaffClients() {
           last_appt: { id: a.id, status: a.status, service_name: a.service_name, start_at: a.start_at },
           imported_id: null,
           invited_at: null,
-          sort_at: new Date(a.start_at).getTime(),
+          sort_at: a.start_at ? new Date(a.start_at).getTime() : 0,
         });
       } else {
         existing.appt_count += 1;
+        if (!existing.phone && a.client_phone) existing.phone = a.client_phone;
+        if (!existing.dob && a.client_dob) existing.dob = a.client_dob;
+        if (a.start_at && new Date(a.start_at).getTime() > existing.sort_at) {
+          existing.last_appt = { id: a.id, status: a.status, service_name: a.service_name, start_at: a.start_at };
+          existing.sort_at = new Date(a.start_at).getTime();
+        }
       }
     }
+
     for (const cp of clientProfiles) {
+      if (isGarbageTestClient({ email: cp.email, first_name: cp.first_name, last_name: cp.last_name })) {
+        continue;
+      }
       const email = (cp.email || "").trim().toLowerCase();
-      if (!email) continue;
-      if (!map.has(email)) {
-        map.set(email, {
-          key: email,
-          first_name: cp.first_name || "Client",
-          last_name: cp.last_name || "",
-          email: cp.email,
+      const fn = (cp.first_name || "").trim();
+      const ln = (cp.last_name || "").trim();
+      if (!email && !fn && !ln) continue;
+
+      const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+      const key = (nameKey && nameKey.length > 1) ? nameKey : (email || `__id_${cp.id || Date.now()}`);
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          first_name: fn || "Client",
+          last_name: ln,
+          email: cp.email ?? "",
           phone: cp.phone ?? null,
           dob: cp.dob ?? null,
           appt_count: 0,
@@ -548,26 +587,42 @@ export default function StaffClients() {
         });
       }
     }
+
     for (const i of imported) {
-      const key = i.email.trim().toLowerCase();
+      if (isGarbageTestClient({ email: i.email, first_name: i.first_name, last_name: i.last_name })) {
+        continue;
+      }
+      const fn = (i.first_name || "").trim();
+      const ln = (i.last_name || "").trim();
+      const email = (i.email || "").trim().toLowerCase();
+      const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+      const key = (nameKey && nameKey.length > 1) ? nameKey : email;
+
       if (map.has(key)) continue;
       map.set(key, {
-        key, first_name: i.first_name, last_name: i.last_name, email: i.email,
+        key, first_name: fn, last_name: ln, email: i.email ?? "",
         phone: i.phone ?? null, dob: i.dob ?? null,
         appt_count: 0, last_appt: null,
         imported_id: i.id, invited_at: i.invited_at,
         sort_at: 0,
       });
     }
-    // Pull in lead-only profiles (abandoned bookings) that have no appointment
-    // and no imported row yet — so staff can still see and text them.
+
     for (const l of leads) {
-      const key = l.email.trim().toLowerCase();
+      if (isGarbageTestClient({ email: l.email, first_name: l.first_name || undefined, last_name: l.last_name || undefined })) {
+        continue;
+      }
+      const email = (l.email || "").trim().toLowerCase();
+      const fn = (l.first_name || "").trim();
+      const ln = (l.last_name || "").trim();
+      const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+      const key = (nameKey && nameKey.length > 1) ? nameKey : email;
+
       if (!key || map.has(key)) continue;
       map.set(key, {
         key,
-        first_name: l.first_name ?? "",
-        last_name: l.last_name ?? "",
+        first_name: fn,
+        last_name: ln,
         email: l.email,
         phone: l.phone ?? null,
         dob: null,
@@ -578,6 +633,7 @@ export default function StaffClients() {
         sort_at: l.lead_captured_at ? new Date(l.lead_captured_at).getTime() : 0,
       });
     }
+
     return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || (a.last_name || "").localeCompare(b.last_name || ""));
   }, [items, imported, leads, clientProfiles]);
 

@@ -12,6 +12,7 @@ import { isClinicalProvider, formatStaffDisplayName } from "@/lib/unifiedStaff";
 
 import type { Step, Category, Service, Location, Staff, ProviderRow, ConsentForm } from "../book/types";
 import type { CompactValue } from "@/components/CompactConsentCard";
+import { DEFAULT_CONSENT_FORMS } from "@/lib/defaultConsents";
 
 const StepService = lazy(() => import("../book/StepService").then(m => ({ default: m.StepService })));
 const StepLocationStaff = lazy(() => import("../book/StepLocationStaff").then(m => ({ default: m.StepLocationStaff })));
@@ -78,13 +79,23 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
   });
 
   // Consents
-  const [consents, setConsents] = useState<ConsentForm[]>([]);
+  const [consents, setConsents] = useState<ConsentForm[]>(DEFAULT_CONSENT_FORMS);
   const [loadingConsents, setLoadingConsents] = useState(false);
   const [consentValues, setConsentValues] = useState<Record<string, CompactValue>>({});
   const [sharedName, setSharedName] = useState("");
   const [sharedSig, setSharedSig] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const [payStep, setPayStep] = useState<"consents" | "pay">("consents");
+
+  const allConsentsSatisfied = useMemo(() => {
+    if (consents.length === 0) return true;
+    const toSign = consents.filter(c => !c.alreadySigned);
+    const requiredForms = toSign.filter(f => !f.is_optional);
+    const requiredDone = requiredForms.every(f => consentValues[f.id]?.agreed);
+    const optionalDone = toSign.filter(f => f.is_optional).every(f => consentValues[f.id]?.agreed || consentValues[f.id]?.declined);
+    const hasSig = !!sharedName.trim() && !!sharedSig;
+    return requiredDone && optionalDone && hasSig;
+  }, [consents, consentValues, sharedName, sharedSig]);
 
   const [submitting, setSubmitting] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
@@ -306,7 +317,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
     } catch (_e) { }
 
     setSubmitting(false);
-    navigate(`/booking-confirmation?id=${aptId}`);
+    navigate(`/booking-confirmation?id=${aptId}&new=1`);
   };
 
   if (loading) {
@@ -489,7 +500,9 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
               slots={[]} loading={false}
               onContinue={goNext}
               durationMin={totalDurationMin}
-              serviceIds={serviceIds} locationId={locationId!} staffId={staffId}
+              serviceIds={serviceIds}
+              locationId={locationId || "loc-01"}
+              staffId={staffId || "any-available"}
             />
           )}
 
@@ -529,7 +542,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
               clearCardError={() => setCardError(null)}
               clientName={`${client.firstName} ${client.lastName}`}
               anyAgreed={Object.values(consentValues).some(v => v?.agreed)}
-              allConsentsSatisfied={true}
+              allConsentsSatisfied={allConsentsSatisfied}
               summary={{
                 serviceName: selectedServices.map(s => s.name).join(" + "),
                 staffName: staff.find(s => s.id === staffId)?.full_name ?? "",
