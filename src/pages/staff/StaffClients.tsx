@@ -67,8 +67,9 @@ export default function StaffClients() {
 
   const reloadAccounts = async () => {
     const { data } = await apiQuery("client_profiles").select("email, is_lead, first_name, last_name, phone, dob, lead_captured_at, lead_source, created_at").limit(5000);
-    const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-    const cpList = [...(data ?? []), ...localClients];
+    const cpList = data ?? [];
+
+    setClientProfiles(cpList);
 
     setClientProfiles(cpList);
     setAccountEmails(new Set(cpList.map((r: any) => (r.email || "").toLowerCase())));
@@ -461,20 +462,6 @@ export default function StaffClients() {
       if (emailLower) {
         await apiQuery("client_profiles").delete().eq("email", emailLower);
         await apiQuery("appointments").delete().eq("client_email", emailLower);
-
-        // Clear from browser local storage keys
-        for (const key of ["rka_demo_clients", "rka_demo_client_profiles", "rka_demo_appointments", "rka_imported_clients"]) {
-          try {
-            const arr: any[] = JSON.parse(localStorage.getItem(key) || "[]");
-            const next = arr.filter((x: any) =>
-              (x.email || x.client_email || "").toLowerCase() !== emailLower &&
-              (!c.imported_id || x.id !== c.imported_id)
-            );
-            localStorage.setItem(key, JSON.stringify(next));
-          } catch {
-            /* ignore */
-          }
-        }
       }
 
       await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
@@ -595,29 +582,23 @@ export default function StaffClients() {
       return;
     }
     setAddClientBusy(true);
-    const newClient = {
-      id: `client-${Date.now()}`,
-      first_name: addClientDraft.first_name.trim(),
-      last_name: addClientDraft.last_name.trim(),
-      email: addClientDraft.email.trim().toLowerCase(),
-      phone: addClientDraft.phone.trim() || null,
-      dob: addClientDraft.dob.trim() || null,
-      created_at: new Date().toISOString(),
-    };
-
-    const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-    localClients.push(newClient);
-    localStorage.setItem("rka_demo_clients", JSON.stringify(localClients));
-
     try {
-      await apiQuery("client_profiles").insert(newClient);
-    } catch (e) {}
-
-    toast.success(`Client ${newClient.first_name} ${newClient.last_name} created successfully!`);
-    setAddClientBusy(false);
-    setAddClientOpen(false);
-    setAddClientDraft({ first_name: "", last_name: "", email: "", phone: "", dob: "" });
-    reloadAccounts();
+      await clientService.saveClient({
+        first_name: addClientDraft.first_name.trim(),
+        last_name: addClientDraft.last_name.trim(),
+        email: addClientDraft.email.trim().toLowerCase(),
+        phone: addClientDraft.phone.trim() || undefined,
+        dob: addClientDraft.dob.trim() || undefined,
+      });
+      toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to create client");
+    } finally {
+      setAddClientBusy(false);
+      setAddClientOpen(false);
+      setAddClientDraft({ first_name: "", last_name: "", email: "", phone: "", dob: "" });
+      reloadAccounts();
+    }
   };
 
   const matchesQuery = (s: string) => !q || s.toLowerCase().includes(q.toLowerCase());
