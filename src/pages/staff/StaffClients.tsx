@@ -20,7 +20,7 @@ type ImportRow = {
 type ImportedClient = { first_name: string; last_name: string; email: string; phone: string | null; dob: string | null; gender: string | null; notes?: string } & { id: string; invited_at: string | null };
 
 export default function StaffClients() {
-  const { canSeeAll, staffId } = useAuth();
+  const { canSeeAll, staffId, isAdmin } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [imported, setImported] = useState<ImportedClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -799,14 +799,16 @@ export default function StaffClients() {
                           <Ban className="h-3.5 w-3.5 mr-2" /> Block from booking
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem
-                        disabled={busyEmail === c.email}
-                        onClick={() => deleteClient({ id: c.id, email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
-                        className="text-destructive focus:text-destructive text-destructive-soft-foreground"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-2" />
-                        Delete client
-                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <DropdownMenuItem
+                          disabled={busyEmail === c.email}
+                          onClick={() => deleteClient({ id: c.id, email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
+                          className="text-destructive focus:text-destructive text-destructive-soft-foreground"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-2" />
+                          Delete client
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
