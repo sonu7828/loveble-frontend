@@ -1,22 +1,47 @@
-import { useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FileCheck, FileText, CheckCircle2, Stethoscope, Search, RefreshCw, ArrowLeft } from "lucide-react";
+import { FileCheck, FileText, Stethoscope, Search, RefreshCw, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { clinicalService, CosignQueueItem } from "@/services/api/clinicalService";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function StaffClinicalReviews() {
   const navigate = useNavigate();
   const [sp, setSp] = useSearchParams();
+  const { isNP, isMedicalDirector, loading: authLoading } = useAuth();
   const activeTab = sp.get("tab") || "pending";
 
   const handleTabChange = (val: string) => {
     setSp({ tab: val });
   };
 
-  const [notes, setNotes] = useState<any[]>([]);
+  const [notes, setNotes] = useState<CosignQueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchQueue = async () => {
+    setLoading(true);
+    try {
+      const data = await clinicalService.getCosignQueue();
+      setNotes(data);
+    } catch (e: any) {
+      setNotes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (isNP || isMedicalDirector) {
+      fetchQueue();
+    } else {
+      setLoading(false);
+    }
+  }, [authLoading, isNP, isMedicalDirector]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
@@ -42,10 +67,10 @@ export default function StaffClinicalReviews() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="w-full sm:w-auto justify-start bg-muted/60 p-1 rounded-xl gap-1 border border-border">
           <TabsTrigger value="pending" className="gap-2 text-xs rounded-lg">
-            <FileText className="h-3.5 w-3.5" /> Pending Notes (0)
+            <FileText className="h-3.5 w-3.5" /> Pending Notes ({notes.length})
           </TabsTrigger>
           <TabsTrigger value="sign" className="gap-2 text-xs rounded-lg">
-            <FileCheck className="h-3.5 w-3.5" /> Sign Notes (0)
+            <FileCheck className="h-3.5 w-3.5" /> Sign Notes ({notes.length})
           </TabsTrigger>
         </TabsList>
 
@@ -59,7 +84,7 @@ export default function StaffClinicalReviews() {
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Chart notes submitted by injectors requiring supervising physician review.</p>
               </div>
-              <Badge variant="outline" className="text-[10px]">0 Notes Pending</Badge>
+              <Badge variant="outline" className="text-[10px]">{notes.length} Notes Pending</Badge>
             </div>
 
             <div className="rounded-xl border border-border overflow-hidden bg-card">
@@ -75,7 +100,13 @@ export default function StaffClinicalReviews() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {notes.length === 0 ? (
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                        </td>
+                      </tr>
+                    ) : notes.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="text-center py-12 text-muted-foreground">
                           <div className="flex flex-col items-center justify-center gap-2">
@@ -86,17 +117,24 @@ export default function StaffClinicalReviews() {
                         </td>
                       </tr>
                     ) : (
-                      notes.map((n) => (
-                        <tr key={n.id} className="hover:bg-muted/30 transition">
-                          <td className="p-3 font-semibold text-foreground">{n.patient}</td>
-                          <td className="p-3 text-muted-foreground">{n.provider}</td>
-                          <td className="p-3 text-muted-foreground">{n.service}</td>
-                          <td className="p-3 text-muted-foreground">{n.date}</td>
-                          <td className="p-3 text-right">
-                            <Button size="sm" className="h-7 text-xs bg-purple-600 text-white hover:bg-purple-700">Review Note</Button>
-                          </td>
-                        </tr>
-                      ))
+                      notes.map((item) => {
+                        const noteId = item.note?.id || item.noteId;
+                        const patientName = item.note?.patient ? `${item.note.patient.firstName} ${item.note.patient.lastName}` : (item.note?.patient?.email || "—");
+                        const dateStr = item.requestedAt ? new Date(item.requestedAt).toLocaleDateString() : "—";
+                        return (
+                          <tr key={item.id} className="hover:bg-muted/30 transition">
+                            <td className="p-3 font-semibold text-foreground">{patientName}</td>
+                            <td className="p-3 text-muted-foreground">{item.author?.fullName || "RN Injector"}</td>
+                            <td className="p-3 text-muted-foreground">SOAP Note</td>
+                            <td className="p-3 text-muted-foreground">{dateStr}</td>
+                            <td className="p-3 text-right">
+                              <Button size="sm" asChild className="h-7 text-xs bg-purple-600 text-white hover:bg-purple-700">
+                                <Link to={`/staff/clinical/notes/${noteId}`}>Review Note</Link>
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
+import { clinicalService } from "@/services/api/clinicalService";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, ShieldAlert, FileText, ShieldCheck, Search, Calendar as CalIcon, AlertTriangle, ClipboardPlus, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
@@ -31,19 +32,7 @@ export default function StaffClinical() {
       if (data) dbNotes = data;
     } catch { }
 
-    let localNotes: any[] = [];
-    try {
-      localNotes = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-    } catch { }
-
-    const map = new Map<string, any>();
-    [...dbNotes, ...localNotes].forEach(n => {
-      if (n && n.id && !map.has(n.id)) {
-        map.set(n.id, n);
-      }
-    });
-
-    const sorted = Array.from(map.values()).sort((a, b) => {
+    const sorted = [...dbNotes].sort((a, b) => {
       const tA = new Date(a.signed_at || a.created_at || 0).getTime();
       const tB = new Date(b.signed_at || b.created_at || 0).getTime();
       return tB - tA;
@@ -60,17 +49,24 @@ export default function StaffClinical() {
       try {
         const now = new Date();
         const in30 = new Date(now.getTime() + 30 * 86400000).toISOString();
-        const [cosRes, gexRes, incompleteRows] = await Promise.all([
-          apiQuery("clinical_notes").select("*").eq("status", "signed").eq("requires_cosign", true).order("signed_at", { ascending: false }).limit(50),
+        const [cosQueue, gexRes, incompleteRows] = await Promise.all([
+          clinicalService.getCosignQueue().catch(() => []),
           apiQuery("gfe_records").select("id, client_email, client_first_name, client_last_name, np_name, expires_at").gte("expires_at", now.toISOString()).lt("expires_at", in30).order("expires_at").limit(20),
           fetchIncompleteCharts({ canSeeAll, staffId }),
         ]);
-        if (cosRes.error) console.error("[StaffClinical] cosign query error:", cosRes.error);
         if (gexRes.error) console.error("[StaffClinical] gfe query error:", gexRes.error);
-        const cos = cosRes.data;
-        const gex = gexRes.data;
-        setNeedsCosign(cos ?? []);
-        setExpiringGfes(gex ?? []);
+        const mappedCosign = cosQueue.map((item: any) => ({
+          id: item.note?.id || item.noteId,
+          client_first_name: item.note?.patient?.firstName || "",
+          client_last_name: item.note?.patient?.lastName || "",
+          client_email: item.note?.patient?.email || "—",
+          service_name: item.note?.serviceName || "Clinical Note",
+          provider_name: item.author?.fullName || "RN Injector",
+          signed_at: item.note?.signedAt || item.requestedAt,
+          status: item.note?.status || "pending_cosign",
+        }));
+        setNeedsCosign(mappedCosign);
+        setExpiringGfes(gexRes.data ?? []);
         setIncomplete(incompleteRows);
         await loadRecentNotes();
       } catch (e) {

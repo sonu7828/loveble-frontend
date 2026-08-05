@@ -45,28 +45,13 @@ export default function ChartNotesIndex() {
       if (data) dbRows = data as Note[];
     } catch { }
 
-    let cachedRows: Note[] = [];
-    try {
-      cachedRows = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-    } catch { }
-
-    // Merge and deduplicate by id
-    const map = new Map<string, Note>();
-    [...dbRows, ...cachedRows].forEach(r => {
-      if (r && r.id && !map.has(r.id)) {
-        if (category === "all" || r.category === category) {
-          map.set(r.id, r);
-        }
-      }
-    });
-
-    const merged = Array.from(map.values()).sort((a, b) => {
+    const sorted = [...dbRows].sort((a, b) => {
       const timeA = new Date(a.signed_at || a.created_at || 0).getTime();
       const timeB = new Date(b.signed_at || b.created_at || 0).getTime();
       return timeB - timeA;
     });
 
-    setRows(merged);
+    setRows(sorted);
     setLoading(false);
   };
 
