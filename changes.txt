@@ -199,10 +199,11 @@
 - Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
 
 
-25. PATIENT BOOKING DOB YEAR VALIDATION
+29. MODEL APPLICATION FORM PHONE NUMBER FORMATTING & VALIDATION
 --------------------------------------------------------------------------------
-- Action: Restricted "DATE OF BIRTH" input in patient booking flow (`StepDetails.tsx`) with `min="1900-01-01"`, `max={today}`, and automatic 4-digit year truncation (`parts[0].slice(0, 4)`).
-- Action: Updated `detailsSchema` Zod validation in `Book.tsx` to strictly enforce 4-digit birth years (>= 1900 and <= today's date), preventing 5+ digit year values (e.g. 444444) from proceeding to consents.
+- Action: Applied `formatPhone10` helper to "PHONE NUMBER" field in `src/pages/public/Model.tsx` with `maxLength={14}` and auto-formatting `(XXX) XXX-XXXX`.
+- Action: Automatically strips all alphabetic characters and non-numeric input on typing.
+- Action: Added submission validation enforcing exactly 10 numeric digits before form submission.
 - Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
 
 
@@ -234,16 +235,19 @@ MODIFIED FILES:
 14. `src/pages/staff/StaffNewAppointment.tsx`
 15. `src/pages/book/StepDetails.tsx`
 16. `src/pages/patient/Book.tsx`
-17. `src/components/RescheduleDialog.tsx`
-18. `src/components/ClientIdDocuments.tsx`
-19. `src/services/api/client.ts`
-20. `src/services/api/clinicalService.ts`
-21. `src/lib/toxGuardrails.ts`
-22. `sonu_lovable_backend/src/routes/clinical.routes.ts`
-23. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
-24. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
-25. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
-26. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
+17. `src/pages/public/Model.tsx`
+18. `src/components/RescheduleDialog.tsx`
+19. `src/components/ClientIdDocuments.tsx`
+20. `src/services/api/client.ts`
+21. `src/services/api/clinicalService.ts`
+22. `src/services/api/tableService.ts`
+23. `src/services/api/appointmentService.ts`
+24. `src/lib/toxGuardrails.ts`
+25. `sonu_lovable_backend/src/routes/clinical.routes.ts`
+26. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
+27. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
+28. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
+29. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
 
 VERIFICATION STATUS:
 - `npx tsc --noEmit`: 0 Errors (Clean TypeScript compilation).

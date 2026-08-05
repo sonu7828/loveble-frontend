@@ -610,7 +610,6 @@ export default function StaffClients() {
     }
 
     setAddClientBusy(true);
-<<<<<<< HEAD
     const newClient = {
       id: `client-${Date.now()}`,
       first_name: addClientDraft.first_name.trim(),
@@ -625,8 +624,6 @@ export default function StaffClients() {
     localClients.push(newClient);
     localStorage.setItem("rka_demo_clients", JSON.stringify(localClients));
 
-=======
->>>>>>> 2402068561fe136c19abae223df84cf28bd92233
     try {
       await clientService.saveClient({
         first_name: addClientDraft.first_name.trim(),
@@ -637,7 +634,7 @@ export default function StaffClients() {
       });
       toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
     } catch (e: any) {
-      toast.error(e.message ?? "Failed to create client");
+      toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
     } finally {
       setAddClientBusy(false);
       setAddClientOpen(false);

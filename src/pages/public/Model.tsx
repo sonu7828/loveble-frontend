@@ -11,6 +11,7 @@ import { Users, CheckCircle2, Sparkles, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { apiQuery } from "@/services/api";
+import { formatPhone10 } from "@/lib/formatPhone";
 
 interface ModelFormData {
   name: string;
@@ -72,6 +73,25 @@ export default function Model() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.dob) {
+      const parts = formData.dob.split("-");
+      const yearStr = parts[0] || "";
+      const year = parseInt(yearStr, 10);
+      const todayStr = new Date().toISOString().split("T")[0];
+
+      if (isNaN(year) || yearStr.length !== 4 || year < 1900 || formData.dob > todayStr) {
+        toast.error("Please enter a valid birth date (4-digit year 1900 - today)");
+        return;
+      }
+    }
+
+    const phoneDigits = formData.phone.replace(/\D/g, "");
+    if (phoneDigits.length !== 10) {
+      toast.error("Please enter a valid 10-digit phone number");
+      return;
+    }
+
     setLoading(true);
 
     const appId = `APP-${Math.floor(100 + Math.random() * 900)}`;
@@ -163,7 +183,26 @@ export default function Model() {
               </div>
               <div>
                 <FormLabel htmlFor="dob">Date of Birth *</FormLabel>
-                <Input id="dob" type="date" required className={inputClass} value={formData.dob} onChange={(e) => updateField("dob", e.target.value)} />
+                <Input
+                  id="dob"
+                  type="date"
+                  required
+                  max={new Date().toISOString().split("T")[0]}
+                  min="1900-01-01"
+                  className={inputClass}
+                  value={formData.dob}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val) {
+                      const parts = val.split("-");
+                      if (parts[0] && parts[0].length > 4) {
+                        parts[0] = parts[0].slice(0, 4);
+                        val = parts.join("-");
+                      }
+                    }
+                    updateField("dob", val);
+                  }}
+                />
               </div>
               <div>
                 <FormLabel htmlFor="email">Email Address *</FormLabel>
@@ -171,7 +210,18 @@ export default function Model() {
               </div>
               <div>
                 <FormLabel htmlFor="phone">Phone Number *</FormLabel>
-                <Input id="phone" type="tel" required className={inputClass} value={formData.phone} onChange={(e) => updateField("phone", e.target.value)} placeholder="(408) 555-0123" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  required
+                  maxLength={14}
+                  className={inputClass}
+                  value={formData.phone}
+                  onChange={(e) => updateField("phone", formatPhone10(e.target.value))}
+                  placeholder="(408) 555-0123"
+                />
               </div>
               <div>
                 <FormLabel htmlFor="city">City / Neighborhood</FormLabel>
@@ -287,7 +337,26 @@ export default function Model() {
               </div>
               <div>
                 <FormLabel htmlFor="sig-date">Signature Date *</FormLabel>
-                <Input id="sig-date" type="date" required className={inputClass} value={formData.signatureDate} onChange={(e) => updateField("signatureDate", e.target.value)} />
+                <Input
+                  id="sig-date"
+                  type="date"
+                  required
+                  min="2000-01-01"
+                  max="2100-12-31"
+                  className={inputClass}
+                  value={formData.signatureDate}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val) {
+                      const parts = val.split("-");
+                      if (parts[0] && parts[0].length > 4) {
+                        parts[0] = parts[0].slice(0, 4);
+                        val = parts.join("-");
+                      }
+                    }
+                    updateField("signatureDate", val);
+                  }}
+                />
               </div>
             </div>
           </section>

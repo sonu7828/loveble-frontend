@@ -50,10 +50,16 @@ export interface CosignQueueItem {
 }
 
 export const clinicalService = {
-<<<<<<< HEAD
-  async getChartNotes(clientEmail?: string): Promise<ChartNote[]> {
+  async getChartNotes(input?: string | { patientId?: string; email?: string }): Promise<ChartNote[]> {
     try {
-      const res = await ApiClient.get<ChartNote[]>(`/clinical/notes?email=${encodeURIComponent(clientEmail || "")}`);
+      let email = typeof input === "string" ? input : input?.email;
+      let patientId = typeof input === "object" ? input?.patientId : undefined;
+      const q = new URLSearchParams();
+      if (patientId) q.set("patientId", patientId);
+      if (email) q.set("email", email);
+
+      const endpoint = `/clinical/notes${q.toString() ? `?${q.toString()}` : ""}`;
+      const res = await ApiClient.get<ChartNote[]>(endpoint);
       if (res.error || !res.data || !Array.isArray(res.data)) {
         return MOCK_CHARTS;
       }
@@ -83,19 +89,6 @@ export const clinicalService = {
 
   async getProtocols(): Promise<any[]> {
     const res = await ApiClient.get<any[]>("/clinical/protocols");
-=======
-  /**
-   * Get list of SOAP notes for patient chart or global notes index.
-   */
-  async getChartNotes(params?: { patientId?: string; email?: string }): Promise<ChartNote[]> {
-    const q = new URLSearchParams();
-    if (params?.patientId) q.set("patientId", params.patientId);
-    if (params?.email) q.set("email", params.email);
-
-    const endpoint = `/clinical/notes${q.toString() ? `?${q.toString()}` : ""}`;
-    const res = await ApiClient.get<ChartNote[]>(endpoint);
-    if (res.error) throw new Error(res.error);
->>>>>>> 2402068561fe136c19abae223df84cf28bd92233
     return res.data || [];
   },
 

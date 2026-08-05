@@ -40,7 +40,6 @@ const MOCK_FALLBACKS: Record<string, any[]> = {
       is_active: true,
     },
   ],
-<<<<<<< HEAD
   client_profiles: [],
   appointments: [
     {
@@ -71,8 +70,6 @@ const MOCK_FALLBACKS: Record<string, any[]> = {
     },
   ],
   imported_clients: [],
-=======
->>>>>>> 2402068561fe136c19abae223df84cf28bd92233
 };
 
 function normalizeRow(tableName: string, row: any): any {
