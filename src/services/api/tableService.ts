@@ -40,39 +40,6 @@ const MOCK_FALLBACKS: Record<string, any[]> = {
       is_active: true,
     },
   ],
-<<<<<<< HEAD
-  client_profiles: [],
-  appointments: [
-    {
-      id: "apt-101",
-      client_first_name: "Sarah",
-      client_last_name: "Jenkins",
-      client_email: "sarah.j@example.com",
-      client_phone: "(408) 555-0123",
-      service_name: "Botox Cosmetic (20 units)",
-      start_at: new Date().toISOString(),
-      status: "confirmed",
-      location_id: "11111111-1111-1111-1111-111111111111",
-      staff_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      total_amount: 280,
-    },
-    {
-      id: "apt-102",
-      client_first_name: "Elena",
-      client_last_name: "Rostova",
-      client_email: "elena.r@example.com",
-      client_phone: "(408) 555-0199",
-      service_name: "Juvederm Voluma XC",
-      start_at: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
-      status: "pending",
-      location_id: "11111111-1111-1111-1111-111111111111",
-      staff_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      total_amount: 750,
-    },
-  ],
-  imported_clients: [],
-=======
->>>>>>> 2402068561fe136c19abae223df84cf28bd92233
 };
 
 function normalizeRow(tableName: string, row: any): any {

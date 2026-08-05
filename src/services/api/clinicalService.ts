@@ -50,40 +50,6 @@ export interface CosignQueueItem {
 }
 
 export const clinicalService = {
-<<<<<<< HEAD
-  async getChartNotes(clientEmail?: string): Promise<ChartNote[]> {
-    try {
-      const res = await ApiClient.get<ChartNote[]>(`/clinical/notes?email=${encodeURIComponent(clientEmail || "")}`);
-      if (res.error || !res.data || !Array.isArray(res.data)) {
-        return MOCK_CHARTS;
-      }
-      return res.data;
-    } catch {
-      return MOCK_CHARTS;
-    }
-  },
-
-  async getChartNoteById(id: string): Promise<ChartNote | null> {
-    try {
-      const res = await ApiClient.get<ChartNote>(`/clinical/notes/${id}`);
-      if (res.data) return res.data;
-    } catch {}
-    return MOCK_CHARTS.find((c) => c.id === id) || MOCK_CHARTS[0];
-  },
-
-  async saveChartNote(note: Partial<ChartNote>): Promise<ChartNote> {
-    const res = await ApiClient.post<ChartNote>("/clinical/notes", note);
-    return res.data || { id: `chart-${Date.now()}`, status: "draft", created_at: new Date().toISOString(), ...note } as ChartNote;
-  },
-
-  async signChartNote(id: string, signature: string): Promise<boolean> {
-    const res = await ApiClient.post(`/clinical/notes/${id}/sign`, { signature });
-    return !res.error;
-  },
-
-  async getProtocols(): Promise<any[]> {
-    const res = await ApiClient.get<any[]>("/clinical/protocols");
-=======
   /**
    * Get list of SOAP notes for patient chart or global notes index.
    */
@@ -95,7 +61,6 @@ export const clinicalService = {
     const endpoint = `/clinical/notes${q.toString() ? `?${q.toString()}` : ""}`;
     const res = await ApiClient.get<ChartNote[]>(endpoint);
     if (res.error) throw new Error(res.error);
->>>>>>> 2402068561fe136c19abae223df84cf28bd92233
     return res.data || [];
   },
 
