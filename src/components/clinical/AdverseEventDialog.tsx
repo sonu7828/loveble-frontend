@@ -55,7 +55,7 @@ export function AdverseEventDialog({
 
   async function save() {
     setSaving(true);
-    const { data: u } = await authService.getSession();
+    const { user } = await authService.getSession();
     const payload = {
       client_email: clientEmail.toLowerCase(),
       client_first_name: clientFirstName,
@@ -71,7 +71,7 @@ export function AdverseEventDialog({
       outcome: form.outcome,
       followup_at: form.followup_at ? new Date(form.followup_at).toISOString() : null,
       notes: form.notes || null,
-      reported_by: u.user?.id ?? null,
+      reported_by: user?.id ?? null,
     };
     const { error } = await apiQuery("adverse_events").insert(payload as any);
     setSaving(false);
@@ -84,7 +84,12 @@ export function AdverseEventDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ?? <Button variant="outline" size="sm"><AlertTriangle className="h-4 w-4 mr-1" />Log adverse event</Button>}
+        {trigger ?? (
+          <Button variant="outline" className="w-full h-11 rounded-xl bg-background hover:bg-muted border-border font-medium text-xs sm:text-sm text-foreground shadow-2xs justify-center">
+            <AlertTriangle className="h-4 w-4 mr-2 text-muted-foreground" />
+            Log adverse event
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader><DialogTitle>Log adverse event</DialogTitle></DialogHeader>

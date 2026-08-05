@@ -29,18 +29,30 @@ const BookingStatus = () => {
 
   const refetch = async () => {
     const idParam = params.get("id") || params.get("token") || token;
-    if (!idParam) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setLoadError(null);
+
+    let localAppt: any = null;
     try {
-      const { data: dbData } = await apiQuery("appointments").select("*").eq("id", idParam).maybeSingle();
-      let appt = dbData;
+      const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      localAppt = idParam ? localAppts.find((a) => a.id === idParam) : localAppts[0];
+    } catch {}
+
+    try {
+      let appt: any = null;
+      if (idParam) {
+        const { data: dbData } = await apiQuery("appointments").select("*").eq("id", idParam).maybeSingle();
+        appt = dbData;
+        if (!appt) {
+          try {
+            const res = await ApiClient.get(`/booking?token=${encodeURIComponent(idParam)}`);
+            if (res.data) appt = res.data;
+          } catch {}
+        }
+      }
+
       if (!appt) {
-        const res = await ApiClient.get(`/booking?token=${encodeURIComponent(idParam)}`);
-        if (res.data) appt = res.data;
+        appt = localAppt;
       }
 
       if (appt) {
@@ -73,6 +85,9 @@ const BookingStatus = () => {
           const svcName = enriched.service_name || "Medical Consultation";
           enriched.services = { name: svcName };
         }
+        if (!enriched.start_at) {
+          enriched.start_at = new Date().toISOString();
+        }
 
         setData(enriched);
         setLoading(false);
@@ -80,6 +95,11 @@ const BookingStatus = () => {
       }
       throw new Error("Appointment not found");
     } catch (e) {
+      if (localAppt) {
+        setData(localAppt);
+        setLoading(false);
+        return;
+      }
       setLoadError((e as Error).message || "Could not load appointment");
     } finally {
       setLoading(false);

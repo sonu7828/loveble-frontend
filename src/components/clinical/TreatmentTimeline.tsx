@@ -3,13 +3,19 @@
 // and wellness doses into one scrollable column. Computes a simple "due now"
 // prediction for neurotoxin based on the typical 12-week return.
 import { useEffect, useMemo, useState } from "react";
-import { apiQuery, authService, ApiClient } from "@/services/api";
-import { Loader2, Syringe, Droplet, Zap, Pill, AlertCircle, CalendarClock } from "lucide-react";
+import { apiQuery } from "@/services/api";
+import { Loader2, Syringe, Droplet, Zap, Pill, CalendarClock } from "lucide-react";
 import { format, differenceInWeeks, addWeeks, formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
 
 const NEURO_RETURN_WEEKS = 12;
 const FILLER_RETURN_WEEKS = 52;
+
+function safeDate(val: any): Date | null {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 type Row = {
   noteId: string;
@@ -27,6 +33,13 @@ type Row = {
   wellnessProduct?: string | null;
   wellnessDose?: string | null;
 };
+
+function CategoryIcon({ c }: { c: string }) {
+  if (c === "neurotoxin") return <Syringe className="h-4 w-4 text-purple-600 shrink-0" />;
+  if (c === "filler") return <Droplet className="h-4 w-4 text-amber-600 shrink-0" />;
+  if (c === "energy") return <Zap className="h-4 w-4 text-blue-600 shrink-0" />;
+  return <Pill className="h-4 w-4 text-emerald-600 shrink-0" />;
+}
 
 export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -64,10 +77,10 @@ export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
       const out: Row[] = (notes ?? []).map((n: any) => {
         const base: Row = {
           noteId: n.id,
-          date: n.created_at,
-          category: n.category,
-          service: n.service_name,
-          provider: n.provider_name,
+          date: n.created_at || new Date().toISOString(),
+          category: n.category || "general",
+          service: n.service_name || "Clinical Treatment",
+          provider: n.provider_name || "Provider",
         };
         const nx: any = neuroMap.get(n.id);
         if (nx) { base.units = Number(nx.total_units ?? 0); base.product = nx.product; }
@@ -96,12 +109,18 @@ export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
     const lastFiller = rows.find(r => r.category === "filler" && (r.syringes ?? 0) > 0);
     const items: { kind: string; last: Row; due: Date; overdue: boolean }[] = [];
     if (lastNeuro) {
-      const due = addWeeks(new Date(lastNeuro.date), NEURO_RETURN_WEEKS);
-      items.push({ kind: "Neurotoxin", last: lastNeuro, due, overdue: due < new Date() });
+      const d = safeDate(lastNeuro.date);
+      if (d) {
+        const due = addWeeks(d, NEURO_RETURN_WEEKS);
+        items.push({ kind: "Neurotoxin", last: lastNeuro, due, overdue: due < new Date() });
+      }
     }
     if (lastFiller) {
-      const due = addWeeks(new Date(lastFiller.date), FILLER_RETURN_WEEKS);
-      items.push({ kind: "Filler", last: lastFiller, due, overdue: due < new Date() });
+      const d = safeDate(lastFiller.date);
+      if (d) {
+        const due = addWeeks(d, FILLER_RETURN_WEEKS);
+        items.push({ kind: "Filler", last: lastFiller, due, overdue: due < new Date() });
+      }
     }
     return items;
   }, [rows]);
@@ -128,7 +147,8 @@ export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
           <div className="space-y-2">
             {forecast.map(f => {
               const last = f.last;
-              const weeksAgo = differenceInWeeks(new Date(), new Date(last.date));
+              const lastDate = safeDate(last.date);
+              const weeksAgo = lastDate ? differenceInWeeks(new Date(), lastDate) : 0;
               const summary = f.kind === "Neurotoxin"
                 ? `${last.units}u ${last.product ?? ""}`.trim()
                 : `${last.syringes} syringe${(last.syringes ?? 0) === 1 ? "" : "s"} ${last.product ?? ""}`.trim();
@@ -139,7 +159,7 @@ export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
                     <span className="text-muted-foreground">Last {summary} ({weeksAgo}w ago)</span>
                   </div>
                   <div className={`text-xs font-medium ${f.overdue ? "text-warning-soft-foreground dark:text-warning" : "text-muted-foreground"}`}>
-                    {f.overdue ? `Due now (${formatDistanceToNow(f.due)} ago)` : `Due ${format(f.due, "MMM d")}`}
+                    {f.overdue ? `Due now (${f.due ? formatDistanceToNow(f.due) : "soon"} ago)` : `Due ${f.due ? format(f.due, "MMM d") : "soon"}`}
                   </div>
                 </div>
               );
@@ -153,49 +173,45 @@ export function TreatmentTimeline({ clientEmail }: { clientEmail: string }) {
           Treatment timeline ({rows.length})
         </div>
         <ol className="relative">
-          {rows.map((r, idx) => (
-            <li key={r.noteId} className="relative pl-10 pr-4 py-3 border-b border-border last:border-b-0">
-              <span className="absolute left-4 top-4 h-2 w-2 rounded-full bg-primary" />
-              {idx < rows.length - 1 && (
-                <span className="absolute left-[19px] top-6 bottom-0 w-px bg-border" aria-hidden />
-              )}
-              <Link to={`/staff/clinical/notes/${r.noteId}`} className="block hover:bg-secondary/30 -mx-4 px-4 -my-3 py-3 transition">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 text-sm font-medium min-w-0">
-                    <CategoryIcon c={r.category} />
-                    <span className="truncate">{r.service ?? r.category}</span>
+          {rows.map((r, idx) => {
+            const dateObj = safeDate(r.date);
+            const formattedDate = dateObj ? format(dateObj, "MMM d, yyyy") : "Recent Date";
+            return (
+              <li key={r.noteId} className="relative pl-10 pr-4 py-3 border-b border-border last:border-b-0">
+                <span className="absolute left-4 top-4 h-2 w-2 rounded-full bg-primary" />
+                {idx < rows.length - 1 && (
+                  <span className="absolute left-[19px] top-6 bottom-0 w-px bg-border" aria-hidden />
+                )}
+                <Link to={`/staff/clinical/notes/${r.noteId}`} className="block hover:bg-secondary/30 -mx-4 px-4 -my-3 py-3 transition">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-sm font-medium min-w-0">
+                      <CategoryIcon c={r.category} />
+                      <span className="truncate">{r.service ?? r.category}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{formattedDate}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{format(new Date(r.date), "MMM d, yyyy")}</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1 pl-6">
-                  {r.category === "neurotoxin" && r.units != null && <span>{r.units}u {r.product}</span>}
-                  {r.category === "filler" && r.syringes != null && (
-                    <span>
-                      {r.syringes} syringe{r.syringes === 1 ? "" : "s"} {r.product}
-                      {r.areas?.length ? ` · ${r.areas.slice(0, 3).join(", ")}` : ""}
-                    </span>
-                  )}
-                  {r.category === "energy" && (
-                    <span>{r.device}{r.passes ? ` · ${r.passes} passes` : ""}{r.areas?.length ? ` · ${r.areas.slice(0, 3).join(", ")}` : ""}</span>
-                  )}
-                  {r.category === "wellness" && (
-                    <span>{r.wellnessProduct ?? r.service}{r.wellnessDose ? ` · ${r.wellnessDose}` : ""}</span>
-                  )}
-                  {r.provider && <span> · {r.provider}</span>}
-                </div>
-              </Link>
-            </li>
-          ))}
+                  <div className="text-xs text-muted-foreground mt-1 pl-6">
+                    {r.category === "neurotoxin" && r.units != null && <span>{r.units}u {r.product}</span>}
+                    {r.category === "filler" && r.syringes != null && (
+                      <span>
+                        {r.syringes} syringe{r.syringes === 1 ? "" : "s"} {r.product}
+                        {r.areas?.length ? ` · ${r.areas.slice(0, 3).join(", ")}` : ""}
+                      </span>
+                    )}
+                    {r.category === "energy" && (
+                      <span>{r.device}{r.passes ? ` · ${r.passes} passes` : ""}{r.areas?.length ? ` · ${r.areas.slice(0, 3).join(", ")}` : ""}</span>
+                    )}
+                    {r.category === "wellness" && (
+                      <span>{r.wellnessProduct ?? r.service}{r.wellnessDose ? ` · ${r.wellnessDose}` : ""}</span>
+                    )}
+                    {r.provider && <span> · {r.provider}</span>}
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ol>
       </div>
     </div>
   );
-}
-
-function CategoryIcon({ c }: { c: string }) {
-  if (c === "neurotoxin") return <Syringe className="h-4 w-4 text-primary" />;
-  if (c === "filler") return <Droplet className="h-4 w-4 text-primary" />;
-  if (c === "energy") return <Zap className="h-4 w-4 text-warning-soft-foreground" />;
-  if (c === "wellness") return <Pill className="h-4 w-4 text-success-soft-foreground" />;
-  return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
 }

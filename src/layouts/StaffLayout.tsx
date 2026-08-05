@@ -112,6 +112,16 @@ export default function StaffLayout() {
           ],
         },
         {
+          key: "md_charts",
+          label: "Patient Charts",
+          icon: FileText,
+          show: true,
+          children: [
+            { to: "/staff/clinical", label: "Patient Charts", icon: FileText },
+            { to: "/staff/clients", label: "Patient Directory", icon: Users },
+          ],
+        },
+        {
           key: "orders_prescriptions",
           label: "Prescriptions",
           icon: Pill,

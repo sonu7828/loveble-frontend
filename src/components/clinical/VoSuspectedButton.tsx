@@ -2,7 +2,7 @@ import { useState } from "react";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { AlertOctagon } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -38,7 +38,7 @@ export function VoSuspectedButton(props: Props) {
   async function activate() {
     setBusy(true);
     try {
-      const { data: u } = await authService.getSession();
+      const { user } = await authService.getSession();
       // 1. Create AE
       const { data: ae, error: aeErr } = await apiQuery("adverse_events").insert({
         client_email: props.clientEmail.toLowerCase(),
@@ -50,7 +50,7 @@ export function VoSuspectedButton(props: Props) {
         outcome: "ongoing",
         product_involved: props.productSuspected ?? null,
         body_region: props.region ?? null,
-        reported_by: u.user?.id ?? null,
+        reported_by: user?.id ?? null,
       } as any).select("id").single();
       if (aeErr) throw aeErr;
       // 2. Create run
@@ -64,7 +64,7 @@ export function VoSuspectedButton(props: Props) {
         onset_at: new Date().toISOString(),
         product_suspected: props.productSuspected ?? null,
         region: props.region ?? null,
-        started_by: u.user?.id ?? null,
+        started_by: user?.id ?? null,
       } as any).select("id").single();
       if (runErr) throw runErr;
       // 3. Seed steps
@@ -98,8 +98,8 @@ export function VoSuspectedButton(props: Props) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm" className="gap-1">
-          <AlertOctagon className="h-4 w-4" />
+        <Button variant="destructive" className="w-full h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs sm:text-sm shadow-2xs justify-center border-0">
+          <AlertTriangle className="h-4 w-4 mr-2" />
           VO suspected
         </Button>
       </AlertDialogTrigger>
