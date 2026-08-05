@@ -87,7 +87,7 @@ export default function AdminModelApplicationDetail() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-5">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="icon" className="rounded-full shrink-0">
-            <Link to="/staff/model-applications">
+            <Link to="/admin/model-applications">
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>

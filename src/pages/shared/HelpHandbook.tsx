@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   BookOpen, Calendar, Users, ShieldAlert, Laptop, Building2,
-  FileCheck, Stethoscope, HelpCircle, Pill, BarChart3, ChevronRight, UserCheck, CheckCircle2
+  FileCheck, Stethoscope, HelpCircle, Pill, BarChart3, ChevronRight, UserCheck, CheckCircle2, ShieldCheck, Tag
 } from "lucide-react";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,59 @@ export default function HelpHandbook() {
   }, []);
 
   const WORKFLOW_CARDS = useMemo(() => {
+    if (isAdmin) {
+      return [
+        {
+          icon: ShieldCheck,
+          title: "1. Admin Operations Overview",
+          desc: "Executive practice management, model applications, staff management, and system overview.",
+          link: "/admin/hub",
+          linkText: "Open Admin Hub",
+          color: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900",
+        },
+        {
+          icon: Users,
+          title: "2. Staff & Team Management",
+          desc: "Manage practice staff profiles, role assignments, provider rates, and account activations.",
+          link: "/admin/team",
+          linkText: "Manage Team",
+          color: "text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900",
+        },
+        {
+          icon: Tag,
+          title: "3. Services & Catalog Pricing",
+          desc: "Update treatment catalog pricing, durations, categories, deposit rules, and promo offers.",
+          link: "/admin/services",
+          linkText: "View Services",
+          color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900",
+        },
+        {
+          icon: Laptop,
+          title: "4. Device Inventory & Presets",
+          desc: "Track laser equipment assets, safety presets, and device inventory.",
+          link: "/admin/device-inventory",
+          linkText: "View Device Inventory",
+          color: "text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900",
+        },
+        {
+          icon: Building2,
+          title: "5. Vendor Management & BAAs",
+          desc: "Track third-party vendors, Business Associate Agreements (BAAs), and hosting infrastructure.",
+          link: "/admin/vendors",
+          linkText: "View Vendors",
+          color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900",
+        },
+        {
+          icon: UserCheck,
+          title: "6. Admin Account & Profile",
+          desc: "Manage your administrator account details and personal preferences.",
+          link: "/admin/me",
+          linkText: "Edit Profile",
+          color: "text-rose-600 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900",
+        },
+      ];
+    }
+
     if (isMedicalDirector) {
       return [
         {
@@ -195,9 +248,29 @@ export default function HelpHandbook() {
         color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900",
       },
     ];
-  }, [isMedicalDirector, isPrivacyOfficer, isNP, isRNInjector, isProvider]);
+  }, [isMedicalDirector, isPrivacyOfficer, isNP, isRNInjector, isProvider, isAdmin]);
 
   const FAQS = useMemo(() => {
+    if (isAdmin) {
+      return [
+        {
+          q: "How do I manage practice staff and assign roles?",
+          a: "Go to Staff Management (/admin/team) -> Select a team member to update their permissions, compensation rates, or assigned roles.",
+        },
+        {
+          q: "How do I update treatment pricing and service durations?",
+          a: "Go to Services & Pricing (/admin/services) -> Edit pricing tiers, deposit amounts, treatment durations, and active promo codes.",
+        },
+        {
+          q: "Where do I track third-party HIPAA BAAs and vendor security?",
+          a: "Go to Vendor Management (/admin/vendors) -> Review AWS hosting regions, Stripe POS compliance, and signed Business Associate Agreements.",
+        },
+        {
+          q: "How does the 15-minute auto-logout work?",
+          a: "For HIPAA compliance, if your screen is left idle for 15 minutes without activity, the system automatically signs out to protect practice data.",
+        },
+      ];
+    }
     if (isMedicalDirector) {
       return [
         {

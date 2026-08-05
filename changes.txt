@@ -114,6 +114,55 @@
 - Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
 
 
+14. ADMIN HUB NAVIGATION LINKS FIX
+--------------------------------------------------------------------------------
+- Action: Updated `AdminHub.tsx` header link `System Audit Logs` to point to `/admin/audit` (Admin System Audit Logs).
+- Action: Updated `AdminHub.tsx` card link `View All Logs` to point to `/admin/audit`.
+- Action: Updated `AdminHub.tsx` header link `Model Applications` to point to `/admin/model-applications`.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+15. ADMIN HUB INTERNAL LINKS CLEANUP
+--------------------------------------------------------------------------------
+- Action: Updated `CORE_MODULES` in `AdminHub.tsx` to point to `/admin/*` paths (`/admin/model-applications`, `/admin/team`, `/admin/services`, `/admin/vendors`).
+- Action: Updated essential metric cards in `AdminHub.tsx` (`Model Candidates`, `Active Staff`, `Services Catalog`) to target `/admin/*` routes natively.
+- Action: Updated `HIPAA Status` metric card in `AdminHub.tsx` to target `/staff/security-officer` (Security Officer Hub).
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+16. ADMIN PAGE ROUTE LEAKS CLEANUP
+--------------------------------------------------------------------------------
+- Action: Updated `AdminModelApplications.tsx` row link from `/staff/model-applications/${app.id}` to `/admin/model-applications/${app.id}`.
+- Action: Updated `AdminModelApplicationDetail.tsx` back button target from `/staff/model-applications` to `/admin/model-applications`.
+- Action: Updated `AdminVendors.tsx` fallback tab redirect target from `/staff/device-presets` to `/admin/device-inventory`.
+- Action: Updated `AdminClinicalTemplates.tsx` protocol link target from `/staff/clinical/protocols` to `/staff/clinical-templates`.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+17. ADMIN HUB HIPAA STATUS NAVIGATION FIX
+--------------------------------------------------------------------------------
+- Action: Added route `/admin/compliance-status` targeting `<AdminOnly><ComplianceAdmin /></AdminOnly>` in `App.tsx` under `<AdminLayout>`.
+- Action: Updated `HIPAA Status` metric card target in `AdminHub.tsx` from `/staff/security-officer` to `/admin/compliance-status`.
+- Action: Maintained Privacy Officer security governance routes (`/staff/security-officer`, `/staff/hipaa-policies`, `/staff/audit-report`) completely untouched inside `<StaffLayout>`.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+18. RESTORATION OF ADMIN VENDORS & HIPAA COMPLIANCE FLOW
+--------------------------------------------------------------------------------
+- Action: Removed unnecessary temporary route `/admin/compliance-status` from `App.tsx`.
+- Action: Updated `HIPAA Status` metric card in `AdminHub.tsx` to target the native Admin HIPAA BAA & Infrastructure page `/admin/vendors`.
+- Action: Kept Privacy Officer security governance routes (`/staff/security-officer`, `/staff/hipaa-policies`, `/staff/audit-report`, `/staff/breach-report`) strictly under `<StaffLayout>`.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
+19. HELPHANDBOOK ROLE-BASED NAVIGATION FIX
+--------------------------------------------------------------------------------
+- Action: Added dedicated `isAdmin` workflow card list in `HelpHandbook.tsx` targeting `/admin/*` routes (`/admin/hub`, `/admin/team`, `/admin/services`, `/admin/device-inventory`, `/admin/vendors`, `/admin/me`).
+- Action: Added dedicated `isAdmin` FAQ section in `HelpHandbook.tsx` addressing Admin operational workflows.
+- Action: Preserved all existing staff, Medical Director, Privacy Officer, NP, and RN workflow cards unchanged.
+- Action: Verified clean compilation via `npx tsc --noEmit` (0 errors).
+
+
 ================================================================================
                               SUMMARY OF FILES MODIFIED / CREATED
 ================================================================================
@@ -131,10 +180,16 @@ MODIFIED FILES:
 3. `src/layouts/StaffLayout.tsx`
 4. `src/context/AuthContext.tsx`
 5. `src/pages/admin/auth/AdminLogin.tsx`
-6. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
-7. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
-8. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
-9. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
+6. `src/pages/admin/AdminHub.tsx`
+7. `src/pages/admin/AdminModelApplications.tsx`
+8. `src/pages/admin/AdminModelApplicationDetail.tsx`
+9. `src/pages/admin/AdminVendors.tsx`
+10. `src/pages/admin/AdminClinicalTemplates.tsx`
+11. `src/pages/shared/HelpHandbook.tsx`
+12. `src/components/staff/AdminOnly.tsx` (converted to re-export bridge)
+13. `src/pages/staff/StaffMyProfile.tsx` (converted to re-export shim)
+14. `src/pages/staff/StaffHelp.tsx` (converted to re-export shim)
+15. `src/pages/staff/compliance/MyCompliance.tsx` (converted to re-export shim)
 
 VERIFICATION STATUS:
 - `npx tsc --noEmit`: 0 Errors (Clean TypeScript compilation).

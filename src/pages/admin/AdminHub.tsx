@@ -74,28 +74,28 @@ export default function AdminHub() {
 
   const CORE_MODULES = [
     {
-      to: "/staff/model-applications",
+      to: "/admin/model-applications",
       label: "Model Applications",
       desc: "Review candidate models, photos & approve promotional treatments",
       icon: Sparkles,
       color: "text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60",
     },
     {
-      to: "/staff/team",
+      to: "/admin/team",
       label: "Staff & Practitioners",
       desc: "Manage provider profiles, licenses, permissions & MFA security",
       icon: Users,
       color: "text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/60",
     },
     {
-      to: "/staff/services",
+      to: "/admin/services",
       label: "Services & Pricing Catalog",
       desc: "Update treatment pricing, duration, categories & promo offers",
       icon: BookOpen,
       color: "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/60",
     },
     {
-      to: "/staff/vendors",
+      to: "/admin/vendors",
       label: "Vendors & BAAs",
       desc: "Track cloud infrastructure, payment processors & HIPAA BAA status",
       icon: Building2,
@@ -124,12 +124,12 @@ export default function AdminHub() {
 
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm" className="rounded-full text-xs">
-            <Link to="/staff/audit-report">
+            <Link to="/admin/audit">
               <HistoryIcon className="h-3.5 w-3.5 mr-1.5 text-primary" /> System Audit Logs
             </Link>
           </Button>
           <Button asChild size="sm" className="rounded-full text-xs font-semibold">
-            <Link to="/staff/model-applications">
+            <Link to="/admin/model-applications">
               <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Model Applications
             </Link>
           </Button>
@@ -139,7 +139,7 @@ export default function AdminHub() {
       {/* Metric Cards (Real Essential Stats) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Model Applications */}
-        <Link to="/staff/model-applications" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
+        <Link to="/admin/model-applications" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Model Candidates</span>
             <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
@@ -156,7 +156,7 @@ export default function AdminHub() {
         </Link>
 
         {/* Staff Members */}
-        <Link to="/staff/team" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
+        <Link to="/admin/team" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Staff</span>
             <div className="h-8 w-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
@@ -173,7 +173,7 @@ export default function AdminHub() {
         </Link>
 
         {/* Live Services */}
-        <Link to="/staff/services" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
+        <Link to="/admin/services" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Services Catalog</span>
             <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
@@ -190,7 +190,7 @@ export default function AdminHub() {
         </Link>
 
         {/* Security & Safeguards */}
-        <Link to="/staff/hipaa-policies" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
+        <Link to="/admin/vendors" className="group rounded-2xl border border-border/80 bg-card p-4 hover:border-primary/40 transition shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">HIPAA Status</span>
             <div className="h-8 w-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
@@ -241,7 +241,7 @@ export default function AdminHub() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-lg font-semibold text-foreground">Recent Audit & Access Logs</h2>
-          <Link to="/staff/audit-report" className="text-xs text-primary font-medium hover:underline flex items-center">
+          <Link to="/admin/audit" className="text-xs text-primary font-medium hover:underline flex items-center">
             View All Logs <ArrowUpRight className="h-3.5 w-3.5 ml-0.5" />
           </Link>
         </div>

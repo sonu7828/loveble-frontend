@@ -213,7 +213,7 @@ export default function AdminModelApplications() {
                         </Button>
                       )}
                       <Button asChild size="sm" variant="ghost" className="h-8 rounded-full">
-                        <Link to={`/staff/model-applications/${app.id}`}>
+                        <Link to={`/admin/model-applications/${app.id}`}>
                           <Eye className="h-4 w-4 mr-1.5" /> View
                         </Link>
                       </Button>

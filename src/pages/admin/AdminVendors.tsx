@@ -57,7 +57,7 @@ export default function AdminVendors() {
 
   // If user hits /staff/vendors?tab=devices, redirect to dedicated Device Inventory page!
   if (searchParams.get("tab") === "devices") {
-    return <Navigate to="/staff/device-presets" replace />;
+    return <Navigate to="/admin/device-inventory" replace />;
   }
 
   const [rows, setRows] = useState<Vendor[]>([]);

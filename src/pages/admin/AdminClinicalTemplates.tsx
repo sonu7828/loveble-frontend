@@ -46,7 +46,7 @@ export default function AdminClinicalTemplates() {
               Clinical protocols have their own editor and version history.
             </p>
             <Button asChild>
-              <Link to="/staff/clinical/protocols">
+              <Link to="/staff/clinical-templates">
                 <ExternalLink className="h-4 w-4 mr-1.5" />
                 Open Protocols
               </Link>
