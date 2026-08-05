@@ -97,6 +97,44 @@ function normalizeRow(tableName: string, row: any): any {
     };
   }
 
+  if (lowerTable === "service_categories" || lowerTable === "servicecategory") {
+    return {
+      ...row,
+      id: row.id,
+      name: row.name,
+      slug: row.slug || (row.name ? row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : ""),
+      description: row.description || "",
+      display_order: row.displayOrder !== undefined ? row.displayOrder : (row.display_order ?? 0),
+      displayOrder: row.displayOrder !== undefined ? row.displayOrder : (row.display_order ?? 0),
+      is_active: row.isActive !== false,
+      isActive: row.isActive !== false,
+    };
+  }
+
+  if (lowerTable === "services" || lowerTable === "service") {
+    return {
+      ...row,
+      id: row.id,
+      category_id: row.categoryId || row.category_id,
+      categoryId: row.categoryId || row.category_id,
+      name: row.name,
+      slug: row.slug,
+      description: row.description || "",
+      duration_minutes: row.durationMinutes !== undefined ? row.durationMinutes : (row.duration_minutes ?? 30),
+      durationMinutes: row.durationMinutes !== undefined ? row.durationMinutes : (row.duration_minutes ?? 30),
+      price_cents: row.priceCents !== undefined ? row.priceCents : (row.price_cents ?? 0),
+      priceCents: row.priceCents !== undefined ? row.priceCents : (row.price_cents ?? 0),
+      price_note: row.priceNote || row.price_note || "",
+      priceNote: row.priceNote || row.price_note || "",
+      promo_group: row.promoGroup || row.promo_group || null,
+      promoGroup: row.promoGroup || row.promo_group || null,
+      is_active: row.isActive !== false,
+      isActive: row.isActive !== false,
+      display_order: row.displayOrder !== undefined ? row.displayOrder : (row.display_order ?? 0),
+      displayOrder: row.displayOrder !== undefined ? row.displayOrder : (row.display_order ?? 0),
+    };
+  }
+
   return row;
 }
 
@@ -241,6 +279,8 @@ export class ApiTableQuery {
   private async execute(): Promise<{ data: any; error: any; count: number }> {
     let res: any;
     const qs = this.buildQueryString();
+    const lowerTable = this.tableName.toLowerCase();
+
     try {
       if (this.action === "insert") {
         res = await ApiClient.post(`/${this.tableName}`, this.payload);
@@ -248,10 +288,35 @@ export class ApiTableQuery {
         res = await ApiClient.patch(`/${this.tableName}${qs}`, this.payload);
       } else if (this.action === "delete") {
         res = await ApiClient.delete(`/${this.tableName}${qs}`);
+      } else if (lowerTable === "service_categories" || lowerTable === "servicecategory") {
+        res = await ApiClient.get(`/services/public`);
+        if (res.status === 401 || res.status === 403 || !res.data) {
+          res = await ApiClient.get(`/services/categories`);
+        }
+      } else if (lowerTable === "services" || lowerTable === "service") {
+        res = await ApiClient.get(`/services/public`);
+        if (res?.data) {
+          const catList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+          const flatSvcs: any[] = [];
+          catList.forEach((cat: any) => {
+            (cat.services || []).forEach((s: any) => {
+              flatSvcs.push({
+                ...s,
+                category_id: s.categoryId || cat.id,
+                categoryId: s.categoryId || cat.id,
+                category: { id: cat.id, name: cat.name, slug: cat.slug || "", display_order: cat.displayOrder ?? 0 },
+              });
+            });
+          });
+          res = { data: flatSvcs, error: null, status: 200 };
+        } else {
+          res = await ApiClient.get(`/${this.tableName}${qs}`);
+        }
       } else {
         res = await ApiClient.get(`/${this.tableName}${qs}`);
       }
-      // 403 / 401 from production backend — treat as empty so localStorage fallback applies
+
+      // 403 / 401 from production backend — treat as empty so fallback applies
       if (res?.status === 403 || res?.status === 401) {
         res = { data: null, error: null, status: res.status };
       }
