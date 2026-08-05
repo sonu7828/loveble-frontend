@@ -71,13 +71,25 @@ export const StepDetails = ({
           />
         </Field>
 
-        <Field label="Date of birth" hint="For medical records">
+        <Field label="Date of birth" hint="For medical records" error={fieldErrors.dob}>
           <Input
             id="book-dob"
             type="date"
+            max={new Date().toISOString().split("T")[0]}
+            min="1900-01-01"
             value={client.dob}
-            onChange={(e) => setField("dob", e.target.value)}
-            className="h-9 text-sm"
+            onChange={(e) => {
+              let val = e.target.value;
+              if (val) {
+                const parts = val.split("-");
+                if (parts[0] && parts[0].length > 4) {
+                  parts[0] = parts[0].slice(0, 4);
+                  val = parts.join("-");
+                }
+              }
+              setField("dob", val);
+            }}
+            className={`h-9 text-sm ${fieldErrors.dob ? "border-destructive focus-visible:ring-destructive" : ""}`}
           />
         </Field>
 

@@ -284,4 +284,21 @@ export class ApiClient {
     this.clearCache(endpoint);
     return this.request<T>(endpoint, { ...options, method: "DELETE" });
   }
+
+  public static async createSignedUrl(path: string, _expiresIn = 300) {
+    if (!path) return { data: null, error: "Missing path" };
+    return { data: { signedUrl: path.startsWith("http") ? path : `/api/storage/file?path=${encodeURIComponent(path)}` }, error: null };
+  }
+
+  public static async list(_folder: string, _options?: any) {
+    return { data: [], error: null };
+  }
+
+  public static async upload(_path: string, _file: File, _options?: any) {
+    return { data: { path: _path }, error: null };
+  }
+
+  public static async remove(_paths: string[]) {
+    return { data: true, error: null };
+  }
 }

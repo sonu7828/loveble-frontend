@@ -124,13 +124,6 @@ export default function StaffAppointmentDetail() {
           gfeData = data;
         } catch (_err) {}
 
-        if (!gfeData) {
-          try {
-            const localItems: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
-            const found = localItems.find((g: any) => g.client_email?.toLowerCase() === a.client_email?.toLowerCase());
-            if (found) gfeData = found;
-          } catch {}
-        }
         setGfe(gfeData ?? null);
       }
 

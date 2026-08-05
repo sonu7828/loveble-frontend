@@ -30,7 +30,13 @@ const detailsSchema = z.object({
   lastName: z.string().trim().min(1, "Required").max(60),
   email: z.string().trim().email("Invalid email").max(120),
   phone: z.string().trim().refine(v => v.replace(/\D/g, "").length === 10, "Phone number must be 10 digits"),
-  dob: z.string().optional(),
+  dob: z.string().optional().refine(v => {
+    if (!v) return true;
+    const today = new Date().toISOString().split("T")[0];
+    const parts = v.split("-");
+    const year = parseInt(parts[0], 10);
+    return parts[0].length === 4 && year >= 1900 && v <= today;
+  }, "Invalid birth date or year"),
   notes: z.string().max(1000).optional(),
   nppAck: z.literal(true, { errorMap: () => ({ message: "Required to book" }) }),
 });

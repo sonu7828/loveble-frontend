@@ -134,6 +134,19 @@ export default function AdminVendors() {
       return;
     }
 
+    if (form.baa_renewal_at) {
+      const yearStr = form.baa_renewal_at.split("-")[0];
+      const year = parseInt(yearStr, 10);
+      if (isNaN(year) || yearStr.length !== 4 || year < 2000 || year > 2100) {
+        toast({
+          title: "Invalid Renewal Date",
+          description: "Please enter a valid 4-digit year (e.g. 2026 - 2100).",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     const payload: any = {
       name: trimmedName,
@@ -408,7 +421,24 @@ export default function AdminVendors() {
             </div>
             <div>
               <Label className="text-xs font-semibold">Renewal Date</Label>
-              <Input type="date" value={form.baa_renewal_at ?? ""} onChange={(e) => setForm({ ...form, baa_renewal_at: e.target.value || null })} className="mt-1" />
+              <Input
+                type="date"
+                min="2000-01-01"
+                max="2100-12-31"
+                value={form.baa_renewal_at ?? ""}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (val) {
+                    const parts = val.split("-");
+                    if (parts[0] && parts[0].length > 4) {
+                      parts[0] = parts[0].slice(0, 4);
+                      val = parts.join("-");
+                    }
+                  }
+                  setForm({ ...form, baa_renewal_at: val || null });
+                }}
+                className="mt-1"
+              />
             </div>
             <div>
               <Label className="text-xs font-semibold">Notes</Label>

@@ -149,30 +149,15 @@ export default function StaffClientDetail() {
         gfeData = res.data;
       } catch { }
 
-      if (!gfeData) {
-        try {
-          const localItems: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
-          const found = localItems.find((g: any) => g.client_email?.toLowerCase() === decodedEmail.toLowerCase());
-          if (found) gfeData = found;
-        } catch { }
-      }
       setGfe(gfeData ?? null);
 
-      const { data: noteRows, count: nc } = await apiQuery
+      const { data: noteRows } = await apiQuery
         .from("clinical_notes")
         .select("id, status, created_at, service_name, category")
         .ilike("client_email", decodedEmail)
         .order("created_at", { ascending: false })
         .limit(1);
       let noteRowsList: any[] = (noteRows ?? []) as any[];
-      try {
-        const localNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-        const matchingLocalNotes = localNotes.filter((item: any) => item.client_email?.toLowerCase() === decodedEmail.toLowerCase());
-        const nMap = new Map<string, any>();
-        noteRowsList.forEach(r => { if (r.id) nMap.set(r.id, r); });
-        matchingLocalNotes.forEach(r => { if (r.id) nMap.set(r.id, r); });
-        noteRowsList = Array.from(nMap.values()).sort((a, b) => new Date(b.created_at || b.signed_at || 0).getTime() - new Date(a.created_at || a.signed_at || 0).getTime());
-      } catch { }
       setRecentNote((noteRowsList[0] as any) ?? null);
       setNoteCount(noteRowsList.length);
 
@@ -796,12 +781,41 @@ export default function StaffClientDetail() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Phone</Label>
-                <Input className="mt-1.5" type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                <Label>Phone (10 digits)</Label>
+                <Input
+                  className="mt-1.5"
+                  type="tel"
+                  maxLength={10}
+                  value={editForm.phone}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setEditForm({ ...editForm, phone: digits });
+                  }}
+                  placeholder="5550000000"
+                />
               </div>
               <div>
                 <Label>Date of birth</Label>
-                <Input className="mt-1.5" type="date" value={editForm.dob} onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })} />
+                <Input
+                  className="mt-1.5"
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  min="1900-01-01"
+                  value={editForm.dob}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val) {
+                      const parts = val.split("-");
+                      if (parts[0] && parts[0].length > 4) {
+                        parts[0] = parts[0].slice(0, 4);
+                        val = parts.join("-");
+                      }
+                      const today = new Date().toISOString().slice(0, 10);
+                      if (val > today) val = today;
+                    }
+                    setEditForm({ ...editForm, dob: val });
+                  }}
+                />
               </div>
             </div>
           </div>
