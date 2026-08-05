@@ -1,7 +1,7 @@
 import { confirmDialog, promptDialog } from "@/components/ui/confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, authService, ApiClient, clientService } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { format } from "date-fns";
@@ -492,6 +492,7 @@ export default function StaffClients() {
   // Booked clients show their most-recent appointment; imported-only show "Imported".
   type UnifiedClient = {
     key: string;
+    id?: string;
     first_name: string;
     last_name: string;
     email: string;

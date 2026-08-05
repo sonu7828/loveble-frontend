@@ -10,16 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// ---------------------------------------------------------------------------
-// Replacement for browser-native window.confirm / window.prompt.
-// Renders as a styled shadcn Dialog (iPad-friendly, on-brand). Imperative API:
-//
-//   if (!(await confirmDialog({ title: "Cancel this appointment?" }))) return;
-//   const slug = await promptDialog({ title: "Slug:", defaultValue: "" });
-//
-// Mount <ConfirmDialogHost /> once near the top of the React tree.
-// ---------------------------------------------------------------------------
-
 type ConfirmOpts = {
   title: string;
   description?: string;
@@ -54,10 +44,10 @@ type State =
 
 let setStateRef: ((s: State) => void) | null = null;
 
-export function confirmDialog(opts: ConfirmOpts): Promise<boolean> {
+export function confirmDialog(titleOrOpts: string | ConfirmOpts, description?: string): Promise<boolean> {
+  const opts: ConfirmOpts = typeof titleOrOpts === "string" ? { title: titleOrOpts, description } : titleOrOpts;
   return new Promise((resolve) => {
     if (!setStateRef) {
-      // Fallback if host isn't mounted — fail safely with native confirm.
       resolve(window.confirm(opts.title + (opts.description ? `\n\n${opts.description}` : "")));
       return;
     }
@@ -84,7 +74,8 @@ export function alertDialog(opts: { title: string; description?: string; okLabel
   });
 }
 
-export function promptDialog(opts: PromptOpts): Promise<string | null> {
+export function promptDialog(titleOrOpts: string | PromptOpts, defaultValue?: string): Promise<string | null> {
+  const opts: PromptOpts = typeof titleOrOpts === "string" ? { title: titleOrOpts, defaultValue } : titleOrOpts;
   return new Promise((resolve) => {
     if (!setStateRef) {
       const v = window.prompt(opts.title, opts.defaultValue ?? "");
