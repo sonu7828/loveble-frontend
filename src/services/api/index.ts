@@ -7,3 +7,4 @@ export * from "./inventoryService";
 export * from "./clinicalService";
 export * from "./adminService";
 export * from "./tableService";
+export * from "./billingService";
