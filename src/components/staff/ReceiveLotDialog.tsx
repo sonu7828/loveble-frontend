@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, inventoryService } from "@/services/api";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { NEUROTOXIN_PRODUCTS, FILLER_PRODUCTS } from "@/lib/clinicalOptions";
@@ -46,7 +46,13 @@ export function ReceiveLotDialog({
       setUnit(defaultUnit);
       setThreshold("");
       apiQuery("locations").select("id, name").eq("is_active", true).order("name")
-        .then(({ data }) => setLocations(data ?? []));
+        .then(({ data }) => {
+          const locs = data ?? [];
+          setLocations(locs);
+          if (locs.length > 0 && !locationId) {
+            setLocationId(locs[0].id);
+          }
+        });
     }
   }, [open, defaultProduct, defaultUnit]);
 
@@ -57,47 +63,19 @@ export function ReceiveLotDialog({
     }
     setSaving(true);
     try {
-      const lotData = {
-        product_name: product.trim(),
-        lot_number: lotNumber.trim(),
-        expiration_date: expDate || null,
-        quantity_initial: Number(qty),
-        quantity_remaining: Number(qty),
+      const activeLocId = locationId || locations[0]?.id || "loc-default";
+      const created = await inventoryService.createLot({
+        productName: product.trim(),
+        lotNumber: lotNumber.trim(),
+        expiryDate: expDate || undefined,
+        quantity: Number(qty),
         unit: unit || "unit",
-        category: defaultCategory ?? null,
-        location_id: locationId || null,
-        low_stock_threshold: threshold ? Number(threshold) : 0,
-        notes: notes.trim() || null,
-        is_active: true,
-        received_at: new Date().toISOString(),
-      };
-
-      // Generate a local ID for the new lot
-      const newId = `lot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const newLot = { id: newId, ...lotData };
-
-      // Persist to local storage so it survives reloads
-      try {
-        const stored: any[] = JSON.parse(localStorage.getItem("rka_demo_inventory_lots") || "[]");
-        stored.unshift(newLot);
-        localStorage.setItem("rka_demo_inventory_lots", JSON.stringify(stored));
-      } catch {
-        /* ignore storage errors */
-      }
-
-      // Also try to call the API (best-effort, won't block on failure)
-      try {
-        const { user } = await authService.getSession();
-        await ApiClient.post("/inventory/receive", {
-          ...lotData,
-          received_by: user?.id ?? null,
-        });
-      } catch {
-        /* API unavailable — local storage is the source of truth */
-      }
+        locationId: activeLocId,
+        receivedAt: new Date().toISOString().split("T")[0],
+      });
 
       toast.success(`Received ${qty} ${unit} of ${product}`);
-      onReceived?.(newId);
+      onReceived?.(created.id || `lot-${Date.now()}`);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to save lot");
