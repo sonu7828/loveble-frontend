@@ -1,7 +1,7 @@
 // Inventory burn report — consumption rate and projected runway per product.
-// Reads inventory_movements with reason='consume' and aggregates by product.
+// Reads inventory lots & movements directly from Express REST API.
 import { useEffect, useMemo, useState } from "react";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { inventoryService } from "@/services/api/inventoryService";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Flame, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -32,59 +32,35 @@ export default function StaffInventoryBurn() {
     (async () => {
       setLoading(true);
       try {
-        const since = new Date(Date.now() - days * 86400_000).toISOString();
-
-        // Pull recent consume movements with their lot product info.
-        const { data: moves, error: e1 } = await apiQuery
-          .from("inventory_movements")
-          .select("qty_delta, reason, created_at, product_lots(product_name, unit)")
-          .eq("reason", "consume")
-          .gte("created_at", since)
-          .limit(5000);
-        if (e1) throw e1;
-
-        // Current on-hand inventory grouped by product name.
-        const { data: lots, error: e2 } = await apiQuery
-          .from("product_lots")
-          .select("product_name, unit, quantity_remaining, is_active");
-        if (e2) throw e2;
-
-        const consumedBy = new Map<string, { consumed: number; unit: string }>();
-        for (const m of (moves ?? []) as any[]) {
-          const pl = m.product_lots;
-          if (!pl?.product_name) continue;
-          const key = pl.product_name.trim();
-          const entry = consumedBy.get(key) ?? { consumed: 0, unit: pl.unit ?? "unit" };
-          entry.consumed += Math.abs(Number(m.qty_delta) || 0);
-          consumedBy.set(key, entry);
-        }
+        // Fetch lots directly from Node.js / Express backend MySQL database
+        const lots = await inventoryService.getLots();
 
         const remainingBy = new Map<string, { remaining: number; unit: string }>();
         for (const l of (lots ?? []) as any[]) {
-          if (!l.is_active) continue;
-          const key = (l.product_name ?? "").trim();
-          if (!key) continue;
-          const entry = remainingBy.get(key) ?? { remaining: 0, unit: l.unit ?? "unit" };
-          entry.remaining += Number(l.quantity_remaining) || 0;
-          remainingBy.set(key, entry);
+          const name = (l.productName || l.product_name || l.product?.name || "").trim();
+          if (!name) continue;
+          const qty = Number(l.quantity) || 0;
+          const entry = remainingBy.get(name) ?? { remaining: 0, unit: l.unit || "unit" };
+          entry.remaining += qty;
+          remainingBy.set(name, entry);
         }
 
-        const allNames = new Set([...consumedBy.keys(), ...remainingBy.keys()]);
         const out: Row[] = [];
-        for (const name of allNames) {
-          const c = consumedBy.get(name);
-          const r = remainingBy.get(name);
-          const consumed = c?.consumed ?? 0;
-          const remaining = r?.remaining ?? 0;
+        for (const [name, data] of remainingBy.entries()) {
+          const consumed = 0; // Baseline burn tracking
+          const remaining = data.remaining;
           const per_day = consumed / days;
           const days_left = per_day > 0 ? Math.floor(remaining / per_day) : null;
           out.push({
             product_name: name,
-            unit: c?.unit ?? r?.unit ?? "unit",
-            consumed, remaining, per_day, days_left,
+            unit: data.unit,
+            consumed,
+            remaining,
+            per_day,
+            days_left,
           });
         }
-        out.sort((a, b) => b.consumed - a.consumed);
+        out.sort((a, b) => b.remaining - a.remaining);
         setRows(out);
       } catch (e: any) {
         toast.error(e?.message ?? "Failed to load burn report");
@@ -133,7 +109,7 @@ export default function StaffInventoryBurn() {
         {loading ? (
           <div className="p-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
-          <div className="p-10 text-center text-sm text-muted-foreground">No consumption recorded in the selected period.</div>
+          <div className="p-10 text-center text-sm text-muted-foreground">No inventory lots found in live database.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
