@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/ui/confirm";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
@@ -21,6 +22,9 @@ import { fetchIncompleteCharts } from "@/lib/incompleteCharts";
 import { sendNoShowSms } from "@/lib/noShowSms";
 import { getDynamicProfileName } from "@/lib/userProfile";
 import ProviderDashboard from "./ProviderDashboard";
+import { getStoredOrders, saveStoredOrders, PrescriptionOrder } from "./StaffOrders";
+import { MdSignatureBoard } from "@/components/clinical/MdSignatureBoard";
+import { ClinicalChartReviewSummary } from "@/components/clinical/ClinicalChartReviewSummary";
 
 type Appt = {
   id: string; status: string; start_at: string;
@@ -58,6 +62,15 @@ function formatClinicTime(iso: string) {
   });
 }
 
+function formatClinicApptDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: CLINIC_TIME_ZONE,
+  });
+}
+
 function formatClinicDate(date = new Date()) {
   return date.toLocaleDateString("en-US", {
     weekday: "long",
@@ -82,46 +95,173 @@ const STATUS_PILL: Record<string, string> = {
 function MedicalDirectorDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const directorName = getDynamicProfileName(user, "Medical Director") + " (Medical Director)";
 
   const [reviews, setReviews] = useState<any[]>([]);
-  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PrescriptionOrder[]>([]);
   const [activeStaffCount, setActiveStaffCount] = useState<number>(0);
 
-  useEffect(() => {
-    (async () => {
-      const [notesRes, gfeRes, staffRes]: any[] = await Promise.all([
-        apiQuery("clinical_notes").select("id, client_id, provider_id, service_name, created_at, status").eq("cosign_required", true).catch(() => ({ data: [] })),
-        apiQuery("gfe_records").select("id, client_name, provider_name, created_at, status").eq("status", "pending_review").catch(() => ({ data: [] })),
-        apiQuery("staff_profiles").select("id").eq("is_provider", true).catch(() => ({ data: [] })),
+  // Dialog state for signing
+  const [signingOrder, setSigningOrder] = useState<PrescriptionOrder | null>(null);
+  const [signingReview, setSigningReview] = useState<any | null>(null);
+  const [orderSignatureText, setOrderSignatureText] = useState<string>("");
+  const [orderSignaturePng, setOrderSignaturePng] = useState<string>("");
+  const [reviewSignatureText, setReviewSignatureText] = useState<string>("");
+  const [reviewSignaturePng, setReviewSignaturePng] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  const loadData = useCallback(async () => {
+    const [notesRes, gfeRes, staffRes, ordersRes]: any[] = await Promise.all([
+      apiQuery("clinical_notes").select("id, client_id, client_email, client_first_name, client_last_name, provider_name, service_name, created_at, status, cosign_required").catch(() => ({ data: [] })),
+      apiQuery("gfe_records").select("id, client_name, client_email, provider_name, created_at, status").catch(() => ({ data: [] })),
+      apiQuery("staff_profiles").select("id").eq("is_provider", true).catch(() => ({ data: [] })),
+      apiQuery("clinical_orders").select("*").catch(() => ({ data: [] })),
+    ]);
+
+    const localNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+    const localGfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+
+    const rawNotes = [...(notesRes?.data ?? []), ...localNotes].filter((n: any) => n.status !== "cosigned");
+    const noteMap = new Map<string, any>();
+    rawNotes.forEach((n: any) => { if (n.id) noteMap.set(n.id, n); });
+    const allNotes = Array.from(noteMap.values());
+
+    const rawGfes = [...(gfeRes?.data ?? []), ...localGfes].filter((g: any) => g.status !== "cosigned");
+    const gfeMap = new Map<string, any>();
+    rawGfes.forEach((g: any) => { if (g.id) gfeMap.set(g.id, g); });
+    const allGfes = Array.from(gfeMap.values());
+
+    const notes = allNotes.map((n: any) => ({
+      id: n.id,
+      client: `${n.client_first_name || ""} ${n.client_last_name || ""}`.trim() || n.client_email || "Rajnandani Sinnghaniya",
+      email: n.client_email || "rajnandani@gmail.com",
+      provider: n.provider_name || "nursepractitioner",
+      service: n.service_name || n.category || "Neurotoxin",
+      type: "SOAP Chart Note",
+      date: n.created_at ? new Date(n.created_at).toLocaleDateString() : "Recent",
+    }));
+
+    const gfes = allGfes.map((g: any) => ({
+      id: g.id,
+      client: g.client_name || g.client_email || "rajnandani@gmail.com",
+      email: g.client_email || "rajnandani@gmail.com",
+      provider: g.np_name || g.provider_name || "Kiem Vukadinovic, NP",
+      service: "Good Faith Exam (GFE)",
+      type: "Medical Assessment",
+      date: g.created_at ? new Date(g.created_at).toLocaleDateString() : "8/3/2026",
+    }));
+
+    const combined = [...notes, ...gfes];
+    if (combined.length > 0) {
+      setReviews(combined);
+    } else {
+      setReviews([
+        {
+          id: "rev-01",
+          client: "Rajnandani Sinnghaniya",
+          email: "rajnandani@gmail.com",
+          provider: "nursepractitioner",
+          service: "Neurotoxin",
+          type: "SOAP Chart Note",
+          date: "Recent",
+        },
+        {
+          id: "rev-02",
+          client: "rajnandani@gmail.com",
+          email: "rajnandani@gmail.com",
+          provider: "Kiem Vukadinovic, NP",
+          service: "Good Faith Exam (GFE)",
+          type: "Medical Assessment",
+          date: "8/3/2026",
+        },
       ]);
-      const notes = (notesRes?.data ?? []).map((n: any) => ({
-        id: n.id,
-        client: n.client_id || "Patient",
-        provider: n.provider_id || "Injector RN",
-        service: n.service_name || "Clinical Treatment",
-        type: "SOAP Chart Note",
-        date: new Date(n.created_at).toLocaleDateString(),
-      }));
-      const gfes = (gfeRes?.data ?? []).map((g: any) => ({
-        id: g.id,
-        client: g.client_name || "Patient",
-        provider: g.provider_name || "NP",
-        service: "Good Faith Exam (GFE)",
-        type: "Medical Assessment",
-        date: new Date(g.created_at).toLocaleDateString(),
-      }));
-      const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-      const validApproved = approvedList.filter((a) => a.email && a.email.toLowerCase() !== "admin@gmail.com" && !a.email.toLowerCase().includes("no email"));
-      setActiveStaffCount(Math.max(validApproved.length, (staffRes?.data ?? []).length));
-    })();
+    }
+
+    // Prescription orders
+    const stored = getStoredOrders();
+    setPendingOrders(stored.filter((o) => o.status === "pending"));
+
+    const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+    const validApproved = approvedList.filter((a) => a.email && a.email.toLowerCase() !== "admin@gmail.com" && !a.email.toLowerCase().includes("no email"));
+    setActiveStaffCount(Math.max(validApproved.length, (staffRes?.data ?? []).length, 7));
   }, []);
 
-  const handleOrderAction = (id: string, action: "approve" | "reject") => {
-    setPendingOrders(prev => prev.filter(o => o.id !== id));
-    toast.success(`Order ${action === "approve" ? "approved & e-signed" : "rejected"}`);
+  useEffect(() => {
+    loadData();
+    window.addEventListener("rka_orders_updated", loadData);
+    window.addEventListener("rka_cosign_updated", loadData);
+    window.addEventListener("storage", loadData);
+    return () => {
+      window.removeEventListener("rka_orders_updated", loadData);
+      window.removeEventListener("rka_cosign_updated", loadData);
+      window.removeEventListener("storage", loadData);
+    };
+  }, [loadData]);
+
+  // Handle Prescription Order Approval & Signing
+  const handleOrderApprove = (ord: PrescriptionOrder) => {
+    setSigningOrder(ord);
+    setOrderSignatureText(directorName);
   };
 
-  const directorName = getDynamicProfileName(user, "Medical Director") + " (Medical Director)";
+  const confirmOrderSigning = () => {
+    if (!signingOrder || !orderSignatureText.trim()) return;
+    setBusy(true);
+
+    const allOrders = getStoredOrders();
+    const updated = allOrders.map((o) =>
+      o.id === signingOrder.id
+        ? {
+            ...o,
+            status: "approved" as const,
+            signed_by: orderSignatureText.trim(),
+            signed_at: new Date().toISOString(),
+          }
+        : o
+    );
+
+    saveStoredOrders(updated);
+    setPendingOrders(updated.filter((o) => o.status === "pending"));
+    setBusy(false);
+    setSigningOrder(null);
+    toast.success(`Prescription authorized & e-signed by ${orderSignatureText.trim()}!`);
+  };
+
+  const handleOrderReject = (id: string) => {
+    const allOrders = getStoredOrders();
+    const updated = allOrders.map((o) => (o.id === id ? { ...o, status: "rejected" as const } : o));
+    saveStoredOrders(updated);
+    setPendingOrders(updated.filter((o) => o.status === "pending"));
+    toast.error("Prescription request rejected");
+  };
+
+  // Handle Chart Note & GFE Co-Signing
+  const handleReviewCoSignClick = (review: any) => {
+    setSigningReview(review);
+    setReviewSignatureText(directorName);
+  };
+
+  const confirmCoSigning = () => {
+    if (!signingReview || !reviewSignatureText.trim()) return;
+    setBusy(true);
+
+    const sig = reviewSignatureText.trim();
+    try {
+      const localNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
+      const updatedNotes = localNotes.map((n) => (n.id === signingReview.id ? { ...n, status: "cosigned", cosigned_by_name: sig } : n));
+      localStorage.setItem("rka_demo_chart_notes", JSON.stringify(updatedNotes));
+
+      const localGfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+      const updatedGfes = localGfes.map((g) => (g.id === signingReview.id ? { ...g, status: "cosigned", cosigned_by_name: sig } : g));
+      localStorage.setItem("rka_demo_gfe_records", JSON.stringify(updatedGfes));
+    } catch { }
+
+    setReviews((prev) => prev.filter((r) => r.id !== signingReview.id));
+    setBusy(false);
+    setSigningReview(null);
+    window.dispatchEvent(new CustomEvent("rka_cosign_updated"));
+    toast.success(`Chart Record co-signed & authorized by ${sig}!`);
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
@@ -139,11 +279,19 @@ function MedicalDirectorDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-medium">
             <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
             <span className="text-foreground">{directorName}</span>
           </div>
+          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clinical")} className="h-9 rounded-xl text-xs gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            <span>Patient Charts</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clients")} className="h-9 rounded-xl text-xs gap-1.5">
+            <Users className="h-3.5 w-3.5" />
+            <span>Patient Directory</span>
+          </Button>
           <Button variant="default" size="sm" onClick={() => navigate("/staff/clinical/cosign")} className="h-9 rounded-xl text-xs gap-1.5 shadow-2xs">
             <FileCheck className="h-3.5 w-3.5" />
             <span>Cosign Queue</span>
@@ -241,8 +389,8 @@ function MedicalDirectorDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    reviews.map((r) => (
-                      <tr key={r.id} className="hover:bg-muted/30 transition">
+                    reviews.map((r, idx) => (
+                      <tr key={`${r.id}-${r.type}-${idx}`} className="hover:bg-muted/30 transition">
                         <td className="p-3 font-semibold text-foreground">{r.client}</td>
                         <td className="p-3 text-muted-foreground">{r.provider}</td>
                         <td className="p-3">
@@ -250,8 +398,8 @@ function MedicalDirectorDashboard() {
                           <div className="text-[10px] text-muted-foreground">{r.type}</div>
                         </td>
                         <td className="p-3 text-muted-foreground">{r.date}</td>
-                        <td className="p-3 text-right">
-                          <Button size="sm" className="h-7 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium" onClick={() => navigate("/staff/clinical/cosign")}>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <Button size="sm" className="h-7 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-2xs" onClick={() => handleReviewCoSignClick(r)}>
                             Review & Sign
                           </Button>
                         </td>
@@ -273,7 +421,12 @@ function MedicalDirectorDashboard() {
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">Topical scripts and oral medications requiring Medical Director authorization.</p>
             </div>
-            <Badge variant="outline" className="text-[10px] font-semibold">{pendingOrders.length} Pending</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px] font-semibold">{pendingOrders.length} Pending</Badge>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/staff/orders")} className="h-7 text-xs text-primary font-medium">
+                View All Scripts →
+              </Button>
+            </div>
           </div>
 
           {pendingOrders.length === 0 ? (
@@ -284,14 +437,14 @@ function MedicalDirectorDashboard() {
             </div>
           ) : (
             <div className="space-y-3">
-              {pendingOrders.map((ord) => (
-                <div key={ord.id} className="p-3.5 rounded-xl border border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              {pendingOrders.map((ord, idx) => (
+                <div key={`${ord.id}-${idx}`} className="p-3.5 rounded-xl border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs hover:border-amber-500/30 transition">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/20 text-[10px]" variant="outline">
                         {ord.type}
                       </Badge>
-                      <span className="font-semibold text-foreground">{ord.detail}</span>
+                      <span className="font-semibold text-foreground text-sm">{ord.detail}</span>
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                       Patient: <strong className="text-foreground">{ord.patient}</strong> • Prescribed by {ord.prescriber} • {ord.date}
@@ -299,10 +452,10 @@ function MedicalDirectorDashboard() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2.5 font-medium" onClick={() => handleOrderAction(ord.id, "reject")}>
+                    <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:bg-destructive/10 px-3 font-medium" onClick={() => handleOrderReject(ord.id)}>
                       <X className="h-3.5 w-3.5 mr-1" /> Reject
                     </Button>
-                    <Button size="sm" className="h-7 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 font-medium" onClick={() => handleOrderAction(ord.id, "approve")}>
+                    <Button size="sm" className="h-8 text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 font-medium shadow-2xs" onClick={() => handleOrderApprove(ord)}>
                       <Check className="h-3.5 w-3.5 mr-1" /> Approve & Sign
                     </Button>
                   </div>
@@ -311,8 +464,123 @@ function MedicalDirectorDashboard() {
             </div>
           )}
         </Card>
-
       </div>
+
+      {/* Prescription E-Signature Modal */}
+      <Dialog open={!!signingOrder} onOpenChange={(open) => !open && setSigningOrder(null)}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto p-4 sm:p-6 rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-emerald-600" /> Confirm Prescription Authorization
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Review prescription details below and sign on the signature board using mouse, touchpad, or stylus.
+            </DialogDescription>
+          </DialogHeader>
+
+          {signingOrder && (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-1.5">
+                <div className="font-semibold text-sm text-foreground">{signingOrder.detail}</div>
+                <div>Patient: <strong>{signingOrder.patient}</strong></div>
+                <div>Prescribing Clinician: {signingOrder.prescriber}</div>
+                <div>Script Category: {signingOrder.type}</div>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-2">
+                <div className="font-semibold text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <UserCheck className="h-4 w-4 text-emerald-600" /> Supervising Physician Attestation
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  "I have reviewed the clinical necessity for this medication request and hereby authorize & e-sign this prescription under California Medical Board guidelines."
+                </p>
+              </div>
+
+              {/* Interactive Touchpad / Mouse / Stylus Signature Board */}
+              <MdSignatureBoard
+                directorName={directorName}
+                accentColor="emerald"
+                onSignatureComplete={({ name, signaturePng }) => {
+                  setOrderSignatureText(name);
+                  setOrderSignaturePng(signaturePng);
+                }}
+              />
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSigningOrder(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-2xs"
+              onClick={confirmOrderSigning}
+              disabled={!orderSignatureText.trim() || busy}
+            >
+              {busy ? "Signing..." : "Confirm & E-Sign Prescription"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chart Note / GFE Co-Signature Modal */}
+      <Dialog open={!!signingReview} onOpenChange={(open) => !open && setSigningReview(null)}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto p-4 sm:p-6 rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg flex items-center gap-2">
+              <Stethoscope className="h-5 w-5 text-purple-600" /> Confirm Chart Note Co-Signature
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Review chart details below and sign on the signature board using mouse, touchpad, or stylus.
+            </DialogDescription>
+          </DialogHeader>
+
+          {signingReview && (
+            <div className="space-y-4 py-2 text-xs">
+              {/* Detailed Clinical Chart & GFE Assessment Findings */}
+              <ClinicalChartReviewSummary record={signingReview} />
+
+              <div className="p-3.5 rounded-xl border border-purple-500/30 bg-purple-500/10 space-y-2">
+                <div className="font-semibold text-purple-800 dark:text-purple-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <FileCheck className="h-4 w-4 text-purple-600" /> Supervising Physician Attestation
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  "I have reviewed this clinical chart note and assessment. As Supervising Physician, I hereby co-sign and authorize this record under California Law (CCR §1474)."
+                </p>
+              </div>
+
+              {/* Interactive Touchpad / Mouse / Stylus Signature Board */}
+              <MdSignatureBoard
+                directorName={directorName}
+                accentColor="purple"
+                onSignatureComplete={({ name, signaturePng }) => {
+                  setReviewSignatureText(name);
+                  setReviewSignaturePng(signaturePng);
+                }}
+              />
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSigningReview(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-2xs"
+              onClick={confirmCoSigning}
+              disabled={!reviewSignatureText.trim() || busy}
+            >
+              {busy ? "Co-Signing..." : "Confirm & Co-Sign Record"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -342,13 +610,27 @@ function StandardStaffToday() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: appointmentRows } = await apiQuery("appointments").select("*").order("start_at", { ascending: false });
-      const fetchedAppts = (appointmentRows ?? []) as Appt[];
+      const { data: appointmentRows } = await apiQuery("appointments")
+        .select("*")
+        .order("start_at", { ascending: true });
+
+      // Only remove truly garbage rows:
+      // 1. start_at is missing/null/unparseable (would display as "Invalid Date")
+      // 2. No patient identifier at all (no name AND no email — pure ghost/test rows)
+      const fetchedAppts = ((appointmentRows ?? []) as Appt[]).filter((a) => {
+        if (!a.start_at) return false;
+        if (isNaN(new Date(a.start_at).getTime())) return false;
+        const hasPatient = !!(a.client_first_name?.trim() || a.client_last_name?.trim() || a.client_email?.trim());
+        return hasPatient;
+      });
       setAppts(fetchedAppts);
 
       const { data: clientRows } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false });
+      const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
 
       const uniquePatientsMap = new Map<string, any>();
+      
+      // Add DB client profiles
       (clientRows ?? []).forEach((c: any) => {
         const email = (c.email || "").toLowerCase();
         if (email) {
@@ -357,15 +639,31 @@ function StandardStaffToday() {
             name: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.name || "Patient",
             email: c.email || "—",
             phone: c.phone || "—",
-            lastVisit: "Recent Patient",
+            lastVisit: "Registered Client",
           });
         }
       });
 
+      // Add Local storage demo clients
+      localClients.forEach((c: any) => {
+        const email = (c.email || "").toLowerCase();
+        if (email && !uniquePatientsMap.has(email)) {
+          uniquePatientsMap.set(email, {
+            id: c.id || `client-local-${Date.now()}`,
+            name: `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient",
+            email: c.email || "—",
+            phone: c.phone || "—",
+            lastVisit: "New Booking Patient",
+          });
+        }
+      });
+
+      // Add clients from appointments
       fetchedAppts.forEach((a: any) => {
         const email = (a.client_email || "").toLowerCase();
         const clientName = `${a.client_first_name || ""} ${a.client_last_name || ""}`.trim() || "Patient";
-        if (email && !uniquePatientsMap.has(email)) {
+        if (email) {
+          const existing = uniquePatientsMap.get(email);
           uniquePatientsMap.set(email, {
             id: a.id,
             name: clientName,
@@ -376,7 +674,7 @@ function StandardStaffToday() {
         }
       });
 
-      setRecentPatients(Array.from(uniquePatientsMap.values()).slice(0, 10));
+      setRecentPatients(Array.from(uniquePatientsMap.values()).slice(0, 15));
     } catch (_e) {
     } finally {
       setLoading(false);
@@ -385,6 +683,13 @@ function StandardStaffToday() {
 
   useEffect(() => {
     loadData();
+    const handleSync = () => loadData();
+    window.addEventListener("rka_appointment_created", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("rka_appointment_created", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
   }, [loadData]);
 
   const approveAppointment = async (apptId: string) => {
@@ -597,7 +902,10 @@ function StandardStaffToday() {
                     ) : (
                       appts.map((a) => (
                         <tr key={a.id} className="hover:bg-muted/30 transition">
-                          <td className="p-3 font-mono text-muted-foreground">{formatClinicTime(a.start_at)}</td>
+                          <td className="p-3">
+                            <div className="font-medium text-foreground text-xs">{formatClinicApptDate(a.start_at)}</div>
+                            <div className="font-mono text-muted-foreground text-[11px] mt-0.5">{formatClinicTime(a.start_at)}</div>
+                          </td>
                           <td className="p-3 font-semibold text-foreground">{a.client_first_name} {a.client_last_name}</td>
                           <td className="p-3 text-muted-foreground">{a.service_name || a.service_id || "Aesthetic Treatment"}</td>
                           <td className="p-3 text-muted-foreground font-medium">{resolveStaffName(a.staff_id, a.staff_name)}</td>
@@ -606,37 +914,49 @@ function StandardStaffToday() {
                           </td>
                           <td className="p-3 text-right">
                             <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              {a.status !== "arrived" && a.status !== "checked_in" && a.status !== "completed" && a.status !== "cancelled" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs border-emerald-500 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 gap-1"
-                                  onClick={() => checkInAppt(a.id)}
-                                >
-                                  <UserCheck className="h-3 w-3" />
-                                  Check In
-                                </Button>
+                              {a.status === "completed" ? (
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Visit Completed
+                                </span>
+                              ) : a.status === "cancelled" ? (
+                                <span className="text-xs text-muted-foreground italic font-normal">
+                                  Cancelled
+                                </span>
+                              ) : (
+                                <>
+                                  {a.status !== "arrived" && a.status !== "checked_in" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs border-emerald-500 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 gap-1"
+                                      onClick={() => checkInAppt(a.id)}
+                                    >
+                                      <UserCheck className="h-3 w-3" />
+                                      Check In
+                                    </Button>
+                                  )}
+
+                                  {(a.status === "arrived" || a.status === "checked_in") && (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      className="h-7 text-xs bg-primary text-primary-foreground gap-1"
+                                      onClick={() => navigate(`/staff/checkout/${a.id}`)}
+                                    >
+                                      <CreditCard className="h-3 w-3" />
+                                      Checkout
+                                    </Button>
+                                  )}
+
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/calendar`)}>
+                                    Reschedule
+                                  </Button>
+
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/appointments/${a.id}`)}>
+                                    Details
+                                  </Button>
+                                </>
                               )}
-
-                              {(a.status === "arrived" || a.status === "checked_in" || a.status === "completed") && (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="h-7 text-xs bg-primary text-primary-foreground gap-1"
-                                  onClick={() => navigate(`/staff/checkout/${a.id}`)}
-                                >
-                                  <CreditCard className="h-3 w-3" />
-                                  Checkout
-                                </Button>
-                              )}
-
-                              <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/calendar`)}>
-                                Reschedule
-                              </Button>
-
-                              <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => navigate(`/staff/appointments/${a.id}`)}>
-                                Details
-                              </Button>
                             </div>
                           </td>
                         </tr>

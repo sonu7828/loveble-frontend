@@ -4,13 +4,21 @@ import { Link, useSearchParams } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
+
+/** Safely format a date string — returns fallback if null / undefined / invalid */
+function safeFormat(dateStr: string | null | undefined, pattern: string, fallback = "—"): string {
+  if (!dateStr) return fallback;
+  const d = new Date(dateStr);
+  return isValid(d) ? format(d, pattern) : fallback;
+}
 import { Loader2, Search, Download, Send, Upload, CalendarPlus, MoreHorizontal, UserPlus, Ban, Trash2, ShieldOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { getDynamicProfileName } from "@/lib/userProfile";
 
 type ImportRow = {
   first_name: string; last_name: string; email: string;
@@ -20,7 +28,10 @@ type ImportRow = {
 type ImportedClient = { first_name: string; last_name: string; email: string; phone: string | null; dob: string | null; gender: string | null; notes?: string } & { id: string; invited_at: string | null };
 
 export default function StaffClients() {
-  const { canSeeAll, staffId } = useAuth();
+  const { canSeeAll, staffId, user, isNP, isRNInjector } = useAuth();
+  const providerName = getDynamicProfileName(user, "");
+  const [providerScope, setProviderScope] = useState<"mine" | "all">(isNP || isRNInjector ? "mine" : "all");
+
   const [items, setItems] = useState<any[]>([]);
   const [imported, setImported] = useState<ImportedClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,6 +130,12 @@ export default function StaffClients() {
         if (error || !data || data.length === 0) break;
         all.push(...data);
         if (data.length < PAGE) break;
+      }
+      const localDemoAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      for (const la of localDemoAppts) {
+        if (la && la.id && !all.some((e) => e.id === la.id)) {
+          all.unshift(la);
+        }
       }
       return { data: all };
     };
@@ -497,8 +514,6 @@ export default function StaffClients() {
     return `/staff/appointments/new?${p.toString()}`;
   };
 
-  // Unified client list — one row per email, regardless of source.
-  // Booked clients show their most-recent appointment; imported-only show "Imported".
   type UnifiedClient = {
     key: string;
     first_name: string;
@@ -507,45 +522,61 @@ export default function StaffClients() {
     phone: string | null;
     dob: string | null;
     appt_count: number;
-    last_appt: { id: string; status: string; service_name: string; start_at: string } | null;
+    last_appt: { id: string; status: string; service_name: string; start_at: string; staff_id?: string; staff_name?: string } | null;
     imported_id: string | null;
     invited_at: string | null;
     sort_at: number;
+    staff_ids: Set<string>;
+    staff_names: Set<string>;
   };
 
   const allClients = useMemo<UnifiedClient[]>(() => {
     const map = new Map<string, UnifiedClient>();
     for (const a of items) {
       const email = (a.client_email || "").trim().toLowerCase();
-      const key = email || `__id_${a.id}`;
-      const existing = map.get(key);
+      const firstName = (a.client_first_name || "").trim();
+      const lastName = (a.client_last_name || "").trim();
+
+      if (!email && !firstName && !lastName) continue;
+
+      const key = email || `__name_${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
+      let existing = map.get(key);
       if (!existing) {
-        map.set(key, {
+        existing = {
           key,
-          first_name: a.client_first_name ?? "",
-          last_name: a.client_last_name ?? "",
+          first_name: firstName,
+          last_name: lastName,
           email: a.client_email ?? "",
           phone: a.client_phone ?? null,
           dob: a.client_dob ?? null,
           appt_count: 1,
-          last_appt: { id: a.id, status: a.status, service_name: a.service_name, start_at: a.start_at },
+          last_appt: { id: a.id, status: a.status, service_name: a.service_name, start_at: a.start_at, staff_id: a.staff_id, staff_name: a.staff_name },
           imported_id: null,
           invited_at: null,
-          sort_at: new Date(a.start_at).getTime(),
-        });
+          sort_at: a.start_at && !isNaN(new Date(a.start_at).getTime()) ? new Date(a.start_at).getTime() : 0,
+          staff_ids: new Set<string>(),
+          staff_names: new Set<string>(),
+        };
+        map.set(key, existing);
       } else {
         existing.appt_count += 1;
       }
+      if (a.staff_id) existing.staff_ids.add(a.staff_id.toLowerCase());
+      if (a.staff_name) existing.staff_names.add(a.staff_name.toLowerCase());
     }
     for (const cp of clientProfiles) {
       const email = (cp.email || "").trim().toLowerCase();
-      if (!email) continue;
-      if (!map.has(email)) {
-        map.set(email, {
-          key: email,
-          first_name: cp.first_name || "Client",
-          last_name: cp.last_name || "",
-          email: cp.email,
+      const firstName = (cp.first_name || "").trim();
+      const lastName = (cp.last_name || "").trim();
+      if (!email && !firstName && !lastName) continue;
+
+      const key = email || `__name_${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          first_name: firstName || "Client",
+          last_name: lastName,
+          email: cp.email ?? "",
           phone: cp.phone ?? null,
           dob: cp.dob ?? null,
           appt_count: 0,
@@ -553,18 +584,27 @@ export default function StaffClients() {
           imported_id: null,
           invited_at: null,
           sort_at: cp.created_at ? new Date(cp.created_at).getTime() : 0,
+          staff_ids: new Set<string>(),
+          staff_names: new Set<string>(),
         });
       }
     }
     for (const i of imported) {
-      const key = i.email.trim().toLowerCase();
-      if (map.has(key)) continue;
-      map.set(key, {
-        key, first_name: i.first_name, last_name: i.last_name, email: i.email,
+      const key = (i.email || "").trim().toLowerCase();
+      const firstName = (i.first_name || "").trim();
+      const lastName = (i.last_name || "").trim();
+      if (!key && !firstName && !lastName) continue;
+
+      const mapKey = key || `__name_${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
+      if (map.has(mapKey)) continue;
+      map.set(mapKey, {
+        key: mapKey, first_name: firstName, last_name: lastName, email: i.email ?? "",
         phone: i.phone ?? null, dob: i.dob ?? null,
         appt_count: 0, last_appt: null,
         imported_id: i.id, invited_at: i.invited_at,
         sort_at: 0,
+        staff_ids: new Set<string>(),
+        staff_names: new Set<string>(),
       });
     }
     // Pull in lead-only profiles (abandoned bookings) that have no appointment
@@ -584,6 +624,8 @@ export default function StaffClients() {
         imported_id: null,
         invited_at: null,
         sort_at: l.lead_captured_at ? new Date(l.lead_captured_at).getTime() : 0,
+        staff_ids: new Set<string>(),
+        staff_names: new Set<string>(),
       });
     }
     return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || (a.last_name || "").localeCompare(b.last_name || ""));
@@ -621,18 +663,50 @@ export default function StaffClients() {
   };
 
   const matchesQuery = (s: string) => !q || s.toLowerCase().includes(q.toLowerCase());
+
+  const matchesProviderScope = (c: UnifiedClient) => {
+    if (providerScope === "all") return true;
+    const myId = (staffId || user?.id || (user as any)?.staff_id || "").toLowerCase();
+    const myName = providerName.toLowerCase();
+    const myFirstName = myName.split(/\s+/)[0];
+
+    if (myId && c.staff_ids && c.staff_ids.has(myId)) return true;
+    if (c.staff_names) {
+      for (const sname of c.staff_names) {
+        if (myName && sname.includes(myName)) return true;
+        if (myFirstName && myFirstName.length >= 3 && sname.includes(myFirstName)) return true;
+      }
+    }
+    if (c.last_appt) {
+      const laStaffId = (c.last_appt.staff_id || "").toLowerCase();
+      const laStaffName = (c.last_appt.staff_name || "").toLowerCase();
+      if (myId && laStaffId && laStaffId.includes(myId)) return true;
+      if (myName && laStaffName && (laStaffName.includes(myName) || myName.includes(laStaffName))) return true;
+      if (myFirstName && myFirstName.length >= 3 && laStaffName.includes(myFirstName)) return true;
+    }
+    return false;
+  };
+
   const filtered = allClients.filter((c) => {
     if (!matchesQuery(`${c.first_name} ${c.last_name} ${c.email} ${c.phone ?? ""}`)) return false;
+    if (!matchesProviderScope(c)) return false;
     if (accountFilter === "all") return true;
     if (accountFilter === "leads") return !!c.email && leadEmails.has(c.email.toLowerCase());
     const has = !!c.email && accountEmails.has(c.email.toLowerCase());
     return accountFilter === "has" ? has : !has;
   });
 
-  const accountsCount = allClients.filter((c) => c.email && accountEmails.has(c.email.toLowerCase())).length;
-  const missingCount = allClients.filter((c) => !c.email || !accountEmails.has(c.email.toLowerCase())).length;
-  const leadsCount = allClients.filter((c) => c.email && leadEmails.has(c.email.toLowerCase())).length;
+  // These counts reflect the current provider scope ("mine" vs "all")
+  const scopedClients = allClients.filter((c) => matchesProviderScope(c));
+  const accountsCount = scopedClients.filter((c) => c.email && accountEmails.has(c.email.toLowerCase())).length;
+  const missingCount = scopedClients.filter((c) => !c.email || !accountEmails.has(c.email.toLowerCase())).length;
+  const leadsCount = scopedClients.filter((c) => c.email && leadEmails.has(c.email.toLowerCase())).length;
   const totalComplete = completeClients.length + imported.filter((i) => i.phone && i.dob).length;
+
+  // Tab-filtered counts (query + scope applied)
+  const filteredHas = scopedClients.filter((c) => !!c.email && accountEmails.has(c.email.toLowerCase()) && matchesQuery(`${c.first_name} ${c.last_name} ${c.email} ${c.phone ?? ""}`)).length;
+  const filteredMissing = scopedClients.filter((c) => (!c.email || !accountEmails.has(c.email.toLowerCase())) && matchesQuery(`${c.first_name} ${c.last_name} ${c.email} ${c.phone ?? ""}`)).length;
+  const filteredLeads = scopedClients.filter((c) => c.email && leadEmails.has(c.email.toLowerCase()) && matchesQuery(`${c.first_name} ${c.last_name} ${c.email} ${c.phone ?? ""}`)).length;
 
   const statusColor = (s: string) =>
     s === "approved" ? "bg-success-soft text-success-soft-foreground" :
@@ -649,7 +723,7 @@ export default function StaffClients() {
         <div>
           <h1 className="font-serif text-xl sm:text-2xl font-medium">Clients</h1>
           <p className="text-xs text-muted-foreground mt-1">
-            {allClients.length} total · {accountsCount} with account · {missingCount} without
+            {scopedClients.length} total · {accountsCount} with account · {missingCount} without
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -687,16 +761,36 @@ export default function StaffClients() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4 text-xs">
-        {([["all", `All (${allClients.length})`], ["has", `Has account (${accountsCount})`], ["missing", `No account (${missingCount})`], ["leads", `Leads (${leadsCount})`]] as const).map(([k, lbl]) => (
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          {([["all", `All (${scopedClients.filter(c => matchesQuery(`${c.first_name} ${c.last_name} ${c.email} ${c.phone ?? ""}`)).length})`], ["has", `Has account (${filteredHas})`], ["missing", `No account (${filteredMissing})`], ["leads", `Leads (${filteredLeads})`]] as const).map(([k, lbl]) => (
+            <button
+              key={k}
+              onClick={() => setAccountFilter(k)}
+              className={`px-3 py-1.5 rounded-full border transition ${accountFilter === k ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        {/* Provider Scope Filter Toggle */}
+        <div className="flex rounded-full bg-muted/60 p-0.5 text-xs font-medium border border-border shrink-0 self-start sm:self-auto">
           <button
-            key={k}
-            onClick={() => setAccountFilter(k)}
-            className={`px-3 py-1.5 rounded-full border transition ${accountFilter === k ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+            type="button"
+            onClick={() => setProviderScope("mine")}
+            className={`px-3 py-1 rounded-full transition ${providerScope === "mine" ? "bg-primary text-primary-foreground font-semibold shadow-2xs" : "text-muted-foreground hover:text-foreground"}`}
           >
-            {lbl}
+            My Patients
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={() => setProviderScope("all")}
+            className={`px-3 py-1 rounded-full transition ${providerScope === "all" ? "bg-primary text-primary-foreground font-semibold shadow-2xs" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            All Practice Patients
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -764,7 +858,7 @@ export default function StaffClients() {
                   </div>
                   {c.last_appt && (
                     <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                      Last: {c.last_appt.service_name} · {format(new Date(c.last_appt.start_at), "MMM d, yyyy")}
+                      Last: {c.last_appt.service_name} · {safeFormat(c.last_appt.start_at, "MMM d, yyyy")}
                     </div>
                   )}
                 </div>

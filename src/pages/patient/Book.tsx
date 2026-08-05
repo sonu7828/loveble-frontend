@@ -240,6 +240,11 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
           zip: "95124",
         },
       staff_id: staffId,
+      staff_name: selectedStaffObj
+        ? selectedStaffObj.full_name
+        : staffId === "any-available"
+          ? "Any Available Provider"
+          : "Girish",
       staff_profiles: selectedStaffObj
         ? {
           id: selectedStaffObj.id,
@@ -263,6 +268,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
     const existingAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
     existingAppts.unshift(newAppointment);
     localStorage.setItem("rka_demo_appointments", JSON.stringify(existingAppts));
+    window.dispatchEvent(new CustomEvent("rka_appointment_created", { detail: newAppointment }));
 
     // Try remote database insert (safely handled if backend endpoint is unavailable)
     try {
