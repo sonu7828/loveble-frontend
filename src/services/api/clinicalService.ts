@@ -52,11 +52,16 @@ export interface CosignQueueItem {
 export const clinicalService = {
   /**
    * Get list of SOAP notes for patient chart or global notes index.
+   * Supports both string (email) and object ({ patientId, email }) parameter formats.
    */
-  async getChartNotes(params?: { patientId?: string; email?: string }): Promise<ChartNote[]> {
+  async getChartNotes(input?: string | { patientId?: string; email?: string }): Promise<ChartNote[]> {
     const q = new URLSearchParams();
-    if (params?.patientId) q.set("patientId", params.patientId);
-    if (params?.email) q.set("email", params.email);
+    if (typeof input === "string") {
+      if (input) q.set("email", input);
+    } else if (input && typeof input === "object") {
+      if (input.patientId) q.set("patientId", input.patientId);
+      if (input.email) q.set("email", input.email);
+    }
 
     const endpoint = `/clinical/notes${q.toString() ? `?${q.toString()}` : ""}`;
     const res = await ApiClient.get<ChartNote[]>(endpoint);
