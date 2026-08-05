@@ -161,7 +161,7 @@ export class ApiTableQuery {
     return this;
   }
 
-  public upsert(data: any): this {
+  public upsert(data: any, _opts?: any): this {
     this.action = "upsert";
     this.payload = data;
     return this;
