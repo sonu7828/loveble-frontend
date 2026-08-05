@@ -442,14 +442,6 @@ export default function ChartNoteEditor() {
         }
       } catch { }
 
-      try {
-        const demoStaff: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-        demoStaff.forEach((s: any) => {
-          if (s.name) list.push(s.name);
-          if (s.full_name) list.push(s.full_name);
-        });
-      } catch { }
-
       const defaults = [
         "Kiem Vukadinovic, NP",
         "Bob Stane, NP",
@@ -491,21 +483,6 @@ export default function ChartNoteEditor() {
             dob: c.dob || "",
           })));
         }
-      } catch { }
-
-      try {
-        const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-        localClients.forEach((c: any) => {
-          if (c.email) {
-            list.push({
-              email: c.email,
-              first_name: c.first_name || c.client_first_name || "",
-              last_name: c.last_name || c.client_last_name || "",
-              phone: c.phone || c.client_phone || "",
-              dob: c.dob || c.client_dob || "",
-            });
-          }
-        });
       } catch { }
 
       // Deduplicate by email
@@ -1031,13 +1008,6 @@ export default function ChartNoteEditor() {
         if (!error && data) n = data;
       } catch { }
 
-      if (!n) {
-        try {
-          const cachedNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-          n = cachedNotes.find((x: any) => x.id === id);
-        } catch { }
-      }
-
       if (!n) { toast.error("Note not found"); navigate(-1); return; }
       // Draft notes should resume in edit mode, not the read-only view (which renders the
       // category template with example imagery and confuses providers mid-chart).
@@ -1446,38 +1416,6 @@ export default function ChartNoteEditor() {
           requires_cosign: notePayload.requires_cosign,
         }).eq("id", noteId);
         if (signErr) throw signErr;
-
-        // Dual persistence: store in local cache as fallback so note is immediately visible everywhere
-        try {
-          const cachedNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-          const noteObj = {
-            id: noteId,
-            appointment_id: svc.appointmentId ?? appointmentId,
-            client_email: client.email.toLowerCase(),
-            client_first_name: client.first,
-            client_last_name: client.last,
-            client_dob: client.dob || null,
-            location_id: locationId,
-            provider_user_id: user!.id,
-            provider_staff_id: staffId,
-            provider_name: providerName || sigFullName || "Provider",
-            provider_role: providerRole,
-            category: noteCategory,
-            service_name: svc.name,
-            summary: visitSummary,
-            status: notePayload.status,
-            signed_at: notePayload.signed_at,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            indication,
-            provider_notes: providerNotes,
-          };
-          const updatedCached = [noteObj, ...cachedNotes.filter((n: any) => n.id !== noteId)];
-          localStorage.setItem("rka_demo_chart_notes", JSON.stringify(updatedCached));
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("rka_chart_note_updated"));
-          }
-        } catch { }
 
         await apiQuery("clinical_audit_log").insert({
           actor_user_id: user!.id, actor_name: providerName,

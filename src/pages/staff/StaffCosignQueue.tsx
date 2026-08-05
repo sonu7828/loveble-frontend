@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, authService, ApiClient, clinicalService } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, Navigate } from "react-router-dom";
 import { Loader2, ClipboardCheck, ChevronRight } from "lucide-react";
@@ -21,31 +21,43 @@ type Note = {
 };
 
 export default function StaffCosignQueue() {
-  const { isAdmin, isNP, isMedicalDirector, isRNInjector, loading } = useAuth();
-  const [notes, setNotes] = useState<Note[]>([]);
+  const { isNP, isMedicalDirector, loading } = useAuth();
+  const isSupervising = isNP || isMedicalDirector;
+  const [notes, setNotes] = useState<any[]>([]);
   const [busy, setBusy] = useState(true);
+
+  const fetchQueue = async () => {
+    try {
+      const queue = await clinicalService.getCosignQueue();
+      const mapped = queue.map((item: any) => ({
+        id: item.note?.id || item.noteId,
+        appointment_id: item.note?.appointmentId || null,
+        client_email: item.note?.patient?.email || "—",
+        client_first_name: item.note?.patient?.firstName || "",
+        client_last_name: item.note?.patient?.lastName || "",
+        service_name: item.note?.serviceName || "Clinical Note",
+        category: item.note?.category || "soap",
+        provider_name: item.author?.fullName || "RN Injector",
+        provider_role: item.author?.title || "RN",
+        signed_at: item.note?.signedAt || item.requestedAt,
+        status: item.note?.status || "pending_cosign",
+      }));
+      setNotes(mapped);
+    } catch (e) {
+      setNotes([]);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (loading) return;
-    if (!isAdmin && !isNP && !isMedicalDirector && !isRNInjector) { setBusy(false); return; }
-    let cancel = false;
-    (async () => {
-      const { data, error } = await apiQuery
-        .from("clinical_notes")
-        .select("id, appointment_id, client_email, client_first_name, client_last_name, service_name, category, provider_name, provider_role, signed_at, status")
-        .eq("requires_cosign", true)
-        .eq("status", "signed")
-        .order("signed_at", { ascending: true })
-        .limit(200);
-      if (cancel) return;
-      if (!error) setNotes((data ?? []) as Note[]);
-      setBusy(false);
-    })();
-    return () => { cancel = true; };
-  }, [loading, isAdmin, isNP, isMedicalDirector, isRNInjector]);
+    if (!isSupervising) { setBusy(false); return; }
+    fetchQueue();
+  }, [loading, isSupervising]);
 
   if (loading) return <div className="p-8"><Loader2 className="h-4 w-4 animate-spin" /></div>;
-  if (!isAdmin && !isNP && !isMedicalDirector && !isRNInjector) return <Navigate to="/staff/today" replace />;
+  if (!isSupervising) return <Navigate to="/staff/today" replace />;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">

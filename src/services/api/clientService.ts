@@ -1,5 +1,6 @@
 /**
  * Client & Patient Service for Express REST API Backend.
+ * Connects directly to backend /patients REST API.
  */
 import { ApiClient } from "./client";
 
@@ -12,38 +13,63 @@ export interface ClientRecord {
   dob?: string;
   created_at?: string;
   notes?: string;
+  account_status?: string;
+  is_active?: boolean;
 }
-
-const MOCK_CLIENTS: ClientRecord[] = [
-  {
-    id: "cli-1",
-    first_name: "Sarah",
-    last_name: "Jenkins",
-    email: "sarah.j@example.com",
-    phone: "(408) 555-0123",
-    dob: "1990-05-14",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "cli-2",
-    first_name: "Elena",
-    last_name: "Rostova",
-    email: "elena.r@example.com",
-    phone: "(408) 555-0199",
-    dob: "1988-11-22",
-    created_at: new Date().toISOString(),
-  },
-];
 
 export const clientService = {
   async getClients(query?: string): Promise<ClientRecord[]> {
-    const res = await ApiClient.get<ClientRecord[]>(`/clients?q=${encodeURIComponent(query || "")}`);
-    return res.data || MOCK_CLIENTS;
+    const res = await ApiClient.get<any>(`/patients?search=${encodeURIComponent(query || "")}`);
+    const rawList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    return rawList.map((p: any) => ({
+      id: p.id,
+      first_name: p.firstName || p.first_name || "",
+      last_name: p.lastName || p.last_name || "",
+      email: p.email || "",
+      phone: p.phone || "",
+      dob: p.dateOfBirth ? new Date(p.dateOfBirth).toISOString().split("T")[0] : (p.dob || ""),
+      created_at: p.createdAt || p.created_at || "",
+      notes: p.notes || "",
+      account_status: p.isActive === false ? "disabled" : "active",
+      is_active: p.isActive !== false,
+    }));
+  },
+
+  async getClientById(id: string): Promise<ClientRecord | null> {
+    const res = await ApiClient.get<any>(`/patients/${id}`);
+    const p = res.data?.data || res.data;
+    if (!p) return null;
+    return {
+      id: p.id,
+      first_name: p.firstName || p.first_name || "",
+      last_name: p.lastName || p.last_name || "",
+      email: p.email || "",
+      phone: p.phone || "",
+      dob: p.dateOfBirth ? new Date(p.dateOfBirth).toISOString().split("T")[0] : (p.dob || ""),
+      created_at: p.createdAt || p.created_at || "",
+      notes: p.notes || "",
+      account_status: p.isActive === false ? "disabled" : "active",
+      is_active: p.isActive !== false,
+    };
   },
 
   async getClientByEmail(email: string): Promise<ClientRecord | null> {
-    const res = await ApiClient.get<ClientRecord>(`/clients/by-email/${encodeURIComponent(email)}`);
-    return res.data || MOCK_CLIENTS.find((c) => c.email.toLowerCase() === email.toLowerCase()) || MOCK_CLIENTS[0];
+    const res = await ApiClient.get<any>(`/patients?search=${encodeURIComponent(email)}`);
+    const rawList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    const found = rawList.find((p: any) => p.email?.toLowerCase() === email.toLowerCase()) || rawList[0];
+    if (!found) return null;
+    return {
+      id: found.id,
+      first_name: found.firstName || found.first_name || "",
+      last_name: found.lastName || found.last_name || "",
+      email: found.email || "",
+      phone: found.phone || "",
+      dob: found.dateOfBirth ? new Date(found.dateOfBirth).toISOString().split("T")[0] : (found.dob || ""),
+      created_at: found.createdAt || found.created_at || "",
+      notes: found.notes || "",
+      account_status: found.isActive === false ? "disabled" : "active",
+      is_active: found.isActive !== false,
+    };
   },
 
   async getClientCredits(email: string): Promise<any[]> {
@@ -57,7 +83,33 @@ export const clientService = {
   },
 
   async saveClient(client: Partial<ClientRecord>): Promise<ClientRecord> {
-    const res = await ApiClient.post<ClientRecord>("/clients", client);
-    return res.data || { id: `cli-${Date.now()}`, ...client } as ClientRecord;
+    const payload = {
+      firstName: client.first_name,
+      lastName: client.last_name,
+      email: client.email,
+      phone: client.phone,
+      dateOfBirth: client.dob,
+    };
+    const res = client.id && !client.id.startsWith("client-")
+      ? await ApiClient.patch(`/patients/${client.id}`, payload)
+      : await ApiClient.post("/patients", payload);
+
+    const p = res.data?.data || res.data;
+    return {
+      id: p.id,
+      first_name: p.firstName || p.first_name || "",
+      last_name: p.lastName || p.last_name || "",
+      email: p.email || "",
+      phone: p.phone || "",
+      dob: p.dateOfBirth ? new Date(p.dateOfBirth).toISOString().split("T")[0] : (p.dob || ""),
+      created_at: p.createdAt || p.created_at || "",
+      notes: p.notes || "",
+      account_status: p.isActive === false ? "disabled" : "active",
+      is_active: p.isActive !== false,
+    };
+  },
+
+  async deleteClient(id: string): Promise<void> {
+    await ApiClient.delete(`/patients/${id}`);
   }
 };

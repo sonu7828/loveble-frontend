@@ -1,7 +1,7 @@
 import { confirmDialog, promptDialog } from "@/components/ui/confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, authService, ApiClient, clientService } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { format } from "date-fns";
@@ -20,7 +20,7 @@ type ImportRow = {
 type ImportedClient = { first_name: string; last_name: string; email: string; phone: string | null; dob: string | null; gender: string | null; notes?: string } & { id: string; invited_at: string | null };
 
 export default function StaffClients() {
-  const { canSeeAll, staffId } = useAuth();
+  const { canSeeAll, staffId, isAdmin } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [imported, setImported] = useState<ImportedClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,8 +67,9 @@ export default function StaffClients() {
 
   const reloadAccounts = async () => {
     const { data } = await apiQuery("client_profiles").select("email, is_lead, first_name, last_name, phone, dob, lead_captured_at, lead_source, created_at").limit(5000);
-    const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-    const cpList = [...(data ?? []), ...localClients];
+    const cpList = data ?? [];
+
+    setClientProfiles(cpList);
 
     setClientProfiles(cpList);
     setAccountEmails(new Set(cpList.map((r: any) => (r.email || "").toLowerCase())));
@@ -443,7 +444,7 @@ export default function StaffClients() {
     } finally { setBusyEmail(null); }
   };
 
-  const deleteClient = async (c: { email: string; first_name: string; last_name: string; imported_id?: string | null }) => {
+  const deleteClient = async (c: { id?: string; email: string; first_name: string; last_name: string; imported_id?: string | null }) => {
     const name = `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.email;
     if (!(await confirmDialog({
       title: `Delete ${name}?`,
@@ -452,28 +453,18 @@ export default function StaffClients() {
       confirmLabel: "Delete client",
     }))) return;
 
-    const emailLower = (c.email || "").toLowerCase();
     setBusyEmail(c.email);
     try {
-      if (c.imported_id) {
-        await apiQuery("imported_clients").delete().eq("id", c.imported_id);
-      }
-      if (emailLower) {
-        await apiQuery("client_profiles").delete().eq("email", emailLower);
-        await apiQuery("appointments").delete().eq("client_email", emailLower);
-
-        // Clear from browser local storage keys
-        for (const key of ["rka_demo_clients", "rka_demo_client_profiles", "rka_demo_appointments", "rka_imported_clients"]) {
-          try {
-            const arr: any[] = JSON.parse(localStorage.getItem(key) || "[]");
-            const next = arr.filter((x: any) =>
-              (x.email || x.client_email || "").toLowerCase() !== emailLower &&
-              (!c.imported_id || x.id !== c.imported_id)
-            );
-            localStorage.setItem(key, JSON.stringify(next));
-          } catch {
-            /* ignore */
-          }
+      if (c.id && !c.id.startsWith("client-")) {
+        await clientService.deleteClient(c.id);
+      } else {
+        const emailLower = (c.email || "").toLowerCase();
+        if (c.imported_id) {
+          await apiQuery("imported_clients").delete().eq("id", c.imported_id);
+        }
+        if (emailLower) {
+          await apiQuery("client_profiles").delete().eq("email", emailLower);
+          await apiQuery("appointments").delete().eq("client_email", emailLower);
         }
       }
 
@@ -501,6 +492,7 @@ export default function StaffClients() {
   // Booked clients show their most-recent appointment; imported-only show "Imported".
   type UnifiedClient = {
     key: string;
+    id?: string;
     first_name: string;
     last_name: string;
     email: string;
@@ -618,6 +610,7 @@ export default function StaffClients() {
     }
 
     setAddClientBusy(true);
+<<<<<<< HEAD
     const newClient = {
       id: `client-${Date.now()}`,
       first_name: addClientDraft.first_name.trim(),
@@ -632,15 +625,25 @@ export default function StaffClients() {
     localClients.push(newClient);
     localStorage.setItem("rka_demo_clients", JSON.stringify(localClients));
 
+=======
+>>>>>>> 2402068561fe136c19abae223df84cf28bd92233
     try {
-      await apiQuery("client_profiles").insert(newClient);
-    } catch (e) {}
-
-    toast.success(`Client ${newClient.first_name} ${newClient.last_name} created successfully!`);
-    setAddClientBusy(false);
-    setAddClientOpen(false);
-    setAddClientDraft({ first_name: "", last_name: "", email: "", phone: "", dob: "" });
-    reloadAccounts();
+      await clientService.saveClient({
+        first_name: addClientDraft.first_name.trim(),
+        last_name: addClientDraft.last_name.trim(),
+        email: addClientDraft.email.trim().toLowerCase(),
+        phone: addClientDraft.phone.trim() || undefined,
+        dob: addClientDraft.dob.trim() || undefined,
+      });
+      toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to create client");
+    } finally {
+      setAddClientBusy(false);
+      setAddClientOpen(false);
+      setAddClientDraft({ first_name: "", last_name: "", email: "", phone: "", dob: "" });
+      reloadAccounts();
+    }
   };
 
   const matchesQuery = (s: string) => !q || s.toLowerCase().includes(q.toLowerCase());
@@ -837,14 +840,16 @@ export default function StaffClients() {
                           <Ban className="h-3.5 w-3.5 mr-2" /> Block from booking
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem
-                        disabled={busyEmail === c.email}
-                        onClick={() => deleteClient({ email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
-                        className="text-destructive focus:text-destructive text-destructive-soft-foreground"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-2" />
-                        Delete client
-                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <DropdownMenuItem
+                          disabled={busyEmail === c.email}
+                          onClick={() => deleteClient({ id: c.id, email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
+                          className="text-destructive focus:text-destructive text-destructive-soft-foreground"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-2" />
+                          Delete client
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
