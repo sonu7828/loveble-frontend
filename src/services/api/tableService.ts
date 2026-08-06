@@ -1,46 +1,9 @@
 /**
  * Table API Query Service for Express REST API Backend.
  * Direct Express API data accessor replacing legacy Supabase table queries.
- * Live Backend API Integration — Zero localStorage/mock data usage.
+ * Live Backend API Integration — Zero localStorage/sessionStorage/mock data usage.
  */
 import { ApiClient } from "./client";
-
-const MOCK_FALLBACKS: Record<string, any[]> = {
-  staff_directory: [
-    {
-      id: "st-girish",
-      full_name: "Girish",
-      fullName: "Girish",
-      title: "Nurse Practitioner",
-      color: "#8B6B5D",
-      is_active: true,
-      role: "nurse_practitioner",
-    },
-  ],
-  staff_profiles: [
-    {
-      id: "st-girish",
-      full_name: "Girish",
-      fullName: "Girish",
-      title: "Nurse Practitioner",
-      color: "#8B6B5D",
-      is_active: true,
-      role: "nurse_practitioner",
-    },
-  ],
-  locations: [
-    {
-      id: "loc-sj-01",
-      name: "San Jose Clinic",
-      slug: "san-jose",
-      address: "123 Medical Center Way, Suite 200, San Jose, CA 95128",
-      phone: "(408) 555-0199",
-      google_place_id: "ChIJrTLr-GfxloARy5B5mX80h0Q",
-      google_review_url: "https://g.page/r/RadiantilykSanJose/review",
-      is_active: true,
-    },
-  ],
-};
 
 function normalizeRow(tableName: string, row: any): any {
   if (!row || typeof row !== "object") return row;
@@ -282,14 +245,20 @@ export class ApiTableQuery {
 
   public async single(): Promise<{ data: any; error: any }> {
     const res = await this.execute();
+    if (res.error) {
+      return { data: null, error: res.error };
+    }
     const first = Array.isArray(res.data) ? res.data[0] : res.data;
-    return { data: first || null, error: res.error };
+    return { data: first || null, error: null };
   }
 
   public async maybeSingle(): Promise<{ data: any; error: any }> {
     const res = await this.execute();
+    if (res.error) {
+      return { data: null, error: res.error };
+    }
     const first = Array.isArray(res.data) ? res.data[0] : res.data;
-    return { data: first || null, error: res.error };
+    return { data: first || null, error: null };
   }
 
   private async execute(): Promise<{ data: any; error: any; count: number }> {
@@ -306,12 +275,12 @@ export class ApiTableQuery {
         res = await ApiClient.delete(`/${this.tableName}${qs}`);
       } else if (lowerTable === "service_categories" || lowerTable === "servicecategory") {
         res = await ApiClient.get(`/services/public`);
-        if (res.status === 401 || res.status === 403 || !res.data) {
+        if (res.error) {
           res = await ApiClient.get(`/services/categories`);
         }
       } else if (lowerTable === "services" || lowerTable === "service") {
         res = await ApiClient.get(`/services/public`);
-        if (res?.data) {
+        if (res?.data && !res.error) {
           const catList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
           const flatSvcs: any[] = [];
           catList.forEach((cat: any) => {
@@ -331,21 +300,22 @@ export class ApiTableQuery {
       } else {
         res = await ApiClient.get(`/${this.tableName}${qs}`);
       }
+    } catch (err: any) {
+      res = { data: null, error: err?.message || "Network request failed", status: 500 };
+    }
 
-      // 403 / 401 from production backend — treat as empty so fallback applies
-      if (res?.status === 403 || res?.status === 401) {
-        res = { data: null, error: null, status: res.status };
-      }
-    } catch {
-      res = { data: null, error: null };
+    if (res?.error) {
+      const errObj = typeof res.error === "string" ? { message: res.error } : res.error;
+      return {
+        data: this.action === "select" ? [] : null,
+        error: errObj,
+        count: 0,
+      };
     }
 
     let data = res?.data;
     if (data && typeof data === "object" && !Array.isArray(data) && "data" in data) {
       data = data.data;
-    }
-    if ((!data || (Array.isArray(data) && data.length === 0)) && MOCK_FALLBACKS[this.tableName]) {
-      data = [...MOCK_FALLBACKS[this.tableName]];
     }
 
     if (Array.isArray(data)) {
@@ -365,7 +335,7 @@ export class ApiTableQuery {
 
     return {
       data,
-      error: res?.error ? (typeof res.error === "string" ? { message: res.error } : res.error) : null,
+      error: null,
       count: Array.isArray(data) ? data.length : 1,
     };
   }
