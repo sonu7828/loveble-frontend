@@ -45,7 +45,7 @@ interface RawLot {
   receivedAt: string;
   createdAt: string;
   updatedAt: string;
-  product?: { id: string; name: string };
+  product?: { id: string; name: string; minReorderLevel?: number };
   location?: { id: string; name: string };
   vendor?: { id: string; name: string };
   movements?: RawMovement[];
@@ -97,13 +97,16 @@ export interface ProductLot {
   vendor?: { id: string; name: string };
 }
 
+/** Exact union of movement types accepted by the backend (inventory.schema.ts line 53). */
+export type InventoryMovementType = "received" | "used" | "adjusted" | "wasted" | "returned";
+
 export interface InventoryMovement {
   id: string;
   lotId: string;
   /**
-   * movementType: one of 'received' | 'used' | 'adjusted' | 'wasted' | 'returned'
+   * movementType: exactly one of the five values accepted by backend inventory.schema.ts.
    */
-  movementType: "received" | "used" | "adjusted" | "wasted" | "returned" | string;
+  movementType: InventoryMovementType;
   /**
    * quantityChange: signed integer.
    * Positive = stock added. Negative = stock removed.
@@ -139,8 +142,10 @@ function normalizeProductLot(raw: RawLot): ProductLot {
     expirationDate,
     quantityRemaining: typeof raw.quantity === "number" ? raw.quantity : 0,
     unit: raw.unit || "units",
-    // backend does not return lowStockThreshold on lot — default to 10
-    lowStockThreshold: 10,
+    // lowStockThreshold: backend lot has no lowStockThreshold field.
+    // Read product.minReorderLevel when included in the response (getLotById includes it
+    // if the backend select is extended), otherwise fall back to the backend default of 10.
+    lowStockThreshold: raw.product?.minReorderLevel ?? 10,
     // Backend does not have isActive on lots; treat as active unless quantity is 0
     isActive: typeof raw.quantity === "number" ? raw.quantity >= 0 : true,
     receivedAt,
@@ -158,7 +163,7 @@ function normalizeInventoryMovement(raw: RawMovement): InventoryMovement {
   return {
     id: raw.id,
     lotId: raw.lotId,
-    movementType: raw.movementType as InventoryMovement["movementType"],
+    movementType: raw.movementType as InventoryMovementType,
     quantityChange: typeof raw.quantityChange === "number" ? raw.quantityChange : 0,
     reason: raw.reason ?? null,
     performedBy: raw.performedBy ?? null,
@@ -202,12 +207,13 @@ export interface CreateLotInput {
   receivedAt: string;  // YYYY-MM-DD
 }
 
-/** Accepted movement type values as defined in backend inventory.schema.ts */
-export type MovementType = "received" | "used" | "adjusted" | "wasted" | "returned";
+// MovementType is InventoryMovementType — use InventoryMovementType directly.
+// Kept as alias for any downstream references.
+export type MovementType = InventoryMovementType;
 
 export interface CreateMovementInput {
   lotId: string;
-  movementType: MovementType;
+  movementType: InventoryMovementType;
   quantityChange: number;
   reason?: string;
 }
