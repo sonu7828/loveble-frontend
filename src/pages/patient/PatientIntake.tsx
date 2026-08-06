@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { PortalCTA } from "@/components/PortalCTA";
+import { patientService } from "@/services/api/patientService";
 
 const ALLERGY_OPTIONS = [
   "No known allergies", "Latex", "Lidocaine", "Penicillin", "Sulfa", "Iodine/Shellfish",
@@ -132,9 +133,8 @@ export default function PatientIntake() {
     if (!token) return;
     (async () => {
       try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/public-client-intake?token=${encodeURIComponent(token)}`);
-        const json = await res.json();
-        if (!res.ok) { toast.error(json.error ?? "Could not load"); return; }
+        const json = await patientService.getPublicIntake(token);
+        if (!json) { toast.error("Could not load intake form"); return; }
         setAppt(json.appointment);
         if (json.submission) {
           const s = json.submission;
@@ -180,6 +180,8 @@ export default function PatientIntake() {
           setAiScribeAck(!!json.lastFull.ai_scribe_consent);
 
         }
+      } catch (err: any) {
+        toast.error(err?.message || "Could not load intake form");
       } finally {
         setLoading(false);
       }
@@ -275,15 +277,12 @@ export default function PatientIntake() {
 
           };
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/public-client-intake`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, payload }),
-      });
-      const json = await res.json();
-      if (!res.ok) { toast.error(json.error ?? "Submission failed"); return; }
+      const json = await patientService.submitPublicIntake(token, payload);
+      if (json?.error) { toast.error(json.error ?? "Submission failed"); return; }
       setDone(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err: any) {
+      toast.error(err?.message || "Submission failed");
     } finally {
       setSubmitting(false);
     }
