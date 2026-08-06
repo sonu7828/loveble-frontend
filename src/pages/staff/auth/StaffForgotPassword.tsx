@@ -16,13 +16,12 @@ export default function StaffForgotPassword() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await authService.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo: `${window.location.origin}/staff/reset-password` }
-    );
+    const { error } = await ApiClient.post("/auth/forgot-password", {
+      email: email.trim().toLowerCase(),
+    });
     setLoading(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(typeof error === "string" ? error : "Password reset request failed");
       return;
     }
     setSent(true);
