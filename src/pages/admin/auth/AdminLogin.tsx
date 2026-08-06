@@ -106,7 +106,7 @@ export default function AdminLogin() {
 
     if (data?.user) {
       try { sessionStorage.removeItem("rka_tab_session_user"); } catch (e) {}
-      await refreshCurrentUser(true);
+      await refreshCurrentUser();
       setLoading(false);
       setPassword("");
       await beginMfa();
