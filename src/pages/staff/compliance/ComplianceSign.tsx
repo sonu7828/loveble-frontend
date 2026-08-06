@@ -43,7 +43,7 @@ export default function ComplianceSign() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await authService.getSession();
+      const { user } = await authService.getSession();
       if (!user) { nav("/staff/login"); return; }
 
       const [{ data: p }, { data: sp }] = await Promise.all([
@@ -72,7 +72,7 @@ export default function ComplianceSign() {
     if (!canSubmit) { toast.error("Complete all initials, name, signature, and confirmation."); return; }
     setSubmitting(true);
     try {
-      const { data: { user } } = await authService.getSession();
+      const { user } = await authService.getSession();
       if (!user) throw new Error("Not signed in");
 
       // Best-effort IP capture
