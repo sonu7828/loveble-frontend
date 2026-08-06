@@ -11,18 +11,9 @@ import { confirmDialog } from "@/components/ui/confirm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import StaffInventoryBurn from "./StaffInventoryBurn";
 
-type Lot = {
-  id: string; product_name: string; lot_number: string;
-  expiration_date: string | null;
-  quantity_initial: number; quantity_remaining: number;
-  unit: string; category: string | null;
-  low_stock_threshold: number; notes: string | null;
-  is_active: boolean; received_at: string;
-};
-
 type TabKey = "all" | "low" | "expiring" | "expired";
 
-function lotStatus(l: Lot): "expired" | "expiring" | "low" | "out" | "ok" {
+function lotStatus(l: ProductLot): "expired" | "expiring" | "low" | "out" | "ok" {
   if (l.quantity_remaining <= 0) return "out";
   if (l.expiration_date) {
     const d = differenceInDays(new Date(l.expiration_date), new Date());
@@ -34,17 +25,17 @@ function lotStatus(l: Lot): "expired" | "expiring" | "low" | "out" | "ok" {
 }
 
 export default function StaffInventory() {
-  const [lots, setLots] = useState<Lot[]>([]);
+  const [lots, setLots] = useState<ProductLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [drawer, setDrawer] = useState<Lot | null>(null);
+  const [drawer, setDrawer] = useState<ProductLot | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const data = await inventoryService.getLots();
-    setLots(Array.isArray(data) ? data as Lot[] : []);
+    setLots(Array.isArray(data) ? data : []);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -74,7 +65,7 @@ export default function StaffInventory() {
     return { low, expiring, expired };
   }, [lots]);
 
-  const adjust = async (lot: Lot) => {
+  const adjust = async (lot: ProductLot) => {
     const next = window.prompt(`New remaining quantity for ${lot.product_name} lot ${lot.lot_number}:`, String(lot.quantity_remaining));
     if (next == null) return;
     const n = Number(next);
@@ -83,7 +74,7 @@ export default function StaffInventory() {
     if (!ok) toast.error("Failed to update lot"); else { toast.success("Updated"); load(); }
   };
 
-  const deactivate = async (lot: Lot) => {
+  const deactivate = async (lot: ProductLot) => {
     if (!(await confirmDialog({
       title: `Deactivate lot ${lot.lot_number}?`,
       description: "It will be hidden from chart pickers. Movement history is kept.",
