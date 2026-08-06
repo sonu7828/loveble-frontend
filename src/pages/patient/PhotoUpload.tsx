@@ -100,7 +100,7 @@ export default function PhotoUpload() {
         const { data, error } = await ApiClient.post("client-upload-photo", {
           body: { token, fileBase64: b64, mimeType: f.type, caption: fullCaption },
         });
-        if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message);
+        if (error || data?.error) throw new Error(data?.error || (typeof error === "string" ? error : "Upload failed"));
       }
       setDone(true);
     } catch (e: any) {

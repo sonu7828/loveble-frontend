@@ -379,7 +379,7 @@ function VouchersTab() {
       },
     });
     setBusyId(null);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "Email failed"); return; }
+    if (error || data?.error) { toast.error(data?.error || (typeof error === "string" ? error : "Email failed")); return; }
     toast.success(`Sent to ${to}`);
     load();
   };
