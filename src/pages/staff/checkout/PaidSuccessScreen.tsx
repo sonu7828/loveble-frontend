@@ -5,8 +5,26 @@ import { Button } from "@/components/ui/button";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { fmt, LineItem } from "./shared";
 
+type SaleRecord = {
+  id?: string;
+  client_email?: string;
+  payment_method?: string;
+  paid_at?: string;
+  total_cents?: number;
+  client_first_name?: string;
+  client_last_name?: string;
+  subtotal_cents?: number;
+  discount_cents?: number;
+  voucher_applied_cents?: number;
+  tax_cents?: number;
+  tip_cents?: number;
+  processing_fee_cents?: number;
+  receipt_url?: string;
+  [key: string]: unknown;
+};
+
 type Props = {
-  sale: any;
+  sale: SaleRecord;
   items: LineItem[];
   redirectSecs: number;
   backHref: string;
@@ -20,17 +38,19 @@ export function PaidSuccessScreen({ sale, items, redirectSecs, backHref }: Props
     let alive = true;
     (async () => {
       if (!sale?.id || !sale?.client_email) return;
-      const [{ data: ledger }, { data: settings }, { data: bal }] = await Promise.all([
-        apiQuery("client_points_ledger").select("delta, reason").eq("sale_id", sale.id),
+      const [{ data: ledger }, { data: settings }, pointsBalRes] = await Promise.all([
+        apiQuery("client_points_ledger").select("delta, reason").eq("sale_id", String(sale.id)),
         apiQuery("client_points_settings").select("point_value_cents").eq("id", true).maybeSingle(),
-        apiQuery("get_points_balance", { _client_email: sale.client_email }),
+        apiQuery.functions.invoke("get_points_balance", { body: { _client_email: String(sale.client_email) } }),
       ]);
       if (!alive) return;
-      const earned = (ledger ?? []).filter((r: any) => r.reason === "earned").reduce((s: number, r: any) => s + (r.delta ?? 0), 0);
-      const redeemed = -(ledger ?? []).filter((r: any) => r.reason === "redeemed").reduce((s: number, r: any) => s + (r.delta ?? 0), 0);
+      const ledgerRows = (ledger ?? []) as Record<string, unknown>[];
+      const earned = ledgerRows.filter((r) => r.reason === "earned").reduce((s: number, r) => s + (Number(r.delta) || 0), 0);
+      const redeemed = -ledgerRows.filter((r) => r.reason === "redeemed").reduce((s: number, r) => s + (Number(r.delta) || 0), 0);
       const valueCents = settings?.point_value_cents ?? 10;
+      const bal = (pointsBalRes?.data as number) ?? 0;
       if (earned > 0 || redeemed > 0) {
-        setPoints({ earned, redeemed, balance: (bal as number) ?? 0, valueCents });
+        setPoints({ earned, redeemed, balance: bal, valueCents });
       }
     })();
     return () => { alive = false; };

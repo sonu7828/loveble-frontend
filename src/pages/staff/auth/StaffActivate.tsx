@@ -8,6 +8,22 @@ import { SiteFooter } from "@/components/SiteChrome";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return fallback;
+}
+
 export default function StaffActivate() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -38,13 +54,13 @@ export default function StaffActivate() {
     });
     if (error || data?.error) {
       setSubmitting(false);
-      toast.error(data?.error || error?.message || "Could not activate");
+      toast.error(getErrorMessage(data?.error || error, "Could not activate"));
       return;
     }
     // Sign in
     const { error: signErr } = await authService.signInWithPassword({ email, password });
     setSubmitting(false);
-    if (signErr) { toast.error(signErr.message); return; }
+    if (signErr) { toast.error(getErrorMessage(signErr, "Could not sign in")); return; }
     setStage("done");
     setTimeout(() => navigate("/staff/today"), 1500);
   };

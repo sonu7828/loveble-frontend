@@ -18,6 +18,22 @@ const AUDIENCE_LABEL: Record<Audience, string> = {
   vip: "VIPs — 3+ completed visits",
 };
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return fallback;
+}
+
 // One-shot newsletter sender: drafts with AI, lets you edit, then sends to
 // a chosen audience. Under the hood it creates a one-off campaign row and
 // invokes the existing run-marketing-campaign function so the audit trail
@@ -53,7 +69,7 @@ export default function StaffNewsletter() {
       body: { prompt, generateImage: genImage },
     });
     setDrafting(false);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "AI draft failed"); return; }
+    if (error || data?.error) { toast.error(getErrorMessage(data?.error || error, "AI draft failed")); return; }
     setSubject(data.draft?.subject ?? "");
     setPreviewText(data.draft?.preview_text ?? "");
     setBody(data.draft?.body_markdown ?? "");
@@ -83,7 +99,7 @@ export default function StaffNewsletter() {
       cooldown_days: 14,
       created_by: user.id,
     }).select("id").single();
-    if (error || !data) { toast.error(error?.message ?? "Could not save newsletter"); return null; }
+    if (error || !data) { toast.error(getErrorMessage(error, "Could not save newsletter")); return null; }
     return data.id as string;
   };
 
@@ -96,7 +112,7 @@ export default function StaffNewsletter() {
       body: { campaignId: id, dryRun: true },
     });
     setChecking(false);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "Preview failed"); return; }
+    if (error || data?.error) { toast.error(getErrorMessage(data?.error || error, "Preview failed")); return; }
     setAudienceSize(data.eligible);
     toast.success(`${data.eligible} eligible recipients (of ${data.audienceSize} in the audience)`);
   };
@@ -114,7 +130,7 @@ export default function StaffNewsletter() {
       body: { campaignId: id, dryRun: false },
     });
     setSending(false);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "Send failed"); return; }
+    if (error || data?.error) { toast.error(getErrorMessage(data?.error || error, "Send failed")); return; }
     toast.success(`Sent ${data.sent}${data.errors ? ` · ${data.errors} errors` : ""}`);
     setSubject(""); setPreviewText(""); setBody(""); setHeroUrl(null);
     setPrompt(""); setAudienceSize(null);
