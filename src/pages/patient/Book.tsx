@@ -288,10 +288,10 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       }
 
       const createdAppt = res.data;
-      const createdId = createdAppt?.id;
+      const createdToken = createdAppt?.bookingToken || createdAppt?.booking_token || createdAppt?.token || createdAppt?.id;
 
-      if (!createdId) {
-        setCardError("Appointment was created but no confirmation ID was returned.");
+      if (!createdToken) {
+        setCardError("Appointment was created but no confirmation token was returned.");
         setSubmitting(false);
         return;
       }
@@ -309,7 +309,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       } catch (_e) { }
 
       setSubmitting(false);
-      navigate(`/booking-confirmation?id=${encodeURIComponent(createdId)}&new=1`);
+      navigate(`/booking-confirmation?token=${encodeURIComponent(createdToken)}&new=1`);
     } catch (err: any) {
       setCardError(err?.message || "An unexpected error occurred while processing your booking. Please try again.");
       setSubmitting(false);
