@@ -39,47 +39,16 @@ export interface MedicalService {
   is_active: boolean;
 }
 
-const MOCK_LOCATIONS: Location[] = [
-  {
-    id: "11111111-1111-1111-1111-111111111111",
-    name: "San Jose Studio",
-    short_name: "San Jose",
-    city: "San Jose",
-    address: "2100 Curtner Ave, Ste 1B",
-  },
-];
-
-const MOCK_STAFF: StaffProfile[] = [
-  {
-    id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    full_name: "Administrator Kiem",
-    email: "admin@radiantilyk.com",
-    role: "admin",
-    is_active: true,
-  },
-  {
-    id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-    full_name: "Nurse Jessica Smith, NP",
-    email: "jessica@radiantilyk.com",
-    role: "nurse_practitioner",
-    is_active: true,
-  },
-];
-
-const MOCK_SERVICES: MedicalService[] = [
-  { id: "srv-1", name: "Botox Cosmetic", price: 14, duration_minutes: 30, is_active: true },
-  { id: "srv-2", name: "Juvederm Voluma XC", price: 800, duration_minutes: 45, is_active: true },
-  { id: "srv-3", name: "HydraFacial Deluxe", price: 250, duration_minutes: 60, is_active: true },
-];
-
 export const staffService = {
   async getLocations(): Promise<Location[]> {
     const res = await ApiClient.get<Location[]>("/locations");
-    return res.data || MOCK_LOCATIONS;
+    if (res.error) throw new Error(res.error);
+    return res.data || [];
   },
 
   async getStaffProfiles(activeOnly = false): Promise<StaffProfile[]> {
     const res = await ApiClient.get<any>(`/staff?activeOnly=${activeOnly}&limit=100`);
+    if (res.error) throw new Error(res.error);
     const raw = res.data;
     if (Array.isArray(raw)) return raw;
     if (Array.isArray(raw?.data)) return raw.data;
@@ -96,6 +65,7 @@ export const staffService = {
     color?: string;
   }): Promise<any> {
     const res = await ApiClient.post<any>("/staff/create-with-user", data);
+    if (res.error) throw new Error(res.error);
     return res.data;
   },
 
@@ -106,36 +76,43 @@ export const staffService = {
       roleName: data.roleName || data.role,
     };
     const res = await ApiClient.patch<any>(`/staff/${id}`, payload);
+    if (res.error) throw new Error(res.error);
     return res.data;
   },
 
   async deleteStaff(id: string): Promise<any> {
     const res = await ApiClient.delete<any>(`/staff/${id}`);
+    if (res.error) throw new Error(res.error);
     return res.data;
   },
 
   async getServiceCategories(): Promise<ServiceCategory[]> {
     const res = await ApiClient.get<ServiceCategory[]>("/service-categories");
-    return res.data || [{ id: "cat-1", name: "Injectables", sort_order: 1 }, { id: "cat-2", name: "Skin Care", sort_order: 2 }];
+    if (res.error) throw new Error(res.error);
+    return res.data || [];
   },
 
   async getServices(opts?: { includeInactive?: boolean }): Promise<MedicalService[]> {
     const res = await ApiClient.get<MedicalService[]>(`/services?includeInactive=${!!opts?.includeInactive}`);
-    return res.data || MOCK_SERVICES;
+    if (res.error) throw new Error(res.error);
+    return res.data || [];
   },
 
   async getUnitServices(): Promise<any[]> {
     const res = await ApiClient.get<any[]>("/unit-services");
+    if (res.error) throw new Error(res.error);
     return res.data || [];
   },
 
   async getProducts(): Promise<any[]> {
     const res = await ApiClient.get<any[]>("/products");
+    if (res.error) throw new Error(res.error);
     return res.data || [];
   },
 
   async getTerminalReaders(): Promise<any[]> {
     const res = await ApiClient.get<any[]>("/terminal-readers");
+    if (res.error) throw new Error(res.error);
     return res.data || [];
   }
 };
