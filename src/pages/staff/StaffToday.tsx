@@ -111,90 +111,65 @@ function MedicalDirectorDashboard() {
   const [busy, setBusy] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [notesRes, gfeRes, staffRes, ordersRes]: any[] = await Promise.all([
-      apiQuery("clinical_notes").select("id, client_id, client_email, client_first_name, client_last_name, provider_name, service_name, created_at, status, cosign_required").catch(() => ({ data: [] })),
-      apiQuery("gfe_records").select("id, client_name, client_email, provider_name, created_at, status").catch(() => ({ data: [] })),
-      apiQuery("staff_profiles").select("id").eq("is_provider", true).catch(() => ({ data: [] })),
-      apiQuery("clinical_orders").select("*").catch(() => ({ data: [] })),
-    ]);
-
-    const localNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-    const localGfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
-
-    const rawNotes = [...(notesRes?.data ?? []), ...localNotes].filter((n: any) => n.status !== "cosigned");
-    const noteMap = new Map<string, any>();
-    rawNotes.forEach((n: any) => { if (n.id) noteMap.set(n.id, n); });
-    const allNotes = Array.from(noteMap.values());
-
-    const rawGfes = [...(gfeRes?.data ?? []), ...localGfes].filter((g: any) => g.status !== "cosigned");
-    const gfeMap = new Map<string, any>();
-    rawGfes.forEach((g: any) => { if (g.id) gfeMap.set(g.id, g); });
-    const allGfes = Array.from(gfeMap.values());
-
-    const notes = allNotes.map((n: any) => ({
-      id: n.id,
-      client: `${n.client_first_name || ""} ${n.client_last_name || ""}`.trim() || n.client_email || "Rajnandani Sinnghaniya",
-      email: n.client_email || "rajnandani@gmail.com",
-      provider: n.provider_name || "nursepractitioner",
-      service: n.service_name || n.category || "Neurotoxin",
-      type: "SOAP Chart Note",
-      date: n.created_at ? new Date(n.created_at).toLocaleDateString() : "Recent",
-    }));
-
-    const gfes = allGfes.map((g: any) => ({
-      id: g.id,
-      client: g.client_name || g.client_email || "rajnandani@gmail.com",
-      email: g.client_email || "rajnandani@gmail.com",
-      provider: g.np_name || g.provider_name || "Kiem Vukadinovic, NP",
-      service: "Good Faith Exam (GFE)",
-      type: "Medical Assessment",
-      date: g.created_at ? new Date(g.created_at).toLocaleDateString() : "8/3/2026",
-    }));
-
-    const combined = [...notes, ...gfes];
-    if (combined.length > 0) {
-      setReviews(combined);
-    } else {
-      setReviews([
-        {
-          id: "rev-01",
-          client: "Rajnandani Sinnghaniya",
-          email: "rajnandani@gmail.com",
-          provider: "nursepractitioner",
-          service: "Neurotoxin",
-          type: "SOAP Chart Note",
-          date: "Recent",
-        },
-        {
-          id: "rev-02",
-          client: "rajnandani@gmail.com",
-          email: "rajnandani@gmail.com",
-          provider: "Kiem Vukadinovic, NP",
-          service: "Good Faith Exam (GFE)",
-          type: "Medical Assessment",
-          date: "8/3/2026",
-        },
+    try {
+      const [notesRes, gfeRes, staffRes, ordersRes]: any[] = await Promise.all([
+        apiQuery("clinical_notes").select("id, client_id, client_email, client_first_name, client_last_name, provider_name, service_name, created_at, status, cosign_required").catch(() => ({ data: [] })),
+        apiQuery("gfe_records").select("id, client_name, client_email, provider_name, created_at, status").catch(() => ({ data: [] })),
+        apiQuery("staff_profiles").select("id").eq("is_provider", true).catch(() => ({ data: [] })),
+        apiQuery("clinical_orders").select("*").catch(() => ({ data: [] })),
       ]);
+
+      const rawNotes = (notesRes?.data ?? []).filter((n: any) => n.status !== "cosigned");
+      const noteMap = new Map<string, any>();
+      rawNotes.forEach((n: any) => { if (n.id) noteMap.set(n.id, n); });
+      const allNotes = Array.from(noteMap.values());
+
+      const rawGfes = (gfeRes?.data ?? []).filter((g: any) => g.status !== "cosigned");
+      const gfeMap = new Map<string, any>();
+      rawGfes.forEach((g: any) => { if (g.id) gfeMap.set(g.id, g); });
+      const allGfes = Array.from(gfeMap.values());
+
+      const notes = allNotes.map((n: any) => ({
+        id: n.id,
+        client: `${n.client_first_name || ""} ${n.client_last_name || ""}`.trim() || n.client_email || "Patient",
+        email: n.client_email || "—",
+        provider: n.provider_name || "Clinician",
+        service: n.service_name || n.category || "Clinical Service",
+        type: "SOAP Chart Note",
+        date: n.created_at ? new Date(n.created_at).toLocaleDateString() : "Recent",
+      }));
+
+      const gfes = allGfes.map((g: any) => ({
+        id: g.id,
+        client: g.client_name || g.client_email || "Patient",
+        email: g.client_email || "—",
+        provider: g.np_name || g.provider_name || "Clinician",
+        service: "Good Faith Exam (GFE)",
+        type: "Medical Assessment",
+        date: g.created_at ? new Date(g.created_at).toLocaleDateString() : "Recent",
+      }));
+
+      const combined = [...notes, ...gfes];
+      setReviews(combined);
+
+      // Prescription orders
+      const stored = getStoredOrders();
+      setPendingOrders(stored.filter((o) => o.status === "pending"));
+
+      setActiveStaffCount((staffRes?.data ?? []).length);
+    } catch (_e) {
+      // Preserve clean empty review state on load errors
+      setReviews([]);
     }
-
-    // Prescription orders
-    const stored = getStoredOrders();
-    setPendingOrders(stored.filter((o) => o.status === "pending"));
-
-    const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-    const validApproved = approvedList.filter((a) => a.email && a.email.toLowerCase() !== "admin@gmail.com" && !a.email.toLowerCase().includes("no email"));
-    setActiveStaffCount(Math.max(validApproved.length, (staffRes?.data ?? []).length, 7));
   }, []);
 
   useEffect(() => {
     loadData();
     window.addEventListener("rka_orders_updated", loadData);
     window.addEventListener("rka_cosign_updated", loadData);
-    window.addEventListener("storage", loadData);
     return () => {
       window.removeEventListener("rka_orders_updated", loadData);
       window.removeEventListener("rka_cosign_updated", loadData);
-      window.removeEventListener("storage", loadData);
     };
   }, [loadData]);
 
@@ -246,16 +221,6 @@ function MedicalDirectorDashboard() {
     setBusy(true);
 
     const sig = reviewSignatureText.trim();
-    try {
-      const localNotes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-      const updatedNotes = localNotes.map((n) => (n.id === signingReview.id ? { ...n, status: "cosigned", cosigned_by_name: sig } : n));
-      localStorage.setItem("rka_demo_chart_notes", JSON.stringify(updatedNotes));
-
-      const localGfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
-      const updatedGfes = localGfes.map((g) => (g.id === signingReview.id ? { ...g, status: "cosigned", cosigned_by_name: sig } : g));
-      localStorage.setItem("rka_demo_gfe_records", JSON.stringify(updatedGfes));
-    } catch { }
-
     setReviews((prev) => prev.filter((r) => r.id !== signingReview.id));
     setBusy(false);
     setSigningReview(null);
@@ -625,11 +590,11 @@ function StandardStaffToday() {
       });
       setAppts(fetchedAppts);
 
-      const { data: clientRows } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false });
-      const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+      const { data: clientRows, error: clientErr } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false });
+      if (clientErr) throw clientErr;
 
       const uniquePatientsMap = new Map<string, any>();
-      
+
       // Add DB client profiles
       (clientRows ?? []).forEach((c: any) => {
         const email = (c.email || "").toLowerCase();
@@ -644,26 +609,11 @@ function StandardStaffToday() {
         }
       });
 
-      // Add Local storage demo clients
-      localClients.forEach((c: any) => {
-        const email = (c.email || "").toLowerCase();
-        if (email && !uniquePatientsMap.has(email)) {
-          uniquePatientsMap.set(email, {
-            id: c.id || `client-local-${Date.now()}`,
-            name: `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient",
-            email: c.email || "—",
-            phone: c.phone || "—",
-            lastVisit: "New Booking Patient",
-          });
-        }
-      });
-
       // Add clients from appointments
       fetchedAppts.forEach((a: any) => {
         const email = (a.client_email || "").toLowerCase();
         const clientName = `${a.client_first_name || ""} ${a.client_last_name || ""}`.trim() || "Patient";
         if (email) {
-          const existing = uniquePatientsMap.get(email);
           uniquePatientsMap.set(email, {
             id: a.id,
             name: clientName,
@@ -675,7 +625,8 @@ function StandardStaffToday() {
       });
 
       setRecentPatients(Array.from(uniquePatientsMap.values()).slice(0, 15));
-    } catch (_e) {
+    } catch (e: any) {
+      toast.error(e?.message || "Error loading schedule data");
     } finally {
       setLoading(false);
     }
@@ -685,10 +636,8 @@ function StandardStaffToday() {
     loadData();
     const handleSync = () => loadData();
     window.addEventListener("rka_appointment_created", handleSync);
-    window.addEventListener("storage", handleSync);
     return () => {
       window.removeEventListener("rka_appointment_created", handleSync);
-      window.removeEventListener("storage", handleSync);
     };
   }, [loadData]);
 
@@ -715,13 +664,7 @@ function StandardStaffToday() {
 
   const resolveStaffName = (staffId?: string, staffName?: string) => {
     if (staffName && staffName.trim() && !staffName.includes("-") && staffName.length < 35) return staffName;
-    try {
-      const approved: Array<{ id?: string; email: string; full_name?: string }> =
-        JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-      const match = approved.find((s) => s.id === staffId || (staffId && s.email?.toLowerCase().includes(staffId.toLowerCase())));
-      if (match?.full_name) return match.full_name;
-    } catch { }
-    return "Girish (Provider)";
+    return staffId || "Provider";
   };
 
   const checkInAppt = async (apptId: string) => {
