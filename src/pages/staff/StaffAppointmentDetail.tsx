@@ -103,10 +103,20 @@ export default function StaffAppointmentDetail() {
   };
 
   const load = useCallback(async () => {
-    if (!id) return;
+    if (!id || id === "undefined") {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const { data: a } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
+      let { data: a } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
+      if (!a) {
+        try {
+          const raw = localStorage.getItem("rka_demo_appointments");
+          const localList = raw ? JSON.parse(raw) : [];
+          a = localList.find((x: any) => x.id === id) || null;
+        } catch { /* ignore */ }
+      }
       if (!a) { setLoading(false); return; }
       setAppt(a);
 

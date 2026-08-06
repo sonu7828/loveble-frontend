@@ -5,7 +5,7 @@ import { apiQuery, authService, ApiClient, clientService } from "@/services/api"
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { format } from "date-fns";
-import { Loader2, Search, Download, Send, Upload, CalendarPlus, MoreHorizontal, UserPlus, Ban, Trash2, ShieldOff } from "lucide-react";
+import { Loader2, Search, Download, Send, Upload, CalendarPlus, MoreHorizontal, UserPlus, Ban, Trash2, ShieldOff, UserX, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -482,6 +482,34 @@ export default function StaffClients() {
     }
   };
 
+  const deleteAppointment = async (apptId: string, clientName: string) => {
+    if (
+      !(await confirmDialog({
+        title: `Delete appointment for ${clientName}?`,
+        description: "This appointment will be cancelled and removed from your schedule.\n\nThis action cannot be undone.",
+        destructive: true,
+        confirmLabel: "Delete appointment",
+      }))
+    )
+      return;
+
+    try {
+      await apiQuery("appointments").delete().eq("id", apptId);
+      try {
+        const raw = localStorage.getItem("rka_demo_appointments");
+        if (raw) {
+          const list = JSON.parse(raw);
+          const filtered = list.filter((a: any) => a.id !== apptId);
+          localStorage.setItem("rka_demo_appointments", JSON.stringify(filtered));
+        }
+      } catch {}
+      await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
+      toast.success("Appointment deleted successfully");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to delete appointment");
+    }
+  };
+
 
   const newApptUrl = (c: { first_name?: string; last_name?: string; email?: string; phone?: string; dob?: string | null }) => {
     const p = new URLSearchParams();
@@ -861,13 +889,24 @@ export default function StaffClients() {
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuContent align="end" className="w-52">
                       {c.last_appt && (
-                        <DropdownMenuItem asChild>
-                          <Link to={`/staff/appointments/${c.last_appt.id}`}>
-                            View last appointment
-                          </Link>
-                        </DropdownMenuItem>
+                        <>
+                          <DropdownMenuItem asChild>
+                            <Link to={`/staff/appointments/${c.last_appt.id}`}>
+                              <Calendar className="h-3.5 w-3.5 mr-2" />
+                              View last appointment
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => deleteAppointment(c.last_appt.id, `${c.first_name} ${c.last_name}`.trim())}
+                            className="text-destructive focus:text-destructive font-medium"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete appointment
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
                       )}
                       <DropdownMenuItem
                         disabled={!c.email || sendingEmail === c.email}
@@ -888,19 +927,8 @@ export default function StaffClients() {
                         <DropdownMenuItem
                           disabled={!c.email || busyEmail === c.email}
                           onClick={() => blockClient({ email: c.email, first_name: c.first_name, last_name: c.last_name })}
-                          className="text-destructive-soft-foreground focus:text-destructive-soft-foreground"
                         >
                           <Ban className="h-3.5 w-3.5 mr-2" /> Block from booking
-                        </DropdownMenuItem>
-                      )}
-                      {isAdmin && (
-                        <DropdownMenuItem
-                          disabled={busyEmail === c.email}
-                          onClick={() => deleteClient({ id: c.id, email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
-                          className="text-destructive focus:text-destructive text-destructive-soft-foreground"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-2" />
-                          Delete client
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>

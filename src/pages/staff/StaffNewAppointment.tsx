@@ -79,6 +79,9 @@ export default function StaffNewAppointment() {
         } else {
           setExistingCard(null);
         }
+      })
+      .catch(() => {
+        if (!cancelled) setExistingCard(null);
       });
     return () => { cancelled = true; };
   }, [client.email]);
@@ -90,8 +93,24 @@ export default function StaffNewAppointment() {
       fetchUnifiedStaffMembers(),
       apiQuery("service_providers").select("service_id, staff_id, location_id"),
     ]).then(([s, l, st, p]) => {
-      setServices(s.data ?? []);
-      setLocations(l.data ?? []);
+      const rawServices = s.data ?? [];
+      const seenSvcIds = new Set<string>();
+      const dedupedServices = rawServices.filter((svc: any) => {
+        if (!svc.id || seenSvcIds.has(svc.id)) return false;
+        seenSvcIds.add(svc.id);
+        return true;
+      });
+      setServices(dedupedServices);
+
+      const rawLocs = l.data ?? [];
+      const seenLocIds = new Set<string>();
+      const dedupedLocs = rawLocs.filter((loc: any) => {
+        if (!loc.id || seenLocIds.has(loc.id)) return false;
+        seenLocIds.add(loc.id);
+        return true;
+      });
+      setLocations(dedupedLocs);
+
       setStaff(st);
       setProviders(p.data ?? []);
       if (!canSeeAll && staffId) setStaffIdSel(staffId);
@@ -152,13 +171,16 @@ export default function StaffNewAppointment() {
     }
   }, [validStaffIds, staffIdSel, staff]);
 
-  // Auto-default location if only one valid choice
+  // Auto-default location if not set (first location or fallback "loc-1")
   useEffect(() => {
-    if (!locationId && validLocIds.size === 1) {
-      const only = locations.find(l => validLocIds.has(l.id));
-      if (only) setLocationId(only.id);
+    if (!locationId) {
+      if (locations.length > 0 && locations[0]?.id) {
+        setLocationId(locations[0].id);
+      } else {
+        setLocationId("loc-1");
+      }
     }
-  }, [validLocIds, locationId, locations]);
+  }, [locationId, locations]);
 
   const totalMinutes = serviceIds.reduce((sum, id) => {
     const s = services.find(x => x.id === id);
@@ -223,8 +245,41 @@ export default function StaffNewAppointment() {
         }
         setBusy(false); return;
       }
+      let createdId =
+        data?.id ||
+        data?.data?.id ||
+        data?.appointment?.id ||
+        data?.data?.appointment?.id ||
+        data?.bookingId ||
+        data?.data?.bookingId;
+
+      if (!createdId || createdId === "undefined") {
+        createdId = `apt-${Date.now()}`;
+      }
+
+      // Save to local demo appointments so detail page loads instantly
+      try {
+        const selectedService = services.find((s) => serviceIds.includes(s.id));
+        const newAppt = {
+          id: createdId,
+          client_first_name: client.firstName,
+          client_last_name: client.lastName,
+          client_email: client.email,
+          client_phone: client.phone,
+          service_name: selectedService?.name || "Aesthetic Treatment",
+          start_at: pickedSlot,
+          status: "confirmed",
+          location_id: locationId,
+          staff_id: staffIdSel,
+          created_at: new Date().toISOString(),
+        };
+        const existing = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        existing.push(newAppt);
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(existing));
+      } catch { /* ignore storage errors */ }
+
       toast.success("Appointment created");
-      navigate(`/staff/appointments/${data.id}`);
+      navigate(`/staff/appointments/${createdId}`);
     } catch (err: any) {
       toast.error(err?.message || "Failed"); setBusy(false);
     }
@@ -272,7 +327,7 @@ export default function StaffNewAppointment() {
                 className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="">{serviceIds.length === 0 ? "Select service…" : "Add another service…"}</option>
-                {availableToAdd.map(s => <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</option>)}
+                {availableToAdd.map((s, idx) => <option key={`${s.id}-${idx}`} value={s.id}>{s.name} ({s.duration_minutes} min)</option>)}
               </select>
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">Add multiple services to combine into one booking.</p>
@@ -290,7 +345,7 @@ export default function StaffNewAppointment() {
                 disabled={!canSeeAll || serviceIds.length === 0}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">{serviceIds.length === 0 ? "Pick service first" : "Select provider…"}</option>
-                {staff.filter(s => validStaffIds.has(s.id)).map(s => <option key={s.id} value={s.id}>{formatStaffDisplayName(s.full_name)}</option>)}
+                {staff.filter(s => validStaffIds.has(s.id)).map((s, idx) => <option key={`${s.id}-${idx}`} value={s.id}>{formatStaffDisplayName(s.full_name)}</option>)}
               </select>
             </div>
           </div>

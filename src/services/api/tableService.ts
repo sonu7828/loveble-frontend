@@ -222,6 +222,11 @@ export class ApiTableQuery {
     return this;
   }
 
+  public not(col: string, op: string, val: any): this {
+    this.filters.push({ col, op: `not.${op}`, val });
+    return this;
+  }
+
   public order(_col: string, _opts?: { ascending?: boolean }): this {
     return this;
   }
@@ -258,6 +263,17 @@ export class ApiTableQuery {
         if (f.op === "ilike") {
           const pat = String(f.val).toLowerCase().replace(/%/g, "");
           return typeof v === "string" && v.toLowerCase().includes(pat);
+        }
+        if (f.op.startsWith("not.")) {
+          const subOp = f.op.replace("not.", "");
+          if (subOp === "is") return f.val === null ? v != null : v !== f.val;
+          if (subOp === "eq") return String(v) !== String(f.val);
+          if (subOp === "in") return !Array.isArray(f.val) || !f.val.map(String).includes(String(v));
+          if (subOp === "ilike") {
+            const pat = String(f.val).toLowerCase().replace(/%/g, "");
+            return typeof v !== "string" || !v.toLowerCase().includes(pat);
+          }
+          return true;
         }
         return true;
       })

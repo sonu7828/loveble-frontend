@@ -193,14 +193,44 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
       const merged = [...apiStaff, ...localOnly].filter(
         (s) => (s.role || "") !== "admin" && (s.role || "") !== "system_admin"
       );
-      if (merged.length > 0) return merged;
+      const seenIds = new Set<string>();
+      const deduped = merged.filter((s) => {
+        if (!s.id || seenIds.has(s.id)) return false;
+        seenIds.add(s.id);
+        return true;
+      });
+
+      // Ensure at least 1 clinical provider exists for appointment booking
+      const hasClinicalProvider = deduped.some(isClinicalProvider);
+      if (!hasClinicalProvider) {
+        FALLBACK_PROVIDERS.forEach((fp) => {
+          if (!seenIds.has(fp.id)) {
+            deduped.push(fp);
+            seenIds.add(fp.id);
+          }
+        });
+      }
+
+      if (deduped.length > 0) return deduped;
     }
   } catch (e) {
     console.error("Failed to fetch staff members from DB:", e);
   }
 
   // ── Step 3: Return local staff if API empty or failed ──
-  if (localStaff.length > 0) return localStaff;
+  if (localStaff.length > 0) {
+    const hasClinicalProvider = localStaff.some(isClinicalProvider);
+    if (!hasClinicalProvider) {
+      const mergedLocal = [...localStaff];
+      FALLBACK_PROVIDERS.forEach((fp) => {
+        if (!mergedLocal.some((s) => s.id === fp.id)) {
+          mergedLocal.push(fp);
+        }
+      });
+      return mergedLocal;
+    }
+    return localStaff;
+  }
 
   // ── Step 4: Absolute fallback — hardcoded demo clinical providers ──
   return FALLBACK_PROVIDERS;
