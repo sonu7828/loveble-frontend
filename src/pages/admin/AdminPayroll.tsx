@@ -73,7 +73,7 @@ function toISODate(d: Date) {
 }
 
 export default function AdminPayroll() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
   const [periodStart, setPeriodStart] = useState<Date>(defaultPeriodStart());
@@ -224,7 +224,6 @@ export default function AdminPayroll() {
     setSaving(true);
     const adj = Math.round((parseFloat(adjustments || "0") || 0) * 100);
     const total = paying.total_cents + adj;
-    const user = (await authService.getSession()).data.user;
     const { error } = await (apiQuery as any).from("staff_payouts").upsert({
       staff_id: paying.member.id,
       period_start: periodStartISO,

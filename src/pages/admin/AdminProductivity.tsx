@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 
 type Range = "today" | "week" | "30d" | "custom";
 
-type Row = {
+interface Row {
   provider_user_id: string;
   provider_name: string;
   charts: number;
@@ -15,7 +15,13 @@ type Row = {
   incomplete: number;
   revenueCents: number;
   avgChartMins: number | null;
-};
+}
+
+interface NeuroRow { clinical_note_id: string; total_units: number }
+interface ApptRow { id: string; start_at: string; staff_id: string }
+interface SaleRow { staff_id: string; total_cents: number; paid_at: string; status: string }
+interface NoShowRow { staff_id: string; status: string; start_at: string }
+interface StaffProfileRow { id: string; user_id: string; full_name: string }
 
 export default function AdminProductivity() {
   const [range, setRange] = useState<Range>("week");
@@ -56,13 +62,13 @@ export default function AdminProductivity() {
       const noteIds = (notes ?? []).map(n => n.id);
       const apptIds = Array.from(new Set((notes ?? []).map(n => n.appointment_id).filter(Boolean) as string[]));
 
-      const [{ data: neuro }, { data: appts }, { data: sales }, { data: noShows }] = await Promise.all([
+      const [neuroRes, apptsRes, salesRes, noShowsRes] = await Promise.all([
         noteIds.length
           ? apiQuery("clinical_note_neurotoxin").select("clinical_note_id, total_units").in("clinical_note_id", noteIds)
-          : Promise.resolve({ data: [] as any[] }),
+          : Promise.resolve({ data: [] as NeuroRow[] }),
         apptIds.length
           ? apiQuery("appointments").select("id, start_at, staff_id").in("id", apptIds)
-          : Promise.resolve({ data: [] as any[] }),
+          : Promise.resolve({ data: [] as ApptRow[] }),
         // Revenue: paid sales in range, joined by staff_id (provider) — need to map staff_id → provider_user_id
         apiQuery("sales")
           .select("staff_id, total_cents, paid_at, status")
@@ -75,16 +81,21 @@ export default function AdminProductivity() {
           .gte("start_at", startIso)
           .lte("start_at", endIso),
       ]);
+      const neuro = (neuroRes as { data: NeuroRow[] }).data ?? [];
+      const appts = (apptsRes as { data: ApptRow[] }).data ?? [];
+      const sales = (salesRes as { data: SaleRow[] }).data ?? [];
+      const noShows = (noShowsRes as { data: NoShowRow[] }).data ?? [];
 
       // Map staff_id → user_id via staff_profiles
-      const { data: staff } = await apiQuery
+      const { data: staffData } = await apiQuery
         .from("staff_profiles")
         .select("id, user_id, full_name");
-      const staffByUser = new Map((staff ?? []).map(s => [s.user_id, s]));
-      const staffById = new Map((staff ?? []).map(s => [s.id, s]));
+      const staff = (staffData as StaffProfileRow[] | null) ?? [];
+      const staffByUser = new Map(staff.map(s => [s.user_id, s]));
+      const staffById = new Map(staff.map(s => [s.id, s]));
 
-      const unitsByNote = new Map((neuro ?? []).map((r: any) => [r.clinical_note_id, Number(r.total_units) || 0]));
-      const apptById = new Map((appts ?? []).map((a: any) => [a.id, a]));
+      const unitsByNote = new Map(neuro.map(r => [r.clinical_note_id, Number(r.total_units) || 0]));
+      const apptById = new Map(appts.map(a => [a.id, a]));
 
       const byProvider = new Map<string, Row>();
       const row = (uid: string, name: string) => {
