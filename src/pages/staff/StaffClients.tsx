@@ -120,12 +120,6 @@ export default function StaffClients() {
         all.push(...data);
         if (data.length < PAGE) break;
       }
-      const localDemoAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-      for (const la of localDemoAppts) {
-        if (la && la.id && !all.some((e) => e.id === la.id)) {
-          all.unshift(la);
-        }
-      }
       return { data: all };
     };
     Promise.all([loadAppointmentsPaged(), reloadImported(), reloadBlocked(), reloadAccounts()]).then(async ([appts]) => {
@@ -495,14 +489,6 @@ export default function StaffClients() {
 
     try {
       await apiQuery("appointments").delete().eq("id", apptId);
-      try {
-        const raw = localStorage.getItem("rka_demo_appointments");
-        if (raw) {
-          const list = JSON.parse(raw);
-          const filtered = list.filter((a: any) => a.id !== apptId);
-          localStorage.setItem("rka_demo_appointments", JSON.stringify(filtered));
-        }
-      } catch {}
       await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
       toast.success("Appointment deleted successfully");
     } catch (e: any) {
