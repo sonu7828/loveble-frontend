@@ -32,27 +32,21 @@ const BookingStatus = () => {
     setLoading(true);
     setLoadError(null);
 
-    let localAppt: any = null;
-    try {
-      const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-      localAppt = idParam ? localAppts.find((a) => a.id === idParam) : localAppts[0];
-    } catch {}
+    if (!idParam) {
+      setLoadError("Booking information unavailable.");
+      setLoading(false);
+      return;
+    }
 
     try {
       let appt: any = null;
-      if (idParam) {
-        const { data: dbData } = await apiQuery("appointments").select("*").eq("id", idParam).maybeSingle();
-        appt = dbData;
-        if (!appt) {
-          try {
-            const res = await ApiClient.get(`/booking?token=${encodeURIComponent(idParam)}`);
-            if (res.data) appt = res.data;
-          } catch {}
-        }
-      }
-
+      const { data: dbData } = await apiQuery("appointments").select("*").eq("id", idParam).maybeSingle();
+      appt = dbData;
       if (!appt) {
-        appt = localAppt;
+        try {
+          const res = await ApiClient.get(`/booking?token=${encodeURIComponent(idParam)}`);
+          if (res.data) appt = res.data;
+        } catch {}
       }
 
       if (appt) {
@@ -95,11 +89,6 @@ const BookingStatus = () => {
       }
       throw new Error("Appointment not found");
     } catch (e) {
-      if (localAppt) {
-        setData(localAppt);
-        setLoading(false);
-        return;
-      }
       setLoadError((e as Error).message || "Could not load appointment");
     } finally {
       setLoading(false);
@@ -136,10 +125,6 @@ const BookingStatus = () => {
       service: data.service_id ?? "",
       location: data.location_id ?? "",
       staff: data.staff_id ?? "",
-      first: data.client_first_name ?? "",
-      last: data.client_last_name ?? "",
-      email: data.client_email ?? "",
-      phone: data.client_phone ?? "",
       utm_source: "booking_status",
       utm_medium: "rebook_button",
     });
