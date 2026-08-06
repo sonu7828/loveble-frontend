@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, ApiClient } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ type Tab = "todo" | "all" | "injectable" | "device" | "wellness" | "emergency" |
 
 export default function MyCompliance() {
   usePageMeta({ title: "My Compliance · Radiantilyk Aesthetic", description: "Sign and review your compliance protocols." });
+  const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -52,10 +54,8 @@ export default function MyCompliance() {
   const [tab, setTab] = useState<Tab>("todo");
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
-      const { data: { user } } = await authService.getSession();
-      if (!user) return;
-
       const { data: protocols } = await apiQuery
         .from("compliance_protocols")
         .select("id, slug, title, category, version, renewal_months, summary")
@@ -98,14 +98,12 @@ export default function MyCompliance() {
       setRows(result);
       setLoading(false);
     })();
-  }, []);
+  }, [user]);
 
   async function downloadPdf(r: Row) {
     if (!r.pdf_path) return;
     setDownloadingId(r.signature_id);
-    const { data, error } = await apiQuery.storage
-      .from("compliance-signatures")
-      .createSignedUrl(r.pdf_path, 300);
+    const { data, error } = await ApiClient.createSignedUrl(r.pdf_path, 300);
     setDownloadingId(null);
     if (error || !data?.signedUrl) { toast.error("Could not generate download link"); return; }
     window.open(data.signedUrl, "_blank");

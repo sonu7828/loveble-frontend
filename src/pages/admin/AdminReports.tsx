@@ -43,17 +43,24 @@ export default function AdminReports() {
       const start = startOfDay(subDays(new Date(), days - 1)).toISOString();
       const end = endOfDay(new Date()).toISOString();
 
-      const [a, st, fb, notesRes] = await Promise.all([
-        apiQuery("appointments").select("id, status, start_at, service_id, staff_id, client_email").gte("start_at", start).lte("start_at", end).catch(() => ({ data: [] })),
-        apiQuery("staff_profiles").select("id, full_name").eq("is_provider", true).catch(() => ({ data: [] })),
-        apiQuery("client_feedback").select("id, rating, comment, allow_testimonial, featured, created_at, client_email").gte("created_at", start).order("created_at", { ascending: false }).catch(() => ({ data: [] })),
-        apiQuery("clinical_notes").select("id").eq("cosign_required", true).catch(() => ({ data: [] })),
-      ]);
+      let aData: any[] = [], stData: any[] = [], fbData: any[] = [], notesData: any[] = [];
+      try {
+        const [a, st, fb, notesRes] = await Promise.all([
+          apiQuery("appointments").select("id, status, start_at, service_id, staff_id, client_email").gte("start_at", start).lte("start_at", end),
+          apiQuery("staff_profiles").select("id, full_name").eq("is_provider", true),
+          apiQuery("client_feedback").select("id, rating, comment, allow_testimonial, featured, created_at, client_email").gte("created_at", start).order("created_at", { ascending: false }),
+          apiQuery("clinical_notes").select("id").eq("cosign_required", true),
+        ]);
+        aData = (a as any)?.data ?? [];
+        stData = (st as any)?.data ?? [];
+        fbData = (fb as any)?.data ?? [];
+        notesData = (notesRes as any)?.data ?? [];
+      } catch (e) {}
 
-      setAppts((a.data ?? []) as Appt[]);
-      setStaff(st.data ?? []);
-      setFeedback((fb.data ?? []) as any);
-      setPendingNotesCount((notesRes.data ?? []).length);
+      setAppts(aData as Appt[]);
+      setStaff(stData);
+      setFeedback(fbData as any);
+      setPendingNotesCount(notesData.length);
       setLoading(false);
     })();
   }, [days, canAccessReports]);
