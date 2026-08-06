@@ -182,7 +182,7 @@ export default function StaffLogin() {
         await refreshCurrentUser();
         const { session } = await authService.getSession();
         const userRoles = session?.user?.roles || [];
-        const target = nextPath || resolveRedirectTarget(userRoles);
+        const target = nextPath || resolveLandingRoute(userRoles);
         setTimeout(() => navigate(target, { replace: true }), 350);
       } catch {
         navigate(nextPath || "/staff/today", { replace: true });
@@ -227,7 +227,7 @@ export default function StaffLogin() {
     setFactorId(null); setChallengeId(null); setQrSvg(""); setSecret(""); setErrMsg("");
   };
 
-  const activeRole = "staff";
+  const activeRole: string = "staff";
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-between">

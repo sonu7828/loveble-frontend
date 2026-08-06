@@ -214,7 +214,7 @@ export default function AdminLogin() {
     setFactorId(null); setChallengeId(null); setQrSvg(""); setSecret(""); setErrMsg("");
   };
 
-  const activeRole = "admin";
+  const activeRole: string = "admin";
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-between">
