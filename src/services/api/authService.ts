@@ -266,11 +266,50 @@ export const authService = {
   },
 
   /**
-   * Legacy alias for updatePassword
+   * Request password reset email via POST /auth/forgot-password.
+   * Returns generic message to avoid email enumeration.
    */
-  async updatePassword(newPassword: string): Promise<{ success: boolean; message?: string }> {
-    const res = await this.changePassword("", newPassword);
-    return { success: res.success, message: res.error || undefined };
+  async requestPasswordReset(email: string): Promise<{ success: boolean; message: string; error: string | null }> {
+    const clean = (email || "").trim().toLowerCase();
+    const res = await ApiClient.post<{ success: boolean; message: string }>("/auth/forgot-password", { email: clean });
+    if (res.error) {
+      return { success: false, message: "If an account exists, password reset instructions have been sent.", error: res.error };
+    }
+    return {
+      success: true,
+      message: res.data?.message || "If an account exists, password reset instructions have been sent.",
+      error: null,
+    };
+  },
+
+  /**
+   * Reset password using token via POST /auth/reset-password.
+   */
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string; error: string | null }> {
+    const res = await ApiClient.post<{ success: boolean; message: string }>("/auth/reset-password", { token, newPassword });
+    if (res.error) {
+      return { success: false, message: "", error: res.error };
+    }
+    return {
+      success: true,
+      message: res.data?.message || "Password updated successfully.",
+      error: null,
+    };
+  },
+
+  /**
+   * Compatibility alias for requestPasswordReset (Supabase legacy signature).
+   */
+  async resetPasswordForEmail(email: string, _options?: any): Promise<{ data: any; error: { message: string } | null }> {
+    const res = await this.requestPasswordReset(email);
+    return { data: res.success ? {} : null, error: res.error ? { message: res.error } : null };
+  },
+
+  /**
+   * Compatibility listener for auth state changes.
+   */
+  onAuthStateChange(_callback: (event: string) => void) {
+    return { data: { subscription: { unsubscribe: () => {} } } };
   },
 
   /**

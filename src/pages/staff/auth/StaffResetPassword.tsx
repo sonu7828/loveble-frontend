@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { authService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,24 +10,19 @@ import { toast } from "sonner";
 
 export default function StaffResetPassword() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
+
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    // Supabase puts the recovery session in the URL hash and triggers PASSWORD_RECOVERY
-    const { data: sub } = authService.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
-    });
-    authService.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token) {
+      toast.error("Invalid or missing reset token. Please request a new password reset link.");
+      return;
+    }
     if (password.length < 8) {
       toast.error("Password must be at least 8 characters");
       return;
@@ -36,15 +31,20 @@ export default function StaffResetPassword() {
       toast.error("Passwords don't match");
       return;
     }
+
     setLoading(true);
-    const { error } = await authService.updateUser({ password });
+    const { success, message, error } = await authService.resetPassword(token, password);
+    setPassword("");
+    setConfirm("");
     setLoading(false);
-    if (error) {
-      toast.error(error.message);
+
+    if (!success || error) {
+      toast.error(error || "Invalid or expired password reset link.");
       return;
     }
-    toast.success("Password updated. Signing you in…");
-    navigate("/staff/mfa", { replace: true });
+
+    toast.success(message || "Password updated successfully. Please sign in.");
+    navigate("/staff/login", { replace: true });
   };
 
   return (
@@ -57,10 +57,15 @@ export default function StaffResetPassword() {
               Choose a new password
             </div>
           </div>
-          {!ready ? (
-            <p className="text-sm text-muted-foreground text-center">
-              Validating your reset link…
-            </p>
+          {!token ? (
+            <div className="space-y-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                Invalid or missing password reset link. Please request a new link.
+              </p>
+              <Link to="/staff/forgot-password" className="text-sm text-primary hover:underline">
+                Request new reset link
+              </Link>
+            </div>
           ) : (
             <form onSubmit={submit} className="space-y-5">
               <div>

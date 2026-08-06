@@ -16,17 +16,15 @@ export default function StaffForgotPassword() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await authService.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo: `${window.location.origin}/staff/reset-password` }
-    );
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      await authService.requestPasswordReset(email.trim().toLowerCase());
+    } catch {
+      // Ignore network errors to prevent account enumeration
+    } finally {
+      setLoading(false);
+      setSent(true);
+      toast.success("If an account exists, password reset instructions have been sent.");
     }
-    setSent(true);
-    toast.success("If that account exists, a reset link is on its way.");
   };
 
   return (
