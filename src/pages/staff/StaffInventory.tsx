@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { inventoryService, ProductLot } from "@/services/api";
+import { inventoryService, ProductLot, InventoryMovement } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Plus, AlertTriangle, PackageX, PackageSearch, Boxes, Flame, Pencil } from "lucide-react";
@@ -14,13 +14,13 @@ import StaffInventoryBurn from "./StaffInventoryBurn";
 type TabKey = "all" | "low" | "expiring" | "expired";
 
 function lotStatus(l: ProductLot): "expired" | "expiring" | "low" | "out" | "ok" {
-  if (l.quantity_remaining <= 0) return "out";
-  if (l.expiration_date) {
-    const d = differenceInDays(new Date(l.expiration_date), new Date());
+  if (l.quantityRemaining <= 0) return "out";
+  if (l.expirationDate) {
+    const d = differenceInDays(new Date(l.expirationDate), new Date());
     if (d < 0) return "expired";
     if (d <= 30) return "expiring";
   }
-  if (l.low_stock_threshold > 0 && l.quantity_remaining <= l.low_stock_threshold) return "low";
+  if (l.lowStockThreshold > 0 && l.quantityRemaining <= l.lowStockThreshold) return "low";
   return "ok";
 }
 
@@ -31,13 +31,21 @@ export default function StaffInventory() {
   const [search, setSearch] = useState("");
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [drawer, setDrawer] = useState<ProductLot | null>(null);
+  const [adjusting, setAdjusting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await inventoryService.getLots();
-    setLots(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      const data = await inventoryService.getLots();
+      setLots(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to load inventory lots");
+      setLots([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
   useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
@@ -48,7 +56,7 @@ export default function StaffInventory() {
       if (tab === "expired" && s !== "expired") return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        return l.product_name.toLowerCase().includes(q) || l.lot_number.toLowerCase().includes(q);
+        return l.productName.toLowerCase().includes(q) || l.lotNumber.toLowerCase().includes(q);
       }
       return true;
     });
@@ -65,23 +73,56 @@ export default function StaffInventory() {
     return { low, expiring, expired };
   }, [lots]);
 
+  /**
+   * Adjust lot quantity.
+   *
+   * Uses POST /inventory/movements with movementType 'adjusted'.
+   * The signed delta is computed from the currently loaded lot quantity.
+   * Prevents duplicate submission while a request is in-flight.
+   */
   const adjust = async (lot: ProductLot) => {
-    const next = window.prompt(`New remaining quantity for ${lot.product_name} lot ${lot.lot_number}:`, String(lot.quantity_remaining));
-    if (next == null) return;
-    const n = Number(next);
-    if (Number.isNaN(n) || n < 0) { toast.error("Invalid quantity"); return; }
-    const ok = await inventoryService.adjustLot(lot.id, n, "adjust");
-    if (!ok) toast.error("Failed to update lot"); else { toast.success("Updated"); load(); }
+    if (adjusting === lot.id) return; // prevent duplicate submission
+
+    const raw = window.prompt(
+      `New remaining quantity for ${lot.productName} lot ${lot.lotNumber}:\n(Current: ${lot.quantityRemaining})`,
+      String(lot.quantityRemaining)
+    );
+    if (raw == null) return;
+
+    const next = Math.floor(Number(raw));
+    if (!Number.isFinite(next) || next < 0) {
+      toast.error("Invalid quantity: must be a non-negative whole number");
+      return;
+    }
+    if (next === lot.quantityRemaining) {
+      toast.info("Quantity unchanged — no adjustment submitted");
+      return;
+    }
+
+    setAdjusting(lot.id);
+    try {
+      await inventoryService.adjustLot(lot, next, "Manual stock adjustment");
+      toast.success("Lot quantity updated");
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to update lot quantity");
+    } finally {
+      setAdjusting(null);
+    }
   };
 
+  /**
+   * Lot deactivation is NOT supported by the backend.
+   * No PATCH /inventory/lots/:id or DELETE /inventory/lots/:id endpoint exists.
+   * This action is disabled in the UI.
+   */
   const deactivate = async (lot: ProductLot) => {
     if (!(await confirmDialog({
-      title: `Deactivate lot ${lot.lot_number}?`,
-      description: "It will be hidden from chart pickers. Movement history is kept.",
-      confirmLabel: "Deactivate", destructive: true,
+      title: `Deactivate lot ${lot.lotNumber}?`,
+      description: "Lot deactivation is not currently supported by the backend. Contact your system administrator.",
+      confirmLabel: "OK", destructive: false,
     }))) return;
-    const ok = await inventoryService.deactivateLot(lot.id);
-    if (!ok) toast.error("Failed to deactivate"); else { toast.success("Deactivated"); load(); }
+    // No-op — backend endpoint does not exist.
   };
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -119,9 +160,8 @@ export default function StaffInventory() {
 
       {view === "burn" ? <StaffInventoryBurn /> : (<>
 
-
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        <Stat label="Total lots" value={lots.filter(l => l.is_active).length} icon={<Boxes className="h-4 w-4" />} />
+        <Stat label="Total lots" value={lots.length} icon={<Boxes className="h-4 w-4" />} />
         <Stat label="Low stock" value={counts.low} tone={counts.low ? "amber" : undefined} icon={<PackageSearch className="h-4 w-4" />} />
         <Stat label="Expiring ≤30d" value={counts.expiring} tone={counts.expiring ? "amber" : undefined} icon={<AlertTriangle className="h-4 w-4" />} />
         <Stat label="Expired" value={counts.expired} tone={counts.expired ? "red" : undefined} icon={<PackageX className="h-4 w-4" />} />
@@ -165,17 +205,35 @@ export default function StaffInventory() {
             <tbody className="divide-y divide-border">
               {filtered.map(l => {
                 const s = lotStatus(l);
+                const isAdjusting = adjusting === l.id;
                 return (
                   <tr key={l.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-2.5 font-medium">{l.product_name}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{l.lot_number}</td>
-                    <td className="px-4 py-2.5 text-xs">{l.expiration_date ? format(new Date(l.expiration_date), "MMM d, yyyy") : "—"}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{l.quantity_remaining} <span className="text-muted-foreground">{l.unit}</span></td>
+                    <td className="px-4 py-2.5 font-medium">{l.productName}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs">{l.lotNumber}</td>
+                    <td className="px-4 py-2.5 text-xs">{l.expirationDate ? format(new Date(l.expirationDate), "MMM d, yyyy") : "—"}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{l.quantityRemaining} <span className="text-muted-foreground">{l.unit}</span></td>
                     <td className="px-4 py-2.5"><StatusBadge status={s} /></td>
                     <td className="px-4 py-2.5 text-right">
                       <button className="text-xs text-muted-foreground hover:text-foreground mr-3" onClick={() => setDrawer(l)}>History</button>
-                      <button className="text-xs text-muted-foreground hover:text-foreground mr-3" onClick={() => adjust(l)}><Pencil className="h-3.5 w-3.5 inline mr-1" />Adjust</button>
-                      {l.is_active && <button className="text-xs text-destructive hover:opacity-80" onClick={() => deactivate(l)}>Deactivate</button>}
+                      <button
+                        className="text-xs text-muted-foreground hover:text-foreground mr-3 disabled:opacity-40"
+                        onClick={() => adjust(l)}
+                        disabled={isAdjusting}
+                        title="Admin only — records an 'adjusted' stock movement"
+                      >
+                        {isAdjusting
+                          ? <Loader2 className="h-3.5 w-3.5 inline animate-spin" />
+                          : <Pencil className="h-3.5 w-3.5 inline mr-1" />}
+                        Adjust
+                      </button>
+                      {/* Deactivate disabled: no backend endpoint exists */}
+                      <button
+                        className="text-xs text-muted-foreground opacity-40 cursor-not-allowed"
+                        onClick={() => deactivate(l)}
+                        title="Lot deactivation is not currently supported by the backend"
+                      >
+                        Deactivate
+                      </button>
                     </td>
                   </tr>
                 );
@@ -185,14 +243,14 @@ export default function StaffInventory() {
         )}
       </div>
 
-      <ReceiveLotDialog open={receiveOpen} onOpenChange={setReceiveOpen} onReceived={load} />
+      <ReceiveLotDialog open={receiveOpen} onOpenChange={setReceiveOpen} onReceived={(_lotId: string) => load()} />
 
       <Sheet open={!!drawer} onOpenChange={(o) => !o && setDrawer(null)}>
         <SheetContent className="sm:max-w-md">
           {drawer && (
             <>
               <SheetHeader>
-                <SheetTitle>{drawer.product_name} · {drawer.lot_number}</SheetTitle>
+                <SheetTitle>{drawer.productName} · {drawer.lotNumber}</SheetTitle>
               </SheetHeader>
               <LotHistory lotId={drawer.id} />
             </>
@@ -227,27 +285,42 @@ function StatusBadge({ status }: { status: ReturnType<typeof lotStatus> }) {
   return <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${m.cls}`}>{m.label}</span>;
 }
 
+/**
+ * Lot history sheet.
+ * Uses GET /inventory/lots/:id (which includes movements[]).
+ * Shows a clear error if the API call fails.
+ */
 function LotHistory({ lotId }: { lotId: string }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<InventoryMovement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     setLoading(true);
+    setError(null);
     inventoryService.getMovements(lotId)
-      .then((data) => { setRows(data ?? []); setLoading(false); });
+      .then(data => { setRows(data); setLoading(false); })
+      .catch((e: any) => { setError(e?.message ?? "Failed to load movement history"); setLoading(false); });
   }, [lotId]);
+
   if (loading) return <div className="mt-4 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin inline mr-2" />Loading…</div>;
-  if (rows.length === 0) return <div className="mt-4 text-xs text-muted-foreground">No movements yet.</div>;
+  if (error) return <div className="mt-4 text-xs text-destructive">{error}</div>;
+  if (rows.length === 0) return <div className="mt-4 text-xs text-muted-foreground">No movements recorded yet.</div>;
+
   return (
     <ul className="mt-4 space-y-2">
       {rows.map(r => (
         <li key={r.id} className="text-sm border-l-2 border-border pl-3 py-1">
           <div className="flex items-center justify-between gap-2">
-            <span className="capitalize">{r.reason}</span>
-            <span className={`tabular-nums font-mono text-xs ${r.qty_delta < 0 ? "text-destructive" : "text-success-soft-foreground"}`}>
-              {r.qty_delta > 0 ? "+" : ""}{r.qty_delta}
+            <span className="capitalize">{r.reason ?? r.movementType}</span>
+            <span className={`tabular-nums font-mono text-xs ${r.quantityChange < 0 ? "text-destructive" : "text-success-soft-foreground"}`}>
+              {r.quantityChange > 0 ? "+" : ""}{r.quantityChange}
             </span>
           </div>
-          <div className="text-[11px] text-muted-foreground">{format(new Date(r.created_at), "MMM d, yyyy · h:mm a")}{r.notes ? ` · ${r.notes}` : ""}</div>
+          <div className="text-[11px] text-muted-foreground">
+            {format(new Date(r.createdAt), "MMM d, yyyy · h:mm a")}
+            {" · "}<span className="capitalize">{r.movementType}</span>
+          </div>
         </li>
       ))}
     </ul>

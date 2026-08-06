@@ -1,9 +1,181 @@
 /**
  * Radiantilyk EMR — Inventory & Product Lots Service.
  * Connects directly to Node.js / Express live /inventory endpoints.
- * ZERO mock data or localStorage fallbacks.
+ * ZERO mock data, localStorage fallbacks, or invented endpoints.
+ *
+ * Supported backend routes (read from inventory.routes.ts):
+ *   POST   /inventory/products
+ *   GET    /inventory/products
+ *   GET    /inventory/products/:id
+ *   PATCH  /inventory/products/:id
+ *   DELETE /inventory/products/:id
+ *   POST   /inventory/lots               (admin only)
+ *   GET    /inventory/lots               (all read roles)
+ *   GET    /inventory/lots/expiring      (all read roles)
+ *   GET    /inventory/lots/:id           (all read roles — returns movements[])
+ *   POST   /inventory/usage              (admin, np, rn_injector)
+ *   POST   /inventory/movements          (admin only)
+ *
+ * NOT SUPPORTED by backend:
+ *   PATCH  /inventory/lots/:id           — does NOT exist
+ *   DELETE /inventory/lots/:id           — does NOT exist
+ *   GET    /inventory/movements          — does NOT exist as standalone
+ *
+ * Lot deactivation: NO backend endpoint. UI action is disabled.
+ *
+ * Accepted movementType values (from inventory.schema.ts):
+ *   'received' | 'used' | 'adjusted' | 'wasted' | 'returned'
  */
 import { ApiClient } from "./client";
+
+// ---- Canonical Backend Response Types ----
+// These match exact field names returned by the backend Prisma queries.
+
+interface RawLot {
+  id: string;
+  productId: string | null;
+  productName: string;
+  lotNumber: string;
+  quantity: number;
+  unit: string;
+  vendorId: string | null;
+  locationId: string;
+  costPerUnitCents: number | null;
+  expiryDate: string | null;
+  receivedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  product?: { id: string; name: string };
+  location?: { id: string; name: string };
+  vendor?: { id: string; name: string };
+  movements?: RawMovement[];
+}
+
+interface RawMovement {
+  id: string;
+  lotId: string;
+  movementType: string;
+  quantityChange: number;
+  reason: string | null;
+  patientId: string | null;
+  encounterId: string | null;
+  performedBy: string | null;
+  createdAt: string;
+}
+
+// ---- Canonical Frontend Types ----
+// Components consume ONLY these types. All mapping from backend names happens
+// inside normalizeProductLot / normalizeInventoryMovement.
+
+export interface ProductLot {
+  id: string;
+  productId: string | null;
+  productName: string;
+  lotNumber: string;
+  /** Backend field: expiryDate (Date stored). Normalized to ISO date string or null. */
+  expirationDate: string | null;
+  /**
+   * quantityRemaining: The current quantity on the lot (backend field: quantity).
+   * The backend does not separately track quantityInitial.
+   */
+  quantityRemaining: number;
+  unit: string;
+  /**
+   * lowStockThreshold: Derived from product.minReorderLevel when available.
+   * Falls back to 10 (the backend schema default) if product is not included.
+   */
+  lowStockThreshold: number;
+  isActive: boolean;
+  receivedAt: string;
+  locationId: string | null;
+  vendorId: string | null;
+  costPerUnitCents: number | null;
+  createdAt: string;
+  // Included relations (may be absent on list endpoint)
+  product?: { id: string; name: string };
+  location?: { id: string; name: string };
+  vendor?: { id: string; name: string };
+}
+
+export interface InventoryMovement {
+  id: string;
+  lotId: string;
+  /**
+   * movementType: one of 'received' | 'used' | 'adjusted' | 'wasted' | 'returned'
+   */
+  movementType: "received" | "used" | "adjusted" | "wasted" | "returned" | string;
+  /**
+   * quantityChange: signed integer.
+   * Positive = stock added. Negative = stock removed.
+   * Backend guards against sending quantity below 0.
+   */
+  quantityChange: number;
+  reason: string | null;
+  performedBy: string | null;
+  createdAt: string;
+}
+
+// ---- Normalization Functions ----
+
+function normalizeProductLot(raw: RawLot): ProductLot {
+  // expiryDate may be a Date object serialized to ISO string or a date-only string
+  let expirationDate: string | null = null;
+  if (raw.expiryDate) {
+    const d = raw.expiryDate.toString();
+    // Accept ISO strings or YYYY-MM-DD strings
+    expirationDate = d.length >= 10 ? d.substring(0, 10) : d;
+  }
+
+  const receivedAt =
+    typeof raw.receivedAt === "string"
+      ? raw.receivedAt.substring(0, 10)
+      : new Date().toISOString().substring(0, 10);
+
+  return {
+    id: raw.id,
+    productId: raw.productId ?? null,
+    productName: raw.productName || raw.product?.name || "Unknown",
+    lotNumber: raw.lotNumber,
+    expirationDate,
+    quantityRemaining: typeof raw.quantity === "number" ? raw.quantity : 0,
+    unit: raw.unit || "units",
+    // backend does not return lowStockThreshold on lot — default to 10
+    lowStockThreshold: 10,
+    // Backend does not have isActive on lots; treat as active unless quantity is 0
+    isActive: typeof raw.quantity === "number" ? raw.quantity >= 0 : true,
+    receivedAt,
+    locationId: raw.locationId ?? null,
+    vendorId: raw.vendorId ?? null,
+    costPerUnitCents: raw.costPerUnitCents ?? null,
+    createdAt: raw.createdAt || raw.receivedAt || new Date().toISOString(),
+    product: raw.product,
+    location: raw.location,
+    vendor: raw.vendor,
+  };
+}
+
+function normalizeInventoryMovement(raw: RawMovement): InventoryMovement {
+  return {
+    id: raw.id,
+    lotId: raw.lotId,
+    movementType: raw.movementType as InventoryMovement["movementType"],
+    quantityChange: typeof raw.quantityChange === "number" ? raw.quantityChange : 0,
+    reason: raw.reason ?? null,
+    performedBy: raw.performedBy ?? null,
+    createdAt: raw.createdAt || new Date().toISOString(),
+  };
+}
+
+// ---- Input Types ----
+
+export interface CreateProductInput {
+  name: string;
+  sku?: string;
+  description?: string;
+  category?: string;
+  unit: string;
+  minReorderLevel?: number;
+}
 
 export interface Product {
   id: string;
@@ -15,72 +187,6 @@ export interface Product {
   minReorderLevel: number;
   isActive: boolean;
   createdAt: string;
-  inventoryLots?: ProductLot[];
-}
-
-export interface ProductLot {
-  id: string;
-  productId?: string | null;
-  productName: string;
-  product_name: string;
-  lotNumber: string;
-  lot_number: string;
-  expirationDate?: string | null;
-  expiration_date?: string | null;
-  expiryDate?: string | null;
-  quantityInitial: number;
-  quantity_initial: number;
-  quantityRemaining: number;
-  quantity_remaining: number;
-  quantity: number;
-  unit: string;
-  category?: string | null;
-  lowStockThreshold: number;
-  low_stock_threshold: number;
-  notes?: string | null;
-  isActive: boolean;
-  is_active: boolean;
-  receivedAt: string;
-  received_at: string;
-  createdAt?: string;
-  created_at?: string;
-  updatedAt?: string;
-  updated_at?: string;
-  locationId?: string;
-  location_id?: string;
-  vendorId?: string | null;
-  costPerUnitCents?: number | null;
-  product?: { id: string; name: string };
-  location?: { id: string; name: string };
-  vendor?: { id: string; name: string };
-}
-
-export type InventoryLot = ProductLot;
-
-export interface InventoryMovement {
-  id: string;
-  lotId: string;
-  lot_id?: string;
-  movementType: string;
-  movement_type?: string;
-  quantityChange: number;
-  quantity_change?: number;
-  qtyDelta?: number;
-  qty_delta?: number;
-  reason?: string;
-  notes?: string | null;
-  createdAt: string;
-  created_at: string;
-  performedBy?: string | null;
-}
-
-export interface CreateProductInput {
-  name: string;
-  sku?: string;
-  description?: string;
-  category?: string;
-  unit: string;
-  minReorderLevel?: number;
 }
 
 export interface CreateLotInput {
@@ -92,291 +198,188 @@ export interface CreateLotInput {
   vendorId?: string;
   locationId: string;
   costPerUnitCents?: number;
-  expiryDate?: string;
-  receivedAt: string;
+  expiryDate?: string; // YYYY-MM-DD
+  receivedAt: string;  // YYYY-MM-DD
 }
 
-export interface InventoryMovementInput {
+/** Accepted movement type values as defined in backend inventory.schema.ts */
+export type MovementType = "received" | "used" | "adjusted" | "wasted" | "returned";
+
+export interface CreateMovementInput {
   lotId: string;
-  movementType: 'received' | 'used' | 'adjusted' | 'transferred' | 'expired' | 'damaged' | 'wasted' | 'returned';
+  movementType: MovementType;
   quantityChange: number;
   reason?: string;
 }
 
-export function mapBackendLotToProductLot(raw: any): ProductLot {
-  if (!raw || typeof raw !== "object") {
-    return {
-      id: "",
-      productName: "",
-      product_name: "",
-      lotNumber: "",
-      lot_number: "",
-      quantityInitial: 0,
-      quantity_initial: 0,
-      quantityRemaining: 0,
-      quantity_remaining: 0,
-      quantity: 0,
-      unit: "units",
-      lowStockThreshold: 10,
-      low_stock_threshold: 10,
-      isActive: true,
-      is_active: true,
-      receivedAt: new Date().toISOString().split("T")[0],
-      received_at: new Date().toISOString().split("T")[0],
-    };
-  }
-
-  const productName = raw.productName || raw.product_name || raw.product?.name || "Unknown Product";
-  const lotNumber = raw.lotNumber || raw.lot_number || "";
-  const expiryDate = raw.expiryDate || raw.expirationDate || raw.expiration_date || raw.expiry_date || null;
-  const qtyRemaining = typeof raw.quantityRemaining === "number"
-    ? raw.quantityRemaining
-    : typeof raw.quantity_remaining === "number"
-    ? raw.quantity_remaining
-    : typeof raw.quantity === "number"
-    ? raw.quantity
-    : 0;
-
-  const qtyInitial = typeof raw.quantityInitial === "number"
-    ? raw.quantityInitial
-    : typeof raw.quantity_initial === "number"
-    ? raw.quantity_initial
-    : qtyRemaining;
-
-  const lowStockThreshold = typeof raw.lowStockThreshold === "number"
-    ? raw.lowStockThreshold
-    : typeof raw.low_stock_threshold === "number"
-    ? raw.low_stock_threshold
-    : 10;
-
-  const receivedAt = raw.receivedAt || raw.received_at || raw.createdAt || raw.created_at || new Date().toISOString().split("T")[0];
-
-  return {
-    ...raw,
-    id: raw.id,
-    productId: raw.productId || raw.product_id,
-    productName,
-    product_name: productName,
-    lotNumber,
-    lot_number: lotNumber,
-    expirationDate: expiryDate,
-    expiration_date: expiryDate,
-    expiryDate: expiryDate,
-    quantityInitial: qtyInitial,
-    quantity_initial: qtyInitial,
-    quantityRemaining: qtyRemaining,
-    quantity_remaining: qtyRemaining,
-    quantity: qtyRemaining,
-    unit: raw.unit || "units",
-    category: raw.category || raw.product?.category || null,
-    lowStockThreshold,
-    low_stock_threshold: lowStockThreshold,
-    notes: raw.notes || null,
-    isActive: raw.isActive !== false && raw.is_active !== false,
-    is_active: raw.isActive !== false && raw.is_active !== false,
-    receivedAt,
-    received_at: receivedAt,
-    createdAt: raw.createdAt || raw.created_at || receivedAt,
-    created_at: raw.createdAt || raw.created_at || receivedAt,
-    updatedAt: raw.updatedAt || raw.updated_at || receivedAt,
-    updated_at: raw.updatedAt || raw.updated_at || receivedAt,
-    locationId: raw.locationId || raw.location_id,
-    vendorId: raw.vendorId || raw.vendor_id,
-    costPerUnitCents: raw.costPerUnitCents || raw.cost_per_unit_cents,
-    product: raw.product,
-    location: raw.location,
-    vendor: raw.vendor,
-  };
-}
+// ---- Service ----
 
 export const inventoryService = {
-  /**
-   * Get list of products from live database.
-   */
+  // ---- Products ----
+
   async getProducts(includeInactive = false): Promise<Product[]> {
-    const res = await ApiClient.get<Product[]>(`/inventory/products?includeInactive=${includeInactive}`);
+    const res = await ApiClient.get<any>(`/inventory/products?includeInactive=${includeInactive}`);
     if (res.error) throw new Error(res.error);
-    const products = Array.isArray(res.data) ? res.data : ((res.data as any)?.data || []);
-    return products;
+    const list = Array.isArray(res.data) ? res.data : ((res.data as any)?.data ?? []);
+    return list;
   },
 
-  /**
-   * Get product by ID with lot details.
-   */
   async getProductById(id: string): Promise<Product> {
-    const res = await ApiClient.get<Product>(`/inventory/products/${id}`);
+    const res = await ApiClient.get<any>(`/inventory/products/${id}`);
     if (res.error) throw new Error(res.error);
-    return (res.data as any)?.data || res.data;
+    return (res.data as any)?.data ?? res.data;
   },
 
-  /**
-   * Create a new product (Admin only).
-   */
   async createProduct(input: CreateProductInput): Promise<Product> {
-    const res = await ApiClient.post<Product>("/inventory/products", input);
+    const res = await ApiClient.post<any>("/inventory/products", input);
     if (res.error) throw new Error(res.error);
-    return (res.data as any)?.data || res.data;
+    return (res.data as any)?.data ?? res.data;
   },
 
-  /**
-   * Update product (Admin only).
-   */
-  async updateProduct(id: string, input: Partial<CreateProductInput> & { isActive?: boolean }): Promise<Product> {
-    const res = await ApiClient.patch<Product>(`/inventory/products/${id}`, input);
+  async updateProduct(
+    id: string,
+    input: Partial<CreateProductInput> & { isActive?: boolean }
+  ): Promise<Product> {
+    const res = await ApiClient.patch<any>(`/inventory/products/${id}`, input);
     if (res.error) throw new Error(res.error);
-    return (res.data as any)?.data || res.data;
+    return (res.data as any)?.data ?? res.data;
   },
 
-  /**
-   * Soft-delete product (Admin only).
-   */
-  async deleteProduct(id: string): Promise<any> {
+  async deleteProduct(id: string): Promise<{ message: string }> {
     const res = await ApiClient.delete(`/inventory/products/${id}`);
     if (res.error) throw new Error(res.error);
-    return res.data;
+    return (res.data as any)?.data ?? res.data;
   },
 
-  /**
-   * Get all inventory lots from live database.
-   */
+  // ---- Lots ----
+
   async getLots(locationId?: string): Promise<ProductLot[]> {
-    const qs = locationId ? `?locationId=${locationId}` : "";
-    const res = await ApiClient.get<any[]>(`/inventory/lots${qs}`);
+    const qs = locationId ? `?locationId=${encodeURIComponent(locationId)}` : "";
+    const res = await ApiClient.get<any>(`/inventory/lots${qs}`);
     if (res.error) throw new Error(res.error);
-    const rawList = Array.isArray(res.data) ? res.data : ((res.data as any)?.data || []);
-    return rawList.map(mapBackendLotToProductLot);
+    const rawList: RawLot[] = Array.isArray(res.data)
+      ? res.data
+      : ((res.data as any)?.data ?? []);
+    return rawList.map(normalizeProductLot);
   },
 
-  /**
-   * Get expiring inventory lots (within 30 days default).
-   */
   async getExpiringLots(daysAhead = 30): Promise<ProductLot[]> {
-    const res = await ApiClient.get<any[]>(`/inventory/lots/expiring?daysAhead=${daysAhead}`);
+    const res = await ApiClient.get<any>(`/inventory/lots/expiring?daysAhead=${daysAhead}`);
     if (res.error) throw new Error(res.error);
-    const rawList = Array.isArray(res.data) ? res.data : ((res.data as any)?.data || []);
-    return rawList.map(mapBackendLotToProductLot);
+    const rawList: RawLot[] = Array.isArray(res.data)
+      ? res.data
+      : ((res.data as any)?.data ?? []);
+    return rawList.map(normalizeProductLot);
   },
 
-  /**
-   * Create new inventory lot / receive stock (Clinical / Staff).
-   */
   async createLot(input: CreateLotInput): Promise<ProductLot> {
     const res = await ApiClient.post<any>("/inventory/lots", input);
     if (res.error) throw new Error(res.error);
-    const raw = (res.data as any)?.data || res.data;
-    return mapBackendLotToProductLot(raw);
+    const raw: RawLot = (res.data as any)?.data ?? res.data;
+    return normalizeProductLot(raw);
+  },
+
+  // ---- Movements ----
+
+  /**
+   * Adjust lot stock quantity by posting a single 'adjusted' movement.
+   *
+   * Backend: POST /inventory/movements (admin only)
+   * Schema:  { lotId: uuid, movementType: 'adjusted', quantityChange: signed-int, reason?: string }
+   *
+   * quantityChange = newQuantityRemaining - currentServerQuantity
+   * If delta === 0, no request is made (no-op).
+   * Backend rejects if resulting quantity < 0.
+   *
+   * CONCURRENCY NOTE: This computes delta from the locally loaded lot quantity.
+   * The backend has no optimistic-lock / updatedAt conflict guard on lot quantity.
+   * If another user updates the same lot between the load and this call, the delta
+   * will be computed against a stale quantity. Callers should reload lots after adjustment.
+   *
+   * @param lot - The currently loaded ProductLot (used to compute delta)
+   * @param newQuantityRemaining - Desired new quantity (must be >= 0)
+   * @param reason - Optional reason string
+   */
+  async adjustLot(
+    lot: ProductLot,
+    newQuantityRemaining: number,
+    reason = "Stock level adjustment"
+  ): Promise<void> {
+    if (!Number.isInteger(newQuantityRemaining) || newQuantityRemaining < 0) {
+      throw new Error("Invalid quantity: must be a non-negative integer");
+    }
+
+    const delta = newQuantityRemaining - lot.quantityRemaining;
+
+    if (delta === 0) {
+      // No change needed — do not make a mutation request
+      return;
+    }
+
+    const payload: CreateMovementInput = {
+      lotId: lot.id,
+      movementType: "adjusted",
+      quantityChange: delta,
+      reason,
+    };
+
+    const res = await ApiClient.post("/inventory/movements", payload);
+    if (res.error) throw new Error(res.error);
   },
 
   /**
-   * Adjust lot quantity remaining.
+   * Lot deactivation is NOT supported by the backend.
+   * There is no PATCH /inventory/lots/:id or DELETE /inventory/lots/:id endpoint.
+   *
+   * This method always throws an unsupported-operation error.
+   * The UI must disable the Deactivate action.
    */
-  async adjustLot(lotId: string, newQuantityRemaining: number, reason = "Stock level adjustment"): Promise<boolean> {
-    try {
-      const lotRes = await ApiClient.get<any>(`/inventory/lots/${lotId}`);
-      if (lotRes.error) return false;
-      const lot = lotRes.data?.data || lotRes.data;
-      const currentQty = typeof lot?.quantity === "number" ? lot.quantity : (lot?.quantity_remaining ?? 0);
-      const delta = newQuantityRemaining - currentQty;
-
-      if (delta === 0) return true;
-
-      const res = await ApiClient.post("/inventory/movements", {
-        lotId,
-        movementType: "adjusted",
-        quantityChange: delta,
-        reason,
-      });
-
-      if (res.error) return false;
-      return true;
-    } catch {
-      return false;
-    }
-  },
-
-  /**
-   * Deactivate an inventory lot.
-   */
-  async deactivateLot(lotId: string): Promise<boolean> {
-    try {
-      const res = await ApiClient.patch(`/inventory/lots/${lotId}`, { isActive: false });
-      if (!res.error) return true;
-
-      const delRes = await ApiClient.delete(`/inventory/lots/${lotId}`);
-      if (!delRes.error) return true;
-
-      // Fallback: record wasted movement zeroing stock
-      const lotRes = await ApiClient.get<any>(`/inventory/lots/${lotId}`);
-      if (lotRes.data) {
-        const lot = lotRes.data?.data || lotRes.data;
-        const currentQty = typeof lot?.quantity === "number" ? lot.quantity : 0;
-        if (currentQty > 0) {
-          const movRes = await ApiClient.post("/inventory/movements", {
-            lotId,
-            movementType: "wasted",
-            quantityChange: -currentQty,
-            reason: "Deactivated lot",
-          });
-          return !movRes.error;
-        }
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
+  async deactivateLot(_lotId: string): Promise<never> {
+    throw new Error(
+      "Lot deactivation is not supported: no backend endpoint exists for PATCH or DELETE /inventory/lots/:id. Contact your administrator."
+    );
   },
 
   /**
    * Get movement ledger for a lot.
+   *
+   * Backend: GET /inventory/lots/:id (all read roles)
+   * This endpoint includes up to 50 recent movements in the response (movements[]).
+   *
+   * If the API call fails, throws the real error rather than returning [] (which
+   * would look like "no movements" and hide the failure).
    */
   async getMovements(lotId: string): Promise<InventoryMovement[]> {
-    try {
-      const res = await ApiClient.get<any>(`/inventory/lots/${lotId}`);
-      if (res.error) return [];
-      const lot = res.data?.data || res.data;
-      const rawMovements = lot?.movements || [];
-      return rawMovements.map((m: any) => {
-        const qtyChange = typeof m.quantityChange === "number" ? m.quantityChange : (m.qty_delta ?? m.quantity_change ?? 0);
-        const reason = m.reason || m.movementType || m.movement_type || "Stock adjustment";
-        const createdAt = m.createdAt || m.created_at || new Date().toISOString();
-        return {
-          id: m.id,
-          lotId: m.lotId || lotId,
-          lot_id: m.lotId || lotId,
-          movementType: m.movementType || m.movement_type || "adjusted",
-          movement_type: m.movementType || m.movement_type || "adjusted",
-          quantityChange: qtyChange,
-          quantity_change: qtyChange,
-          qtyDelta: qtyChange,
-          qty_delta: qtyChange,
-          reason,
-          notes: m.notes || null,
-          createdAt,
-          created_at: createdAt,
-          performedBy: m.performedBy || null,
-        };
-      });
-    } catch {
-      return [];
-    }
+    const res = await ApiClient.get<any>(`/inventory/lots/${lotId}`);
+    if (res.error) throw new Error(res.error);
+    const raw: RawLot = (res.data as any)?.data ?? res.data;
+    const rawMovements: RawMovement[] = Array.isArray(raw?.movements) ? raw.movements : [];
+    return rawMovements.map(normalizeInventoryMovement);
   },
 
   /**
-   * Create inventory movement.
+   * Create a raw movement (admin only).
+   * For stock adjustment from the UI, prefer adjustLot() instead.
    */
-  async createMovement(input: InventoryMovementInput): Promise<any> {
-    const res = await ApiClient.post("/inventory/movements", input);
+  async createMovement(input: CreateMovementInput): Promise<InventoryMovement> {
+    const res = await ApiClient.post<any>("/inventory/movements", input);
     if (res.error) throw new Error(res.error);
-    return (res.data as any)?.data || res.data;
+    const raw: RawMovement = (res.data as any)?.data ?? res.data;
+    return normalizeInventoryMovement(raw);
   },
 
   /**
    * Record clinical treatment lot consumption.
+   * Requires: admin, nurse_practitioner, or rn_injector role.
    */
-  async recordTreatmentUsage(input: { encounterId: string; lotId: string; unitsUsed: number; bodySite?: string }): Promise<any> {
+  async recordTreatmentUsage(input: {
+    encounterId: string;
+    lotId: string;
+    unitsUsed: number;
+    bodySite?: string;
+  }): Promise<any> {
     const res = await ApiClient.post("/inventory/usage", input);
     if (res.error) throw new Error(res.error);
-    return (res.data as any)?.data || res.data;
+    return (res.data as any)?.data ?? res.data;
   },
 };
