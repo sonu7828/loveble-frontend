@@ -137,7 +137,10 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
 
       if (c.data) setCategories(c.data as any);
       if (s.data) setServices(s.data as any);
-      if (l.data) setLocations(l.data as any);
+      if (l.data && Array.isArray(l.data) && l.data.length > 0) {
+        setLocations(l.data as any);
+        setLocationId(prev => prev || l.data[0].id);
+      }
       if (sp.data && Array.isArray(sp.data)) {
         const rawStaff = (sp.data as any[]).map(x => ({
           ...x,
@@ -147,7 +150,11 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
           role: (x.role || x.pending_role || "").toLowerCase(),
         }));
 
-        setStaff(rawStaff.filter(isClinicalProvider));
+        const filtered = rawStaff.filter(isClinicalProvider);
+        setStaff(filtered);
+        if (filtered.length > 0) {
+          setStaffId(prev => prev || filtered[0].id);
+        }
       }
       if (p.data) setProviders(p.data as any);
 
@@ -238,8 +245,10 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
     }
 
     const validServiceId = serviceIds[0] || services[0]?.id;
-    const validLocationId = locationId || locations[0]?.id;
-    const validStaffId = staffId && staffId !== "any-available" ? staffId : (staff[0]?.id || "00000000-0000-0000-0000-000000000000");
+    const validLocationId = locationId || availableLocations[0]?.id || locations[0]?.id;
+    const validStaffId = (staffId && staffId !== "any-available")
+      ? staffId
+      : (availableStaff[0]?.id || staff[0]?.id || "00000000-0000-0000-0000-000000000000");
 
     if (!validServiceId || !validLocationId || !slot) {
       setCardError("Please select a service, location, and date/time slot before confirming.");
@@ -419,7 +428,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
               onToggle={(id) => {
                 setServiceIds((prev) => {
                   const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-                  setLocationId(null); setStaffId(null); setDate(undefined); setSlot(null);
+                  setDate(undefined); setSlot(null);
                   return next;
                 });
               }}
