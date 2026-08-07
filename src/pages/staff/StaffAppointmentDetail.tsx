@@ -110,13 +110,6 @@ export default function StaffAppointmentDetail() {
     setLoading(true);
     try {
       let { data: a } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
-      if (!a) {
-        try {
-          const raw = localStorage.getItem("rka_demo_appointments");
-          const localList = raw ? JSON.parse(raw) : [];
-          a = localList.find((x: any) => x.id === id) || null;
-        } catch { /* ignore */ }
-      }
       if (!a) { setLoading(false); return; }
       setAppt(a);
 

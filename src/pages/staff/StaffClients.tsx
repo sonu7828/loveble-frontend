@@ -680,20 +680,6 @@ export default function StaffClients() {
     }
 
     setAddClientBusy(true);
-    const newClient = {
-      id: `client-${Date.now()}`,
-      first_name: addClientDraft.first_name.trim(),
-      last_name: addClientDraft.last_name.trim(),
-      email: addClientDraft.email.trim().toLowerCase(),
-      phone: addClientDraft.phone.replace(/\D/g, "").slice(0, 10) || null,
-      dob: addClientDraft.dob.trim() || null,
-      created_at: new Date().toISOString(),
-    };
-
-    const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-    localClients.push(newClient);
-    localStorage.setItem("rka_demo_clients", JSON.stringify(localClients));
-
     try {
       await clientService.saveClient({
         first_name: addClientDraft.first_name.trim(),
@@ -704,7 +690,7 @@ export default function StaffClients() {
       });
       toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
     } catch (e: any) {
-      toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
+      toast.error(e?.message || `Failed to create client ${addClientDraft.first_name}`);
     } finally {
       setAddClientBusy(false);
       setAddClientOpen(false);

@@ -257,27 +257,6 @@ export default function StaffNewAppointment() {
         createdId = `apt-${Date.now()}`;
       }
 
-      // Save to local demo appointments so detail page loads instantly
-      try {
-        const selectedService = services.find((s) => serviceIds.includes(s.id));
-        const newAppt = {
-          id: createdId,
-          client_first_name: client.firstName,
-          client_last_name: client.lastName,
-          client_email: client.email,
-          client_phone: client.phone,
-          service_name: selectedService?.name || "Aesthetic Treatment",
-          start_at: pickedSlot,
-          status: "confirmed",
-          location_id: locationId,
-          staff_id: staffIdSel,
-          created_at: new Date().toISOString(),
-        };
-        const existing = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-        existing.push(newAppt);
-        localStorage.setItem("rka_demo_appointments", JSON.stringify(existing));
-      } catch { /* ignore storage errors */ }
-
       toast.success("Appointment created");
       navigate(`/staff/appointments/${createdId}`);
     } catch (err: any) {
