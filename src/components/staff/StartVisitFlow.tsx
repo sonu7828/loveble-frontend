@@ -82,6 +82,16 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     setIntakeSentAt(appt.intake_last_sent_at ?? appt.intake_sent_at ?? null);
   }, [appt.intake_last_sent_at, appt.intake_sent_at]);
 
+  const activeStepRef = useRef<HTMLLIElement | null>(null);
+  const prevActiveStep = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    // Only auto-scroll when the active step actually advances, not on initial mount
+    if (prevActiveStep.current) {
+      activeStepRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [loading]);
+
   if (["cancelled", "denied", "no_show"].includes(appt.status)) return null;
 
   // Step states
@@ -365,17 +375,6 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
       ) : null,
     },
   ];
-
-  const activeStepRef = useRef<HTMLLIElement | null>(null);
-  const prevActiveStep = useRef<string | null>(null);
-  useEffect(() => {
-    if (loading) return;
-    // Only auto-scroll when the active step actually advances, not on initial mount
-    if (prevActiveStep.current && prevActiveStep.current !== activeStep) {
-      activeStepRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-    prevActiveStep.current = activeStep;
-  }, [activeStep, loading]);
 
   const activeStepObj = steps.find(s => s.key === activeStep);
 

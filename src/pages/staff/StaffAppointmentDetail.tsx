@@ -573,7 +573,28 @@ export default function StaffAppointmentDetail() {
               <XCircle className="h-3.5 w-3.5 mr-1.5" />Cancel appointment
             </Button>
           )}
-          {["approved", "pending"].includes(appt.status) && (
+          {appt.status === "pending" && (
+            <Button
+              size="sm"
+              className="rounded-full bg-sky-600 hover:bg-sky-700 text-white font-medium"
+              onClick={async () => {
+                const { error } = await apiQuery
+                  .from("appointments")
+                  .update({ status: "confirmed" })
+                  .eq("id", appt.id);
+                if (error) { toast.error(error.message); return; }
+                await apiQuery("appointment_audit_log").insert({
+                  appointment_id: appt.id, action: "confirmed_by_staff",
+                  from_status: "pending", to_status: "confirmed" as any,
+                });
+                toast.success("Appointment confirmed!");
+                load();
+              }}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Confirm appointment
+            </Button>
+          )}
+          {["approved", "pending", "confirmed"].includes(appt.status) && (
             <Button
               size="sm"
               className="rounded-full"
