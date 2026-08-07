@@ -96,37 +96,12 @@ const ROLE_TITLE_MAP: Record<string, string> = {
 };
 
 /** Hardcoded fallback clinical providers used when API + localStorage are both empty */
-const FALLBACK_PROVIDERS: UnifiedStaffMember[] = [
-  {
-    id: "staff-md-1",
-    full_name: "Dr. Dhruva (MD)",
-    title: "Medical Director & Supervising Physician",
-    email: "medicaldirector@gmail.com",
-    role: "medical_director",
-    is_active: true,
-    is_provider: true,
-  },
-  {
-    id: "staff-np-1",
-    full_name: "Kiem Vukadinovic, NP",
-    title: "Nurse Practitioner & Lead Injector",
-    email: "nurseprectitioner@gmail.com",
-    role: "nurse_practitioner",
-    is_active: true,
-    is_provider: true,
-  },
-  {
-    id: "staff-rn-1",
-    full_name: "Girish, RN Injector",
-    title: "Registered Nurse Injector",
-    email: "injector@gmail.com",
-    role: "rn_injector",
-    is_active: true,
-    is_provider: true,
-  },
-];
+const FALLBACK_PROVIDERS: UnifiedStaffMember[] = [];
 
 export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> {
+  const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+  const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
+
   // ── Step 1: Read rka_approved_staff_accounts from localStorage (always available, set by AdminTeam) ──
   const localStaff: UnifiedStaffMember[] = [];
   const seenEmails = new Set<string>();
@@ -135,7 +110,7 @@ export async function fetchUnifiedStaffMembers(): Promise<UnifiedStaffMember[]> 
     const approved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
     approved.forEach((a: any) => {
       const emailKey = (a.email || "").toLowerCase();
-      if (!emailKey || seenEmails.has(emailKey)) return;
+      if (!emailKey || seenEmails.has(emailKey) || deletedSet.has(emailKey)) return;
       seenEmails.add(emailKey);
       // Skip admin accounts from provider list
       const role = (a.role || "front_desk").toLowerCase().trim();

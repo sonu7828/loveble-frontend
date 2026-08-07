@@ -318,13 +318,17 @@ export default function StaffLogin() {
                   const approvedStaff: Array<{ email: string; full_name?: string; role: string }> =
                     JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
 
-                  const combined: Array<{ email: string; defaultName?: string; full_name?: string; role: string }> = [...defaultStaffList];
+                  const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+                  const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
+
+                  const combinedRaw: Array<{ email: string; defaultName?: string; full_name?: string; role: string }> = [...defaultStaffList];
                   approvedStaff.forEach((a) => {
                     if (a.role === "admin" || (a.email && a.email.toLowerCase() === "admin@gmail.com")) return; // Filter out admin accounts
-                    if (a.email && !combined.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
-                      combined.push({ email: a.email, defaultName: a.full_name, role: a.role });
+                    if (a.email && !combinedRaw.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
+                      combinedRaw.push({ email: a.email, defaultName: a.full_name, role: a.role });
                     }
                   });
+                  const combined = combinedRaw.filter((c) => c.email && !deletedSet.has(c.email.toLowerCase()));
 
                   const roleEmoji: Record<string, string> = {
                     admin: "👑", medical_director: "🩺", privacy_officer: "🛡️",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiQuery } from "@/services/api";
+import { staffService } from "@/services/api/staffService";
 import {
   Users, ShieldCheck, BookOpen, Sparkles, ArrowUpRight,
   History as HistoryIcon, Building2, CheckCircle2, Clock
@@ -32,22 +33,45 @@ export default function AdminHub() {
       try {
         const [
           { data: servicesData },
-          { data: staffData },
+          rawData,
           { data: phiLogs },
         ] = await Promise.all([
           apiQuery("services" as any).select("id"),
-          apiQuery("staff_profiles" as any).select("id"),
+          staffService.getStaffProfiles(false).catch(() => []),
           apiQuery("phi_access_log" as any).select("id, action, resource, created_at, user_id").order("created_at", { ascending: false }).limit(5),
         ]);
 
+        const removedSampleEmails = [
+          "medicaldirector@gmail.com",
+          "securityofficer@gmail.com",
+          "injector@gmail.com",
+          "nurseprectitioner@gmail.com",
+        ];
+        const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+        removedSampleEmails.forEach((e) => {
+          if (!deletedEmails.some((d) => d.toLowerCase() === e.toLowerCase())) {
+            deletedEmails.push(e);
+          }
+        });
+        const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
+
+        const dataList: any[] = Array.isArray(rawData) ? rawData : (rawData as any)?.data || (rawData as any)?.staff || [];
+        const validStaff = dataList.filter((x: any) => {
+          const email = (x.email || x.user?.email || "").toLowerCase();
+          return email && !deletedSet.has(email) && email !== "admin@gmail.com";
+        });
+
         const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-        const validApproved = approvedList.filter((a) => a.email && a.email.toLowerCase() !== "admin@gmail.com" && !a.email.toLowerCase().includes("no email"));
-        const dbCount = Array.isArray(staffData) ? staffData.length : 0;
-        const totalStaff = Math.max(validApproved.length, dbCount);
+        const validApproved = approvedList.filter((a) => a.email && a.email.toLowerCase() !== "admin@gmail.com" && !deletedSet.has(a.email.toLowerCase()));
+
+        const combinedEmails = new Set([
+          ...validStaff.map((s: any) => (s.email || s.user?.email || "").toLowerCase()).filter(Boolean),
+          ...validApproved.map((a: any) => a.email.toLowerCase()).filter(Boolean),
+        ]);
 
         setCounts({
           modelApps: 0,
-          staffCount: totalStaff,
+          staffCount: combinedEmails.size,
           servicesCount: Array.isArray(servicesData) ? servicesData.length : 60,
           auditLogCount: Array.isArray(phiLogs) ? phiLogs.length : 0,
         });
