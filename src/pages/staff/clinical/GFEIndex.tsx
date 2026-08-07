@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { Search, ShieldCheck, Plus, FileText, Trash2 } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Search, ShieldCheck, Plus, FileText, Trash2, FileSignature } from "lucide-react";
 import { apiQuery } from "@/services/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ type GFE = {
   client_email: string | null;
   client_first_name: string | null;
   client_last_name: string | null;
+  client_dob?: string | null;
+  client_phone?: string | null;
   np_name: string | null;
   signed_at: string | null;
   expires_at: string | null;
@@ -20,7 +22,9 @@ type GFE = {
 
 export default function GFEIndex() {
   const [sp] = useSearchParams();
+  const navigate = useNavigate();
   const initialSearch = sp.get("search") || sp.get("email") || "";
+  const isSelectMode = sp.get("fromNote") === "1" || sp.get("select") === "1";
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<GFE[]>([]);
   const [q, setQ] = useState(initialSearch);
@@ -34,7 +38,7 @@ export default function GFEIndex() {
     try {
       const { data } = await apiQuery
         .from("gfe_records")
-        .select("id, client_email, client_first_name, client_last_name, np_name, signed_at, expires_at, created_at")
+        .select("id, client_email, client_first_name, client_last_name, client_dob, client_phone, np_name, signed_at, expires_at, created_at")
         .limit(1000);
       dbList = (data as any[]) ?? [];
     } catch { }
@@ -66,6 +70,20 @@ export default function GFEIndex() {
     window.addEventListener("rka_gfe_updated", handleUpdate);
     return () => window.removeEventListener("rka_gfe_updated", handleUpdate);
   }, []);
+
+  const selectForChartNote = (r: GFE, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const params = new URLSearchParams();
+    if (r.client_email) params.set("email", r.client_email);
+    if (r.client_first_name) params.set("first", r.client_first_name);
+    if (r.client_last_name) params.set("last", r.client_last_name);
+    if (r.client_dob) params.set("dob", r.client_dob.slice(0, 10));
+    params.set("gfeId", r.id);
+    navigate(`/staff/clinical/notes/new?${params.toString()}`);
+  };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -115,7 +133,9 @@ export default function GFEIndex() {
           <h1 className="font-serif text-3xl mb-1 flex items-center gap-2">
             <ShieldCheck className="h-7 w-7 opacity-70 text-primary" /> Good Faith Exams
           </h1>
-          <p className="text-sm text-muted-foreground">All GFEs with 12-month expiration tracking.</p>
+          <p className="text-sm text-muted-foreground">
+            {isSelectMode ? "Select an existing GFE to populate patient details in your chart note." : "All GFEs with 12-month expiration tracking."}
+          </p>
         </div>
         <Link to="/staff/clinical/gfe/new">
           <Button className="gap-2">
@@ -171,28 +191,45 @@ export default function GFEIndex() {
             const expired = exp !== null && exp < now;
             return (
               <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-accent/50 transition">
-                <Link to={`/staff/clinical/gfe/${r.id}`} className="flex-1 min-w-0 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate text-foreground">{name}</div>
+                <div
+                  className="flex-1 min-w-0 flex items-center justify-between gap-3 cursor-pointer"
+                  onClick={(e) => isSelectMode ? selectForChartNote(r, e) : undefined}
+                >
+                  <Link
+                    to={`/staff/clinical/gfe/${r.id}`}
+                    onClick={(e) => { if (isSelectMode) { e.preventDefault(); selectForChartNote(r, e); } }}
+                    className="min-w-0 flex-1"
+                  >
+                    <div className="font-medium truncate text-foreground hover:underline">{name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {r.np_name ?? "—"} · signed {r.signed_at ? new Date(r.signed_at).toLocaleDateString() : "—"}
+                      {r.np_name ?? "—"} · signed {r.signed_at ? new Date(r.signed_at).toLocaleDateString() : "—"} {r.client_email ? `· ${r.client_email}` : ""}
                     </div>
-                  </div>
+                  </Link>
                   <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full shrink-0 ${
                     expired ? "bg-red-500/15 text-red-700 dark:text-red-300" : expiring ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                   }`}>
                     {r.expires_at ? `${expired ? "expired" : "exp"} ${new Date(r.expires_at).toLocaleDateString()}` : "no expiry"}
                   </span>
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                  onClick={(e) => handleDelete(r.id, e)}
-                  title="Delete GFE"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs gap-1"
+                    onClick={(e) => selectForChartNote(r, e)}
+                  >
+                    <FileSignature className="h-3.5 w-3.5" /> Use for Chart
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={(e) => handleDelete(r.id, e)}
+                    title="Delete GFE"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             );
           })

@@ -326,7 +326,7 @@ export default function EncounterEditor() {
     // Generate PDFs
     const { data, error } = await ApiClient.post("generate-encounter-pdf", { body: { encounter_id: encId } });
     setSigning(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(typeof error === "string" ? error : "PDF generation failed"); return; }
     const r = data as any;
     if (r?.error) { toast.error(r.error); return; }
     setStatus("signed");

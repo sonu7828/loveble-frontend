@@ -120,12 +120,6 @@ export default function StaffClients() {
         all.push(...data);
         if (data.length < PAGE) break;
       }
-      const localDemoAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-      for (const la of localDemoAppts) {
-        if (la && la.id && !all.some((e) => e.id === la.id)) {
-          all.unshift(la);
-        }
-      }
       return { data: all };
     };
     Promise.all([loadAppointmentsPaged(), reloadImported(), reloadBlocked(), reloadAccounts()]).then(async ([appts]) => {
@@ -495,14 +489,6 @@ export default function StaffClients() {
 
     try {
       await apiQuery("appointments").delete().eq("id", apptId);
-      try {
-        const raw = localStorage.getItem("rka_demo_appointments");
-        if (raw) {
-          const list = JSON.parse(raw);
-          const filtered = list.filter((a: any) => a.id !== apptId);
-          localStorage.setItem("rka_demo_appointments", JSON.stringify(filtered));
-        }
-      } catch {}
       await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
       toast.success("Appointment deleted successfully");
     } catch (e: any) {
@@ -694,20 +680,6 @@ export default function StaffClients() {
     }
 
     setAddClientBusy(true);
-    const newClient = {
-      id: `client-${Date.now()}`,
-      first_name: addClientDraft.first_name.trim(),
-      last_name: addClientDraft.last_name.trim(),
-      email: addClientDraft.email.trim().toLowerCase(),
-      phone: addClientDraft.phone.replace(/\D/g, "").slice(0, 10) || null,
-      dob: addClientDraft.dob.trim() || null,
-      created_at: new Date().toISOString(),
-    };
-
-    const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-    localClients.push(newClient);
-    localStorage.setItem("rka_demo_clients", JSON.stringify(localClients));
-
     try {
       await clientService.saveClient({
         first_name: addClientDraft.first_name.trim(),
@@ -718,7 +690,7 @@ export default function StaffClients() {
       });
       toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
     } catch (e: any) {
-      toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
+      toast.error(e?.message || `Failed to create client ${addClientDraft.first_name}`);
     } finally {
       setAddClientBusy(false);
       setAddClientOpen(false);

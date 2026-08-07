@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { PortalCTA } from "@/components/PortalCTA";
-import { ApiClient } from "@/services/api";
+import { consentService } from "@/services/api/consentService";
 
 export default function PatientConsents() {
   const { token } = useParams();
@@ -23,9 +23,10 @@ export default function PatientConsents() {
 
   useEffect(() => {
     if (!token) return;
-    ApiClient.get(`/consents?token=${encodeURIComponent(token)}`)
-      .then((res) => {
-        const d = res.data || {};
+    consentService
+      .getConsentsByToken(token)
+      .then((d) => {
+        if (!d) { toast.error("Could not load consents"); return; }
         if (d.error) { toast.error(d.error); }
         else {
           setAppt(d.appointment);
@@ -35,6 +36,9 @@ export default function PatientConsents() {
             setName(`${d.appointment.client_first_name} ${d.appointment.client_last_name ?? ""}`.trim());
           }
         }
+      })
+      .catch((err: any) => {
+        toast.error(err?.message || "Could not load consents");
       })
       .finally(() => setLoading(false));
   }, [token]);
@@ -80,15 +84,22 @@ export default function PatientConsents() {
       })
       .filter(Boolean);
 
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/public-sign-consents`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: ANON },
-      body: JSON.stringify({ token, signatures: payload, signingMode: "remote" }),
-    });
-    const data = await res.json();
-    setSubmitting(false);
-    if (!res.ok || data.error) { toast.error(data.error || "Could not submit"); return; }
-    setDone(true);
+    try {
+      const data = await consentService.submitSignedConsents({
+        token: token!,
+        signatures: payload,
+        signingMode: "remote",
+      });
+      if (data?.error) {
+        toast.error(data.error || "Could not submit");
+        return;
+      }
+      setDone(true);
+    } catch (err: any) {
+      toast.error(err?.message || "Could not submit signed forms");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

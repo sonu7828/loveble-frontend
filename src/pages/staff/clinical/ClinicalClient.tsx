@@ -50,7 +50,18 @@ export default function ClinicalClient() {
       const a = aRes?.data;
 
       setGfes((g as any[]) ?? []);
-      setNotes((n as any[]) ?? []);
+      let nList = (n as any[]) ?? [];
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+        const matchLocal = local.filter((item: any) =>
+          item.client_email?.toLowerCase() === decoded.toLowerCase()
+        );
+        const map = new Map<string, any>();
+        nList.forEach((item: any) => map.set(item.id, item));
+        matchLocal.forEach((item: any) => map.set(item.id, item));
+        nList = Array.from(map.values());
+      } catch { }
+      setNotes(nList);
       setEncounters(e ?? []);
       setLatestApt(a ?? null);
       setLoading(false);

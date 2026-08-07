@@ -38,7 +38,8 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const { data: { user } } = await authService.getSession();
+      const { session } = await authService.getSession();
+      const user = session?.user;
       if (!user) return;
       const { data: sp } = await apiQuery("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
       if (sp?.full_name) setWitnessName(sp.full_name);
@@ -94,14 +95,13 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
     setMissing(miss);
 
     try {
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/public-sign-consents?token=${encodeURIComponent(a.public_token)}`,
-        { headers: { apikey: ANON } });
-      const d = await r.json();
-      if (d.error) { toast.error(d.error); }
+      const res = await ApiClient.get<any>(`/consents?token=${encodeURIComponent(a.public_token)}`);
+      const d = res.data;
+      if (res.error || d?.error) { toast.error(d?.error || res.error); }
       else {
-        setAppt(d.appointment);
-        setForms(d.forms ?? []);
-        if (d.appointment?.client_first_name) {
+        setAppt(d?.appointment);
+        setForms(d?.forms ?? []);
+        if (d?.appointment?.client_first_name) {
           setSharedName(`${d.appointment.client_first_name} ${d.appointment.client_last_name ?? ""}`.trim());
         }
       }
@@ -126,7 +126,7 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
     });
     setFixing(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Could not assign missing forms");
+      toast.error((data as any)?.error || (typeof error === "string" ? error : (error as any)?.message) || "Could not assign missing forms");
       return;
     }
     toast.success(`Assigned ${missing.length} missing form${missing.length > 1 ? "s" : ""}`);
@@ -175,19 +175,15 @@ export function SignConsentsInPersonDialog({ open, onOpenChange, appointmentId, 
       return;
     }
     setSubmitting(true);
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/public-sign-consents`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: ANON },
-      body: JSON.stringify({
-        token,
-        signatures: payload,
-        signingMode: "in_person_kiosk",
-        witnessName: witnessName.trim(),
-      }),
+    const res = await ApiClient.post<any>("/public-sign-consents", {
+      token,
+      signatures: payload,
+      signingMode: "in_person_kiosk",
+      witnessName: witnessName.trim(),
     });
-    const data = await res.json();
+    const data = res.data;
     setSubmitting(false);
-    if (!res.ok || data.error) { toast.error(data.error || "Could not submit"); return; }
+    if (res.error || data?.error) { toast.error(data?.error || res.error || "Could not submit"); return; }
     setDone(true);
     toast.success("Consent forms signed");
     onSigned?.();

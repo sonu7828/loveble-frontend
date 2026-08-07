@@ -436,23 +436,32 @@ export default function ChartNoteEditor() {
     (async () => {
       let list: string[] = [];
       try {
-        const { data } = await apiQuery("staff_profiles").select("full_name, title").order("full_name");
+        const { data } = await apiQuery("staff_profiles")
+          .select("full_name, title, is_active, is_provider")
+          .order("full_name");
         if (data) {
-          list = data.map((sp: any) => sp.full_name).filter(Boolean);
+          list = (data as any[])
+            .filter((sp: any) => {
+              if (sp.is_active === false) return false;
+              if (sp.is_provider === false) return false;
+              const name = (sp.full_name || "").trim();
+              if (!name) return false;
+              // Exclude inactive/placeholder/test staff entries (e.g. "INACTIVE Staff", "MULTI Staff", "SCHEDULER Staff", "Test RN Injector", etc.)
+              if (/^(INACTIVE|MULTI|SCHEDULER|TEST|DEMO|SYSTEM|DELETED)/i.test(name)) return false;
+              if (/\b(Staff|Test)\b/i.test(name)) return false;
+              return true;
+            })
+            .map((sp: any) => sp.full_name.trim());
         }
       } catch { }
 
-      const defaults = [
-        "Kiem Vukadinovic, NP",
-        "Bob Stane, NP",
-        "Girish, RN Injector",
-        "Dr. Suhaas Sharma, MD",
-        "Dr. Aloysius N. Fobi, MD",
-      ];
-      const merged = Array.from(new Set([...list, ...defaults])).filter(Boolean);
-      setProviderOptions(merged);
+      const filtered = Array.from(new Set(list)).filter(Boolean);
+      if (providerName && !filtered.includes(providerName)) {
+        filtered.push(providerName);
+      }
+      setProviderOptions(filtered);
     })();
-  }, []);
+  }, [providerName]);
 
   type ClientOption = {
     email: string;
@@ -776,16 +785,21 @@ export default function ChartNoteEditor() {
         }
       } else {
         setClient(c => ({
-          ...c,
-          email: sp.get("email") ?? "",
-          first: sp.get("first") ?? "",
-          last: sp.get("last") ?? "",
+          email: sp.get("email") ?? c.email,
+          first: sp.get("first") ?? c.first,
+          last: sp.get("last") ?? c.last,
+          dob: sp.get("dob") ?? c.dob,
         }));
       }
 
-      // Look up most recent valid GFE for this client
+      // Look up most recent valid GFE for this client or by gfeId URL parameter
+      const gfeParam = sp.get("gfeId");
       const email = (appointmentId ? undefined : sp.get("email"));
-      if (email) await loadGfeFor(email);
+      if (gfeParam) {
+        await loadGfeFor(gfeParam);
+      } else if (email) {
+        await loadGfeFor(email);
+      }
       setLoading(false);
     })();
   }, [isViewMode, user, appointmentId, resumedDraftServiceName]); // eslint-disable-line
@@ -863,7 +877,14 @@ export default function ChartNoteEditor() {
       photo_post_paths: extra.photo_post_paths ?? photoPostPaths,
     };
     const { error } = await apiQuery("clinical_notes").upsert(payload, { onConflict: "id" });
-    if (error) { console.warn("draft upsert failed", error); return; }
+    if (error) { console.warn("draft upsert failed", error); }
+    try {
+      const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+      const idx = localList.findIndex((item: any) => item.id === pendingNoteId);
+      if (idx >= 0) localList[idx] = payload;
+      else localList.unshift(payload);
+      localStorage.setItem("rka_demo_clinical_notes", JSON.stringify(localList));
+    } catch { }
     setDraftRowExists(true);
   }
 
@@ -989,13 +1010,42 @@ export default function ChartNoteEditor() {
     toast.success("Prefilled from last visit — review lot # and units");
   }
 
-  async function loadGfeFor(email: string) {
-    const { data } = await apiQuery("gfe_records")
-      .select("id, expires_at, signed_at, np_name, allergies, allergies_other, current_medications, current_medications_other")
-      .ilike("client_email", email).order("signed_at", { ascending: false }).limit(1).maybeSingle();
+  async function loadGfeFor(emailOrId: string) {
+    if (!emailOrId) return;
+    let data: any = null;
+    if (emailOrId.includes("@")) {
+      const { data: dbData } = await apiQuery("gfe_records")
+        .select("id, client_email, client_first_name, client_last_name, client_dob, expires_at, signed_at, np_name, allergies, allergies_other, current_medications, current_medications_other")
+        .ilike("client_email", emailOrId).order("signed_at", { ascending: false }).limit(1).maybeSingle();
+      data = dbData;
+    } else {
+      const { data: dbData } = await apiQuery("gfe_records")
+        .select("id, client_email, client_first_name, client_last_name, client_dob, expires_at, signed_at, np_name, allergies, allergies_other, current_medications, current_medications_other")
+        .eq("id", emailOrId).maybeSingle();
+      data = dbData;
+    }
+
+    if (!data) {
+      try {
+        const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+        data = localList.find((item: any) => item.id === emailOrId || item.client_email?.toLowerCase() === emailOrId.toLowerCase());
+      } catch { }
+    }
+
+    const prevGfeId = gfe?.id;
     setGfe(data ?? null);
-    // Default the reconciliation checklist to all GFE allergies un-checked (force confirmation).
-    if (data?.allergies) setAllergiesConfirmedToday([]);
+    if (data) {
+      setClient((c) => ({
+        email: c.email || data.client_email || "",
+        first: c.first || data.client_first_name || "",
+        last: c.last || data.client_last_name || "",
+        dob: c.dob || (data.client_dob ? data.client_dob.slice(0, 10) : ""),
+      }));
+    }
+    // Only default the reconciliation checklist if switching to a new/different GFE record
+    if (data?.allergies && prevGfeId !== data.id) {
+      setAllergiesConfirmedToday([]);
+    }
   }
 
   // ===== Load existing note =====
@@ -1007,6 +1057,13 @@ export default function ChartNoteEditor() {
         const { data, error } = await apiQuery("clinical_notes").select("*").eq("id", id).maybeSingle();
         if (!error && data) n = data;
       } catch { }
+
+      if (!n) {
+        try {
+          const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+          n = localList.find((item: any) => item.id === id);
+        } catch { }
+      }
 
       if (!n) { toast.error("Note not found"); navigate(-1); return; }
       // Draft notes should resume in edit mode, not the read-only view (which renders the
@@ -1422,6 +1479,26 @@ export default function ChartNoteEditor() {
           resource_type: "clinical_note", resource_id: noteId,
           action: "sign", user_agent: ua,
         });
+
+        // Always save full signed note to local storage so view navigation never fails
+        try {
+          const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+          const signedNoteObj = {
+            ...notePayload,
+            id: noteId,
+            status: notePayload.status,
+            signed_at: notePayload.signed_at,
+            cosigned_at: notePayload.cosigned_at,
+            locked_at: notePayload.locked_at,
+            requires_cosign: notePayload.requires_cosign,
+          };
+          const idx = localList.findIndex((item: any) => item.id === noteId);
+          if (idx >= 0) localList[idx] = signedNoteObj;
+          else localList.unshift(signedNoteObj);
+          localStorage.setItem("rka_demo_clinical_notes", JSON.stringify(localList));
+          window.dispatchEvent(new Event("rka_chart_note_updated"));
+        } catch { }
+
         createdNoteIds.push(noteId);
       }
 
@@ -1800,7 +1877,7 @@ export default function ChartNoteEditor() {
                 variant="outline"
                 onClick={() => {
                   const query = client.email || `${client.first} ${client.last}`.trim();
-                  navigate(`/staff/clinical/gfe${query ? `?search=${encodeURIComponent(query)}` : ""}`);
+                  navigate(`/staff/clinical/gfe?fromNote=1${query ? `&search=${encodeURIComponent(query)}` : ""}`);
                 }}
               >
                 Find existing GFE

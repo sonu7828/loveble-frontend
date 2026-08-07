@@ -81,9 +81,14 @@ export function PhotoCaptureFlow(props: Props) {
       //    the literal substring "photo" would count, false-blocking capture.
       const { data: forms } = await apiQuery
         .from("consent_forms")
-        .select("id, slug, title")
-        .or("slug.ilike.%photo%,slug.ilike.%media%,slug.ilike.%image%,title.ilike.%photo%,title.ilike.%media%,title.ilike.%image%");
-      const formIds = (forms ?? []).map(f => f.id);
+        .select("id, slug, title");
+      const matchedForms = (forms ?? []).filter((f: any) => {
+        const s = (f.slug || "").toLowerCase();
+        const t = (f.title || "").toLowerCase();
+        return s.includes("photo") || s.includes("media") || s.includes("image") ||
+          t.includes("photo") || t.includes("media") || t.includes("image");
+      });
+      const formIds = matchedForms.map((f: any) => f.id);
       // If no recognizable form schema exists, leave hasConsent as null
       // (indeterminate) — capture stays unblocked rather than false-failing.
       if (formIds.length === 0) { if (!cancelled) setHasConsent(null); return; }
@@ -159,11 +164,12 @@ export function PhotoCaptureFlow(props: Props) {
     try {
       const ext = mime.includes("png") ? "png" : "jpg";
       const key = `${noteId}/${kind}/${Date.now()}-${angle}.${ext}`;
-      const { error } = await ApiClient.upload(key, blob, {
+      const file = new File([blob], `${Date.now()}-${angle}.${ext}`, { type: mime });
+      const { error } = await ApiClient.upload(key, file, {
         contentType: mime, upsert: false,
       });
       if (error) throw error;
-      const { data: u } = await authService.getSession();
+      const { user: currentUser } = await authService.getSession();
       const { error: mErr } = await apiQuery("clinical_photo_meta").insert({
         storage_path: key,
         clinical_note_id: noteId,
@@ -174,7 +180,7 @@ export function PhotoCaptureFlow(props: Props) {
         product: productInput.trim() || null,
         kind,
         framing_ref_path: ghostPath,
-        created_by: u.user?.id ?? null,
+        created_by: currentUser?.id ?? null,
       });
       if (mErr) console.warn("photo meta insert failed", mErr);
       onCaptured(key);
@@ -203,101 +209,104 @@ export function PhotoCaptureFlow(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(b) => { if (!b) stop(); onOpenChange(b); }}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="max-w-2xl max-h-[92vh] flex flex-col p-4 sm:p-6 overflow-hidden">
+        <DialogHeader className="pb-1">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Camera className="h-4 w-4" />
             Standardized capture — {kind === "pre" ? "pre-procedure" : "post-procedure"}
             {clientName && <span className="text-sm font-normal text-muted-foreground">· {clientName}</span>}
           </DialogTitle>
         </DialogHeader>
 
-        {hasConsent === false && (
-          <div className="rounded-md border border-warning/40 bg-warning-soft p-3 flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 mt-0.5 text-warning" />
-            <div className="flex-1 text-xs">
-              <div className="font-medium">Photo consent not on file.</div>
-              <div className="text-muted-foreground">Capture once before photographing this patient.</div>
-            </div>
-            <Button size="sm" onClick={() => setConsentOpen(true)}>Get consent</Button>
-          </div>
-        )}
-        {hasConsent === true && (
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Photo consent on file</div>
-        )}
-
-        <div className="flex flex-wrap gap-1.5">
-          {PHOTO_ANGLES.map(a => (
-            <button
-              key={a.id} type="button"
-              onClick={() => setAngle(a.id)}
-              className={`px-3 py-1 rounded-full text-xs border ${angle === a.id
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border hover:border-primary/50"}`}
-            >{a.label}</button>
-          ))}
-        </div>
-
-        <div className="relative rounded-lg overflow-hidden bg-black aspect-[4/3]">
-          {cameraError ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white text-sm p-4 text-center">
-              <AlertTriangle className="h-6 w-6" />
-              <div>{cameraError}</div>
-              <label className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded border border-white/30 cursor-pointer text-xs">
-                <ImagePlus className="h-3 w-3" /> Pick from photos
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => onFile(e.target.files)} />
-              </label>
-            </div>
-          ) : (
-            <>
-              <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
-              {ghostUrl && showGhost && (
-                <img
-                  src={ghostUrl} alt=""
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none mix-blend-screen"
-                  style={{ opacity: 0.35 }}
-                />
-              )}
-              {/* Center rule-of-thirds guides */}
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute left-1/3 top-0 bottom-0 border-l border-white/20" />
-                <div className="absolute left-2/3 top-0 bottom-0 border-l border-white/20" />
-                <div className="absolute top-1/3 left-0 right-0 border-t border-white/20" />
-                <div className="absolute top-2/3 left-0 right-0 border-t border-white/20" />
+        <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+          {hasConsent === false && (
+            <div className="rounded-md border border-warning/40 bg-warning-soft p-2.5 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-warning shrink-0" />
+              <div className="flex-1 text-xs">
+                <div className="font-medium">Photo consent not on file.</div>
+                <div className="text-muted-foreground">Capture once before photographing this patient.</div>
               </div>
-            </>
+              <Button size="sm" onClick={() => setConsentOpen(true)}>Get consent</Button>
+            </div>
           )}
+          {hasConsent === true && (
+            <div className="text-[11px] text-muted-foreground flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Photo consent on file</div>
+          )}
+
+          <div className="flex flex-wrap gap-1">
+            {PHOTO_ANGLES.map(a => (
+              <button
+                key={a.id} type="button"
+                onClick={() => setAngle(a.id)}
+                className={`px-2.5 py-0.5 rounded-full text-xs border ${angle === a.id
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:border-primary/50"}`}
+              >{a.label}</button>
+            ))}
+          </div>
+
+          <div className="relative rounded-lg overflow-hidden bg-black max-h-[280px] sm:max-h-[350px] aspect-[4/3] w-full mx-auto flex items-center justify-center">
+            {cameraError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white text-sm p-4 text-center">
+                <AlertTriangle className="h-6 w-6" />
+                <div>{cameraError}</div>
+                <label className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded border border-white/30 cursor-pointer text-xs">
+                  <ImagePlus className="h-3 w-3" /> Pick from photos
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => onFile(e.target.files)} />
+                </label>
+              </div>
+            ) : (
+              <>
+                <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
+                {ghostUrl && showGhost && (
+                  <img
+                    src={ghostUrl} alt=""
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none mix-blend-screen"
+                    style={{ opacity: 0.35 }}
+                  />
+                )}
+                {/* Center rule-of-thirds guides */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute left-1/3 top-0 bottom-0 border-l border-white/20" />
+                  <div className="absolute left-2/3 top-0 bottom-0 border-l border-white/20" />
+                  <div className="absolute top-1/3 left-0 right-0 border-t border-white/20" />
+                  <div className="absolute top-2/3 left-0 right-0 border-t border-white/20" />
+                </div>
+              </>
+            )}
+          </div>
+
+          <PhotoLightingHint />
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-xs">Region</Label>
+              <Input className="h-8 text-xs" value={regionInput} onChange={e => setRegionInput(e.target.value)} placeholder="e.g. Glabella, Chin" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Product</Label>
+              <Input className="h-8 text-xs" value={productInput} onChange={e => setProductInput(e.target.value)} placeholder="e.g. Botox, Volux" />
+            </div>
+          </div>
         </div>
 
-        <PhotoLightingHint />
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Region</Label>
-            <Input value={regionInput} onChange={e => setRegionInput(e.target.value)} placeholder="e.g. Glabella, Chin" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Product</Label>
-            <Input value={productInput} onChange={e => setProductInput(e.target.value)} placeholder="e.g. Botox, Volux" />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+        <div className="flex items-center justify-between flex-wrap gap-2 pt-2 mt-2 border-t border-border bg-background shrink-0">
           <Button
             type="button" variant="ghost" size="sm"
             onClick={() => setShowGhost(s => !s)}
             disabled={!ghostUrl}
+            className="text-xs h-8 px-2"
           >
             {showGhost ? <EyeOff className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
-            {ghostUrl ? (showGhost ? "Hide ghost overlay" : "Show ghost overlay") : "No prior photo at this angle"}
+            {ghostUrl ? (showGhost ? "Hide ghost" : "Show ghost") : "No prior photo"}
           </Button>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Close</Button>
-            <Button type="button" onClick={capture} disabled={busy || hasConsent === false || !!cameraError}>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>Close</Button>
+            <Button type="button" size="sm" onClick={capture} disabled={busy || hasConsent === false || !!cameraError}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
               Capture
             </Button>
-            <Button type="button" variant="ghost" size="icon" title="Restart camera" onClick={() => { stop(); setCameraError(null); setRestartKey(k => k + 1); }}>
+            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Restart camera" onClick={() => { stop(); setCameraError(null); setRestartKey(k => k + 1); }}>
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>

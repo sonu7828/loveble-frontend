@@ -65,7 +65,7 @@ export default function StaffMarketing() {
       body: { prompt: aiPrompt, generateImage: aiGenImage },
     });
     setAiDrafting(false);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "AI draft failed"); return; }
+    if (error || data?.error) { toast.error(data?.error || (typeof error === "string" ? error : "AI draft failed")); return; }
     setEditing(prev => prev ? {
       ...prev,
       subject: data.draft.subject || prev.subject,
@@ -84,12 +84,10 @@ export default function StaffMarketing() {
     setUploading(true);
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${user?.id}/${Date.now()}.${ext}`;
-    const { error } = await ApiClient.upload(path, file, { upsert: false, contentType: file.type });
-    if (error) { setUploading(false); toast.error(error.message); return; }
-    const { data } = ApiClient.getPublicUrl(path);
-    setEditing(prev => prev ? { ...prev, hero_image_url: data.publicUrl } : prev);
+    const { data, error } = await ApiClient.upload(path, file, { upsert: false, contentType: file.type });
     setUploading(false);
-    toast.success("Image uploaded");
+    if (error) { toast.error(typeof error === "string" ? error : "Upload failed"); return; }
+    toast.error("Public image storage URL service is not configured on backend yet.");
   };
 
   const refresh = async () => {
@@ -137,7 +135,7 @@ export default function StaffMarketing() {
       body: { campaignId: c.id, dryRun },
     });
     setRunning(null);
-    if (error || data?.error) { toast.error(data?.error || error?.message || "Failed"); return; }
+    if (error || data?.error) { toast.error(data?.error || (typeof error === "string" ? error : "Failed")); return; }
     if (dryRun) {
       toast.success(`${data.eligible} eligible (of ${data.audienceSize} in audience, ${data.skipped} on cooldown)`);
     } else {

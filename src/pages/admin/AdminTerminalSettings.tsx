@@ -48,7 +48,7 @@ export default function AdminTerminalSettings() {
       body: { locationId, registrationCode: code.trim(), label: label.trim() },
     });
     setBusy(false);
-    if (error || data?.error) { toast.error(data?.error || error?.message); return; }
+    if (error || data?.error) { toast.error(data?.error || (typeof error === "string" ? error : "Failed to pair reader")); return; }
     toast.success("Reader paired!"); setCode(""); setLabel(""); load();
   };
 

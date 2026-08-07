@@ -217,13 +217,11 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       }
     }
 
-    const aptId = `apt-${Date.now()}`;
     const selectedSvcNames = selectedServices.map((s) => s.name).join(" + ");
     const selectedLoc = locations.find((l) => l.id === locationId) || locations[0];
     const selectedStaffObj = staff.find((s) => s.id === staffId);
 
-    const newAppointment = {
-      id: aptId,
+    const newAppointmentPayload = {
       client_first_name: client.firstName,
       client_last_name: client.lastName,
       client_email: client.email.toLowerCase(),
@@ -277,47 +275,45 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
             full_name: "Girish",
             title: "Provider",
           },
-      stripe_payment_method_id: cardData?.paymentMethodId || `pm_${Date.now()}`,
+      stripe_payment_method_id: cardData?.paymentMethodId || null,
       created_at: new Date().toISOString(),
     };
 
-    // Store appointment locally for instant UI availability
-    const existingAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-    existingAppts.unshift(newAppointment);
-    localStorage.setItem("rka_demo_appointments", JSON.stringify(existingAppts));
-    window.dispatchEvent(new CustomEvent("rka_appointment_created", { detail: newAppointment }));
-
-    // Try remote database insert (safely handled if backend endpoint is unavailable)
     try {
-      await apiQuery("appointments").insert(newAppointment);
-    } catch (_e) { }
+      const res = await apiQuery("appointments").insert(newAppointmentPayload).single();
+      if (res.error) {
+        setCardError(typeof res.error === "string" ? res.error : res.error?.message || "Failed to create appointment with server");
+        setSubmitting(false);
+        return;
+      }
 
-    // Store client profile locally
-    const newClientProfile = {
-      id: `client-${Date.now()}`,
-      first_name: client.firstName,
-      last_name: client.lastName,
-      email: client.email.toLowerCase(),
-      phone: client.phone,
-      dob: client.dob || null,
-      created_at: new Date().toISOString(),
-    };
+      const createdAppt = res.data;
+      const createdToken = createdAppt?.bookingToken || createdAppt?.booking_token || createdAppt?.token || createdAppt?.id;
 
-    const existingClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
-    if (!existingClients.some((c) => (c.email || "").toLowerCase() === client.email.toLowerCase())) {
-      existingClients.push(newClientProfile);
-      localStorage.setItem("rka_demo_clients", JSON.stringify(existingClients));
+      if (!createdToken) {
+        setCardError("Appointment was created but no confirmation token was returned.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Record client profile on server
+      try {
+        await apiQuery("client_profiles").insert({
+          first_name: client.firstName,
+          last_name: client.lastName,
+          email: client.email.toLowerCase(),
+          phone: client.phone,
+          dob: client.dob || null,
+          created_at: new Date().toISOString(),
+        });
+      } catch (_e) { }
+
+      setSubmitting(false);
+      navigate(`/booking-confirmation?token=${encodeURIComponent(createdToken)}&new=1`);
+    } catch (err: any) {
+      setCardError(err?.message || "An unexpected error occurred while processing your booking. Please try again.");
+      setSubmitting(false);
     }
-    try {
-      await apiQuery("client_profiles").insert(newClientProfile);
-    } catch (_e) { }
-
-    try {
-      localStorage.removeItem("rka_book_draft");
-    } catch (_e) { }
-
-    setSubmitting(false);
-    navigate(`/booking-confirmation?id=${aptId}&new=1`);
   };
 
   if (loading) {

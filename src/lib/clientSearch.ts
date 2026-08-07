@@ -60,22 +60,6 @@ export async function searchClients(query: string, limit = 50): Promise<ClientHi
     fetchServiceClients(q),
   ]);
 
-  // Safely read all possible localStorage client keys
-  const localKeys = ["rka_demo_clients", "rka_demo_client_profiles", "rka_imported_clients", "rka_demo_appointments"];
-  const localClients: any[] = [];
-
-  for (const k of localKeys) {
-    try {
-      const raw = localStorage.getItem(k);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) localClients.push(...parsed);
-      }
-    } catch {
-      // Ignore JSON parse errors
-    }
-  }
-
   const map = new Map<string, ClientHit>();
 
   const addOrUpdate = (
@@ -123,15 +107,6 @@ export async function searchClients(query: string, limit = 50): Promise<ClientHi
 
   // Populate from database appointments
   apptData.forEach((a: any) => addOrUpdate(a.client_first_name, a.client_last_name, a.client_email, a.client_phone, null, a.start_at));
-
-  // Populate from all localStorage keys
-  localClients.forEach((c: any) => {
-    const fn = c.first_name || c.firstName || c.client_first_name;
-    const ln = c.last_name || c.lastName || c.client_last_name;
-    const em = c.email || c.client_email;
-    const ph = c.phone || c.client_phone;
-    addOrUpdate(fn, ln, em, ph, c.dob, c.created_at || c.start_at);
-  });
 
   // Populate from clientService mock
   svcData.forEach((c: any) => addOrUpdate(c.first_name, c.last_name, c.email, c.phone, c.dob, c.created_at));

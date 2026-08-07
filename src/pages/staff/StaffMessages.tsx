@@ -9,6 +9,22 @@ import { format, formatDistanceToNow } from "date-fns";
 import { SmsThread } from "@/components/messaging/SmsThread";
 import { toast } from "sonner";
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return fallback;
+}
+
 type Row = {
   id: string;
   client_email: string;
@@ -48,8 +64,8 @@ export default function StaffMessages() {
     ]);
 
     const pmap: Record<string, { first_name: string; last_name: string; phone?: string | null }> = {};
-    for (const p of (profs ?? []) as any[]) {
-      pmap[String(p.email).toLowerCase()] = { first_name: p.first_name ?? "", last_name: p.last_name ?? "", phone: p.phone ?? null };
+    for (const p of (profs ?? []) as Record<string, unknown>[]) {
+      pmap[String(p.email).toLowerCase()] = { first_name: String(p.first_name ?? ""), last_name: String(p.last_name ?? ""), phone: (p.phone as string) ?? null };
     }
     setProfiles(pmap);
 
@@ -113,7 +129,7 @@ export default function StaffMessages() {
       .update({ read_by_staff_at: new Date().toISOString() })
       .is("read_by_staff_at", null)
       .eq("direction", "inbound");
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(getErrorMessage(error, "Could not mark messages as read")); return; }
     toast.success(`Marked ${totalUnread} message${totalUnread === 1 ? "" : "s"} as read`);
     setThreads(prev => prev.map(t => ({ ...t, unread: 0 })));
   };
@@ -320,14 +336,15 @@ function ComposeDialog({
       const { data, error } = await ApiClient.post("staff-send-sms", {
         body: { clientEmail: picked, message: message.trim() },
       });
-      if (error || (data as any)?.error) {
-        toast.error((data as any)?.error || error?.message || "Could not send SMS");
+      const resError = (data as { error?: unknown } | null)?.error;
+      if (error || resError) {
+        toast.error(getErrorMessage(resError || error, "Could not send SMS"));
         return;
       }
       toast.success("Message sent");
       onStart(picked);
-    } catch (e: any) {
-      toast.error(e?.message || "Could not send SMS");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "Could not send SMS"));
     } finally {
       setSending(false);
     }
