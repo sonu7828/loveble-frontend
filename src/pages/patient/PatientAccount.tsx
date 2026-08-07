@@ -2,7 +2,7 @@
 import { confirmDialog } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, authService, ApiClient, patientService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -119,24 +119,31 @@ export default function PatientAccount() {
         if (!session) { navigate("/account/auth"); return; }
         setUser(session.user);
 
-        const email = session.user.email?.toLowerCase();
+        // Fetch authenticated patient data via secure /patient REST endpoints (isolated by JWT userId)
+        const [meResult, apResult, csResult, { data: sv }, { data: st }, { data: loc }] = await Promise.all([
+          patientService.getMe().catch(() => null),
+          patientService.getMyAppointments().catch(() => []),
+          patientService.getMyConsents().catch(() => []),
+          apiQuery("services").select("id, name"),
+          apiQuery("staff_directory" as any).select("id, full_name, title"),
+          apiQuery("locations").select("id, name, city"),
+        ]);
 
-      const [{ data: prof }, { data: ap }, { data: cs }, { data: sv }, { data: st }, { data: loc }] = await Promise.all([
-        apiQuery("client_profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
-        apiQuery("appointments").select("*").ilike("client_email", email ?? "").order("start_at", { ascending: false }),
-        apiQuery("consent_signatures").select("*").ilike("client_email", email ?? "").order("signed_at", { ascending: false }),
-        apiQuery("services").select("id, name"),
-        apiQuery("staff_directory" as any).select("id, full_name, title"),
-        apiQuery("locations").select("id, name, city"),
-      ]);
-
-        const resolvedProfile = prof ?? {
-          id: "demo-profile",
+        const resolvedProfile = meResult ? {
+          id: meResult.id,
           user_id: session.user.id,
-          email: session.user.email ?? "user@gmail.com",
-          first_name: session.user.user_metadata?.first_name ?? "Demo",
-          last_name: session.user.user_metadata?.last_name ?? "User",
-          phone: session.user.user_metadata?.phone ?? "555-0199",
+          email: meResult.email,
+          first_name: meResult.firstName || meResult.first_name,
+          last_name: meResult.lastName || meResult.last_name,
+          phone: meResult.phone,
+          date_of_birth: meResult.dateOfBirth,
+        } : {
+          id: session.user.id,
+          user_id: session.user.id,
+          email: session.user.email,
+          first_name: session.user.first_name || "Patient",
+          last_name: session.user.last_name || "",
+          phone: "",
         };
 
         setProfile(resolvedProfile);
@@ -144,11 +151,27 @@ export default function PatientAccount() {
           firstName: resolvedProfile.first_name || "",
           lastName: resolvedProfile.last_name || "",
           phone: resolvedProfile.phone || "",
-          emergencyContact: resolvedProfile.emergency_contact || "",
+          emergencyContact: (resolvedProfile as any).emergency_contact || "",
         });
 
-        setAppts((ap ?? []) as Appt[]);
-        setConsents(cs ?? []);
+        // Map appointments returned from GET /patient/my-appointments
+        const mappedAppts = (apResult || []).map((a: any) => ({
+          id: a.id,
+          start_at: a.startAt || a.start_at,
+          end_at: a.endAt || a.end_at,
+          status: (a.status || "PENDING").toLowerCase(),
+          client_first_name: resolvedProfile.first_name,
+          client_last_name: resolvedProfile.last_name,
+          client_email: resolvedProfile.email,
+          client_phone: resolvedProfile.phone,
+          service_id: a.appointmentServices?.[0]?.serviceId || a.service_id,
+          staff_id: a.staffId || a.staff_id,
+          location_id: a.locationId || a.location_id,
+          consent_pdf_url: null,
+        }));
+
+        setAppts(mappedAppts);
+        setConsents(csResult || []);
         setServices(Object.fromEntries((sv ?? []).map((s: any) => [s.id, s.name])));
         setStaff(Object.fromEntries((st ?? []).map((s: any) => [s.id, { name: s.full_name, title: s.title }])));
         setLocations(Object.fromEntries((loc ?? []).map((l: any) => [l.id, { name: l.name, city: l.city }])));
@@ -384,9 +407,7 @@ export default function PatientAccount() {
                     const initials = (displayFirstName[0] ?? "P") + (displayLastName[0] ?? "");
                     
                     const rawEmail = (profile?.email || user?.email || "").trim();
-                    const displayEmail = (!rawEmail || rawEmail.toLowerCase() === "admin@gmail.com" || rawEmail.toLowerCase().includes("admin"))
-                      ? "user@gmail.com"
-                      : rawEmail;
+                    const displayEmail = rawEmail;
 
                     return (
                       <>

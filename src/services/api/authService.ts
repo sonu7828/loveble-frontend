@@ -121,6 +121,7 @@ export const authService = {
     user: UserProfile | null;
     mfaRequired?: boolean;
     mfaToken?: string;
+    mustChangePassword?: boolean;
     error: string | null;
   }> {
     const res = await ApiClient.post<{
@@ -129,6 +130,7 @@ export const authService = {
         user?: UserProfile;
         mfaRequired?: boolean;
         mfaToken?: string;
+        mustChangePassword?: boolean;
       };
       message?: string;
     }>("/auth/login", { email, password });
@@ -156,7 +158,7 @@ export const authService = {
         roles: (rawUser.roles || []).map((r: string) => normalizeRole(r)),
         staff_id: rawUser.staff_id || rawUser.id,
       };
-      return { user, error: null };
+      return { user, mustChangePassword: !!res.data.data.mustChangePassword, error: null };
     }
 
     return { user: null, error: "Login failed" };
@@ -178,6 +180,13 @@ export const authService = {
     if (result.mfaRequired) {
       return {
         data: { user: null, session: null, mfaRequired: true, mfaToken: result.mfaToken },
+        error: null,
+      };
+    }
+
+    if (result.mustChangePassword) {
+      return {
+        data: { user: result.user, session: { user: result.user }, mustChangePassword: true },
         error: null,
       };
     }

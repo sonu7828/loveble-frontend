@@ -1,11 +1,11 @@
 import { confirmDialog, promptDialog } from "@/components/ui/confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiQuery, authService, ApiClient, clientService } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { format } from "date-fns";
-import { Loader2, Search, Download, Send, Upload, CalendarPlus, MoreHorizontal, UserPlus, Ban, Trash2, ShieldOff, UserX, Calendar } from "lucide-react";
+import { Loader2, Search, Download, Send, Upload, CalendarPlus, MoreHorizontal, UserPlus, Ban, Trash2, ShieldOff, UserX, Calendar, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -21,7 +21,8 @@ type ImportRow = {
 type ImportedClient = { first_name: string; last_name: string; email: string; phone: string | null; dob: string | null; gender: string | null; notes?: string } & { id: string; invited_at: string | null };
 
 export default function StaffClients() {
-  const { canSeeAll, staffId, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const { canSeeAll, staffId, isAdmin, isPatientAccountManager } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [imported, setImported] = useState<ImportedClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -803,6 +804,11 @@ export default function StaffClients() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search clients…" className="pl-9 w-full sm:w-64" />
           </div>
+          {isPatientAccountManager && (
+            <Button variant="outline" size="sm" onClick={() => navigate("/staff/patient-accounts")} className="rounded-full">
+              <ShieldCheck className="h-4 w-4 mr-1.5 text-primary" /> Patient Login Accounts
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="rounded-full">

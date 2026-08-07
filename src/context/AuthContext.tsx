@@ -40,6 +40,7 @@ export interface AuthContextType {
   isPrivacyOfficer: boolean;
   isRNInjector: boolean;
   isPatient: boolean;
+  isPatientAccountManager: boolean;
   isProvider: boolean;
   isClinicalStaff: boolean;
   isPrivileged: boolean;
@@ -230,6 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isPrivacyOfficer = roles.includes("privacy_officer");
   const isRNInjector = roles.includes("rn_injector");
   const isPatient = roles.includes("patient");
+  const isPatientAccountManager = isAdmin || roles.includes("patient_account_manager" as any);
 
   const isProvider = isMedicalDirector || isNP || isRNInjector;
   const isClinicalStaff = isAdmin || isNP || isMedicalDirector || isRNInjector;
@@ -258,6 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isPrivacyOfficer,
     isRNInjector,
     isPatient,
+    isPatientAccountManager,
     isProvider,
     isClinicalStaff,
     isPrivileged,

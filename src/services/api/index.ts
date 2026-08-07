@@ -8,3 +8,5 @@ export * from "./clinicalService";
 export * from "./adminService";
 export * from "./tableService";
 export * from "./billingService";
+export * from "./patientService";
+export * from "./patientAccountService";

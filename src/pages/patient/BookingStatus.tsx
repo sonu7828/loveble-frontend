@@ -51,12 +51,10 @@ const BookingStatus = () => {
       } catch { }
 
       if (!appt) {
-        try {
-          const res = await ApiClient.get<any>(`/booking?token=${encodeURIComponent(tokenParam)}`);
-          if (res.data) {
-            appt = res.data.data || res.data;
-          }
-        } catch { }
+        // Token not found in system
+        setLoading(false);
+        setLoadError("Booking token not found.");
+        return;
       }
 
       if (appt) {
