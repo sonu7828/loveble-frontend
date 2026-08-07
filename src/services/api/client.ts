@@ -113,8 +113,10 @@ export class ApiClient {
     options: RequestInit = {},
     maxRetries = 4
   ): Promise<ApiResponse<T>> {
+    const storedToken = localStorage.getItem("rka_access_token") || localStorage.getItem("rka_token") || sessionStorage.getItem("rka_access_token");
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
       ...(options.headers as Record<string, string>),
     };
 
