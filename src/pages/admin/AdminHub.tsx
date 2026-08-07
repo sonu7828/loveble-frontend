@@ -33,19 +33,20 @@ export default function AdminHub() {
       try {
         const [
           { data: servicesData },
-          { data: staffData },
+          rawStaffData,
           { data: phiLogs },
         ] = await Promise.all([
           apiQuery("services" as any).select("id"),
-          apiQuery("staff_profiles" as any).select("id").eq("deleted_at", null),
+          staffService.getStaffProfiles(false),
           apiQuery("phi_access_log" as any).select("id, action, resource, created_at, user_id").order("created_at", { ascending: false }).limit(5),
         ]);
 
-        const dbCount = Array.isArray(staffData) ? staffData.length : 1;
+        const staffList: any[] = Array.isArray(rawStaffData) ? rawStaffData : (rawStaffData as any)?.data || (rawStaffData as any)?.staff || [];
+        const staffCount = staffList.length;
 
         setCounts({
           modelApps: 0,
-          staffCount: dbCount,
+          staffCount: staffCount,
           servicesCount: Array.isArray(servicesData) ? servicesData.length : 60,
           auditLogCount: Array.isArray(phiLogs) ? phiLogs.length : 0,
         });
