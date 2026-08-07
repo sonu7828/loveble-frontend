@@ -244,16 +244,8 @@ export default function AdminTeam() {
         });
 
         const targetMember = members.find((m) => m.id === draft.id);
-        if (targetMember?.user_id) {
-          try {
-            await apiQuery("user_roles" as any).delete().eq("user_id", targetMember.user_id);
-            await apiQuery("user_roles" as any).insert([
-              { user_id: targetMember.user_id, role: draft.role },
-              ...((draft.role as string) !== "staff" && (draft.role as string) !== "front_desk" ? [{ user_id: targetMember.user_id, role: "front_desk" }] : []),
-            ]);
-          } catch (e) {}
-        }
 
+        // Update local member state immediately for instant UI feedback
         setMembers((prev) =>
           prev.map((m) =>
             m.id === draft.id
@@ -272,6 +264,21 @@ export default function AdminTeam() {
         if (targetMember?.user_id) {
           setRoles((prev) => ({ ...prev, [targetMember.user_id!]: [draft.role] }));
         }
+
+        // Update localStorage approved accounts with new role
+        try {
+          const approvedAccounts: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+          const filtered = approvedAccounts.filter((a) => a.email?.toLowerCase() !== email);
+          filtered.push({
+            id: draft.id,
+            email,
+            password,
+            full_name: draft.full_name.trim(),
+            role: draft.role,
+          });
+          localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(filtered));
+          window.dispatchEvent(new Event("rka_staff_updated"));
+        } catch (_err) {}
 
         toast.success(`Member ${draft.full_name} updated successfully!`);
       } catch (e: any) {

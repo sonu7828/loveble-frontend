@@ -332,7 +332,7 @@ export function ProviderDashboard() {
           <Button size="sm" onClick={() => navigate("/staff/clinical/notes/new")} className="gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs">
             <Plus className="h-3.5 w-3.5" /> Create Clinical Note
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clinical/clients")} className="gap-1.5 text-xs">
+          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clients")} className="gap-1.5 text-xs">
             <Users className="h-3.5 w-3.5" /> View Patients
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate("/staff/calendar")} className="gap-1.5 text-xs">
