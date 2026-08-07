@@ -257,6 +257,38 @@ export default function StaffNewAppointment() {
         createdId = `apt-${Date.now()}`;
       }
 
+      // Save to rka_demo_appointments in localStorage for offline & demo resilience
+      const selectedServicesList = services.filter(s => serviceIds.includes(s.id));
+      const serviceNameLabel = selectedServicesList.map(s => s.name).join(" + ") || "Aesthetic Treatment";
+      const staffMember = staff.find(s => s.id === staffIdSel);
+      const locationMember = locations.find(l => l.id === locationId);
+
+      const newAppt = {
+        id: createdId,
+        status: "confirmed",
+        start_at: pickedSlot || new Date().toISOString(),
+        end_at: pickedSlot ? new Date(new Date(pickedSlot).getTime() + (totalMinutes || 30) * 60000).toISOString() : new Date().toISOString(),
+        client_first_name: client.firstName,
+        client_last_name: client.lastName,
+        client_email: client.email,
+        client_phone: client.phone,
+        client_dob: client.dob,
+        service_id: serviceIds[0] || "",
+        service_name: serviceNameLabel,
+        staff_id: staffIdSel,
+        staff_name: staffMember?.full_name || "Nurse Practitioner",
+        location_id: locationId,
+        location_name: locationMember?.name || "Main Clinic",
+        created_at: new Date().toISOString(),
+      };
+
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const updated = [...local.filter((a: any) => a.id !== createdId), newAppt];
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+        window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+      } catch { }
+
       toast.success("Appointment created");
       navigate(`/staff/appointments/${createdId}`);
     } catch (err: any) {

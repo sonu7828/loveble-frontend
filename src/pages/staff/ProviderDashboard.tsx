@@ -325,17 +325,14 @@ export function ProviderDashboard() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => loadData()} disabled={loading} className="gap-1.5 text-xs">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button size="sm" onClick={() => navigate("/staff/clinical/notes/new")} className="gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs">
+        <div className="flex items-center gap-2 shrink-0">
+          <Button size="sm" onClick={() => navigate("/staff/clinical/notes/new")} className="gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs whitespace-nowrap">
             <Plus className="h-3.5 w-3.5" /> Create Clinical Note
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clinical/clients")} className="gap-1.5 text-xs">
+          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clinical/clients")} className="gap-1.5 text-xs whitespace-nowrap">
             <Users className="h-3.5 w-3.5" /> View Patients
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate("/staff/calendar")} className="gap-1.5 text-xs">
+          <Button variant="outline" size="sm" onClick={() => navigate("/staff/calendar")} className="gap-1.5 text-xs whitespace-nowrap">
             <CalIcon className="h-3.5 w-3.5" /> Today's Schedule
           </Button>
         </div>
@@ -457,12 +454,12 @@ export function ProviderDashboard() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/50 text-muted-foreground border-b border-border uppercase tracking-wider text-[10px]">
                   <tr>
-                    <th className="p-3 font-semibold">Date & Time</th>
-                    <th className="p-3 font-semibold">Patient Name</th>
-                    <th className="p-3 font-semibold">Treatment / Service</th>
-                    <th className="p-3 font-semibold">Assigned Nurse</th>
-                    <th className="p-3 font-semibold">Status</th>
-                    <th className="p-3 font-semibold text-right">Action</th>
+                    <th className="p-3 font-semibold whitespace-nowrap">Date & Time</th>
+                    <th className="p-3 font-semibold whitespace-nowrap">Patient Name</th>
+                    <th className="p-3 font-semibold min-w-[200px]">Treatment / Service</th>
+                    <th className="p-3 font-semibold whitespace-nowrap">Assigned Nurse</th>
+                    <th className="p-3 font-semibold whitespace-nowrap">Status</th>
+                    <th className="p-3 font-semibold text-right whitespace-nowrap">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -479,20 +476,24 @@ export function ProviderDashboard() {
                   ) : (
                     displayedAppts.map((a) => (
                       <tr key={a.id} className="hover:bg-muted/30 transition">
-                        <td className="p-3 font-mono font-medium text-foreground whitespace-nowrap">
+                        <td className="p-3 font-mono font-medium text-foreground whitespace-nowrap align-top">
                           {formatClinicDateTime(a.start_at)}
                         </td>
-                        <td className="p-3 font-semibold text-foreground">
+                        <td className="p-3 font-semibold text-foreground align-top whitespace-nowrap">
                           {a.client_first_name} {a.client_last_name}
                           <div className="text-[10px] font-normal text-muted-foreground">{a.client_phone || a.client_email}</div>
                         </td>
-                        <td className="p-3 text-muted-foreground font-medium">{a.service_name || "Aesthetic Treatment"}</td>
-                        <td className="p-3 font-medium text-foreground">
+                        <td className="p-3 text-muted-foreground font-medium align-top max-w-[240px]">
+                          <div className="line-clamp-2 leading-relaxed" title={a.service_name || "Aesthetic Treatment"}>
+                            {a.service_name || "Aesthetic Treatment"}
+                          </div>
+                        </td>
+                        <td className="p-3 font-medium text-foreground align-top whitespace-nowrap">
                           <Badge variant="outline" className="text-[10px] bg-secondary/40">
                             {a.staff_name || a.staff_profiles?.full_name || providerName}
                           </Badge>
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 align-top whitespace-nowrap">
                           {a.status === "completed" ? (
                             <Badge className="bg-blue-600 text-white text-[10px] uppercase">Completed & Paid</Badge>
                           ) : a.status === "arrived" || a.checked_in_at ? (
@@ -505,7 +506,7 @@ export function ProviderDashboard() {
                             <Badge variant="outline" className="text-[10px] uppercase">{a.status}</Badge>
                           )}
                         </td>
-                        <td className="p-3 text-right whitespace-nowrap space-x-1.5">
+                        <td className="p-3 text-right whitespace-nowrap space-x-1.5 align-top">
                           {a.status !== "arrived" && !a.checked_in_at && a.status !== "completed" && (
                             <Button
                               size="sm"
@@ -529,7 +530,14 @@ export function ProviderDashboard() {
                             size="sm"
                             variant="default"
                             className="h-7 text-xs bg-primary text-primary-foreground gap-1"
-                            onClick={() => navigate(`/staff/clinical/clients/${encodeURIComponent(a.client_email || "patient@example.com")}`)}
+                            disabled={!a.client_email}
+                            onClick={() => {
+                              if (a.client_email) {
+                                navigate(`/staff/clinical/clients/${encodeURIComponent(a.client_email)}`);
+                              } else {
+                                navigate(`/staff/appointments/${a.id}`);
+                              }
+                            }}
                           >
                             <FileText className="h-3 w-3" /> Open Chart
                           </Button>

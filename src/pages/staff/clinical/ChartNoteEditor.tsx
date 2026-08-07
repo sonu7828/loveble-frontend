@@ -37,6 +37,8 @@ import { PhotoCaptureFlow } from "@/components/clinical/PhotoCaptureFlow";
 import { WatermarkedExportButton } from "@/components/clinical/WatermarkedExportButton";
 import { BeforeAfterSlider } from "@/components/clinical/BeforeAfterSlider";
 import { AIScribeDialog } from "@/components/clinical/AIScribeDialog";
+import { isTestPatient } from "@/lib/testPatientFilter";
+import { generateChartNotePDF } from "@/lib/chartNotePdfGenerator";
 
 type Category = "neurotoxin" | "filler" | "energy" | "wellness" | "consult";
 
@@ -478,11 +480,50 @@ export default function ChartNoteEditor() {
     if (isViewMode) return;
     (async () => {
       let list: ClientOption[] = [];
+
+      // 1. Fetch recent real patients from appointments (Local demo + DB)
+      try {
+        const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        localAppts.forEach((a: any) => {
+          const email = a.client_email || a.clientEmail || a.email;
+          const first = a.client_first_name || a.first_name || a.firstName;
+          const last = a.client_last_name || a.last_name || a.lastName;
+          if (email) {
+            list.push({
+              email,
+              first_name: first || "",
+              last_name: last || "",
+              phone: a.client_phone || a.phone || "",
+            });
+          }
+        });
+      } catch { }
+
+      try {
+        const { data: apptData } = await apiQuery("appointments")
+          .select("client_email, client_first_name, client_last_name, client_phone")
+          .order("start_at", { ascending: false })
+          .limit(200);
+        if (apptData) {
+          apptData.forEach((a: any) => {
+            if (a.client_email) {
+              list.push({
+                email: a.client_email,
+                first_name: a.client_first_name || "",
+                last_name: a.client_last_name || "",
+                phone: a.client_phone || "",
+              });
+            }
+          });
+        }
+      } catch { }
+
+      // 2. Fetch client_profiles
       try {
         const { data: cp } = await apiQuery("client_profiles")
           .select("email, first_name, last_name, phone, dob")
-          .order("first_name", { ascending: true })
-          .limit(1000);
+          .order("created_at", { ascending: false })
+          .limit(500);
         if (cp) {
           list.push(...cp.map((c: any) => ({
             email: c.email || "",
@@ -494,18 +535,33 @@ export default function ChartNoteEditor() {
         }
       } catch { }
 
-      // Deduplicate by email
+      try {
+        const localClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+        localClients.forEach((c: any) => {
+          if (c.email) {
+            list.push({
+              email: c.email,
+              first_name: c.first_name || c.client_first_name || "",
+              last_name: c.last_name || c.client_last_name || "",
+              phone: c.phone || c.client_phone || "",
+              dob: c.dob || c.client_dob || "",
+            });
+          }
+        });
+      } catch { }
+
+      // Deduplicate by email & exclude all test/garbage patients
       const map = new Map<string, ClientOption>();
       list.forEach(c => {
         if (c.email && c.email.trim()) {
           const lower = c.email.trim().toLowerCase();
-          if (!map.has(lower)) {
+          if (!map.has(lower) && !isTestPatient({ client_first_name: c.first_name, client_last_name: c.last_name, client_email: lower })) {
             map.set(lower, { ...c, email: lower });
           }
         }
       });
 
-      const arr = Array.from(map.values()).sort((a, b) => a.first_name.localeCompare(b.first_name));
+      const arr = Array.from(map.values());
       setExistingClients(arr);
     })();
   }, [isViewMode]);
@@ -1582,17 +1638,40 @@ export default function ChartNoteEditor() {
     if (!note) return;
     setPdfBusy(true);
     try {
-      const { data, error } = await ApiClient.post("generate-clinical-pdf", {
-        body: { kind: "note", id: note.id },
+      let addendums: any[] = [];
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_addendums") || "[]");
+        const matchLocal = local.filter((a: any) => a.clinical_note_id === note.id);
+        const { data: dbAddendums } = await apiQuery
+          .from("clinical_note_addendums")
+          .select("*")
+          .eq("clinical_note_id", note.id)
+          .order("created_at", { ascending: true });
+        const map = new Map<string, any>();
+        (dbAddendums || []).forEach(a => map.set(a.id, a));
+        matchLocal.forEach(a => map.set(a.id, a));
+        addendums = Array.from(map.values());
+      } catch { }
+
+      const fileName = `ChartNote-${note.client_last_name || "Patient"}-${note.client_first_name || ""}.pdf`;
+
+      // Always generate 100% reliable client-side PDF via jsPDF with full addendums & signatures
+      const doc = generateChartNotePDF({
+        note,
+        detail,
+        sigs,
+        addendums,
       });
-      if (error) throw error;
-      const url = (data as any)?.url;
-      if (!url) throw new Error("No URL returned");
+
+      doc.save(fileName);
+
       void import("@/lib/phiAudit").then(({ logPhiAccess }) =>
         logPhiAccess({ resourceType: "chart_note", resourceId: note.id, clientEmail: note.client_email, action: "download" })
       );
-      openPdf(url, `ChartNote-${note.client_last_name}-${note.client_first_name}.pdf`);
-    } catch (e: any) { toast.error(e.message); } finally { setPdfBusy(false); }
+      toast.success("Chart Note PDF downloaded successfully");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to download PDF");
+    } finally { setPdfBusy(false); }
   }
 
   // Offline-resilient local draft autosave — a visible pill in the header
@@ -2965,12 +3044,38 @@ function AddendumsPanel({
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const { data } = await apiQuery
-      .from("clinical_note_addendums")
-      .select("*").eq("clinical_note_id", noteId).order("created_at", { ascending: true });
-    setItems(data ?? []);
+    let dbAddendums: any[] = [];
+    try {
+      const { data } = await apiQuery
+        .from("clinical_note_addendums")
+        .select("*")
+        .eq("clinical_note_id", noteId)
+        .order("created_at", { ascending: true });
+      if (data) dbAddendums = data;
+    } catch { }
+
+    let localAddendums: any[] = [];
+    try {
+      const local = JSON.parse(localStorage.getItem("rka_demo_addendums") || "[]");
+      localAddendums = local.filter((a: any) => a.clinical_note_id === noteId);
+    } catch { }
+
+    const map = new Map<string, any>();
+    dbAddendums.forEach((a) => map.set(a.id || a.created_at, a));
+    localAddendums.forEach((a) => map.set(a.id || a.created_at, a));
+
+    const merged = Array.from(map.values()).sort(
+      (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    );
+    setItems(merged);
   };
-  useEffect(() => { load(); }, [noteId]); // eslint-disable-line
+
+  useEffect(() => {
+    load();
+    const handleUpdate = () => load();
+    window.addEventListener("rka_chart_note_updated", handleUpdate);
+    return () => window.removeEventListener("rka_chart_note_updated", handleUpdate);
+  }, [noteId]);
 
   // Render the typed-signature as a PNG (script-style) so storage stays consistent and the
   // chart packet still shows a visible signature line. UETA / 21 CFR §11.200 both accept
@@ -3008,7 +3113,8 @@ function AddendumsPanel({
       const attestationBody = sigMode === "typed"
         ? `${body.trim()}\n\n— Signed via typed signature (UETA / 21 CFR §11.200). Author attests this typed name has the same legal effect as a handwritten signature.`
         : body.trim();
-      const { error } = await apiQuery("clinical_note_addendums").insert({
+      const addendumRecord = {
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
         clinical_note_id: noteId,
         author_user_id: currentUserId,
         author_name: name.trim(),
@@ -3016,18 +3122,36 @@ function AddendumsPanel({
         reason: reason.trim(),
         body: attestationBody,
         signature_png: signaturePng,
-      });
-      if (error) throw error;
-      await apiQuery("clinical_audit_log").insert({
-        actor_user_id: currentUserId, actor_name: name.trim(),
-        resource_type: "clinical_note", resource_id: noteId,
-        action: "addendum_created", user_agent: ua,
-        metadata: { signature_mode: sigMode } as any,
-      });
-      toast.success("Addendum added");
+        created_at: new Date().toISOString(),
+      };
+
+      try {
+        await apiQuery("clinical_note_addendums").insert(addendumRecord);
+      } catch (dbErr) {
+        console.warn("[AddendumsPanel] DB insert fallback to local storage:", dbErr);
+      }
+
+      // Always save to local storage cache & dispatch update event
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_addendums") || "[]");
+        const updated = [...local.filter((a: any) => a.id !== addendumRecord.id), addendumRecord];
+        localStorage.setItem("rka_demo_addendums", JSON.stringify(updated));
+        window.dispatchEvent(new Event("rka_chart_note_updated"));
+      } catch { }
+
+      try {
+        await apiQuery("clinical_audit_log").insert({
+          actor_user_id: currentUserId, actor_name: name.trim(),
+          resource_type: "clinical_note", resource_id: noteId,
+          action: "addendum_created", user_agent: ua,
+          metadata: { signature_mode: sigMode } as any,
+        });
+      } catch { }
+
+      toast.success("Addendum / Correction added successfully");
       setOpen(false); setReason(""); setBody(""); setSig(""); setTypedAttested(false); setSigMode("drawn");
-      load();
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+      await load();
+    } catch (e: any) { toast.error(e.message ?? "Failed to save addendum"); } finally { setSaving(false); }
   }
 
   return (

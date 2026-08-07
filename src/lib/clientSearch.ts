@@ -1,4 +1,5 @@
 import { apiQuery, clientService } from "@/services/api";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 export type ClientHit = {
   first_name: string | null;
@@ -47,7 +48,7 @@ async function fetchServiceClients(q: string): Promise<any[]> {
 }
 
 /**
- * Robust canonical client search querying database profiles, imported clients, appointments & localStorage.
+ * Robust canonical client search querying database profiles, imported clients, appointments & localStorage, excluding dummy/test patients.
  */
 export async function searchClients(query: string, limit = 50): Promise<ClientHit[]> {
   const q = query.trim().toLowerCase();
@@ -101,7 +102,7 @@ export async function searchClients(query: string, limit = 50): Promise<ClientHi
 
   // Populate from database client_profiles
   cpData.forEach((c: any) => addOrUpdate(c.first_name, c.last_name, c.email, c.phone, c.dob, c.created_at));
-  
+
   // Populate from database imported_clients
   impData.forEach((c: any) => addOrUpdate(c.first_name, c.last_name, c.email, c.phone, c.dob, c.created_at));
 
@@ -111,7 +112,15 @@ export async function searchClients(query: string, limit = 50): Promise<ClientHi
   // Populate from clientService mock
   svcData.forEach((c: any) => addOrUpdate(c.first_name, c.last_name, c.email, c.phone, c.dob, c.created_at));
 
-  let list = Array.from(map.values());
+  // Populate from local storage demo clients & demo appointments
+  try {
+    const demoClients: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+    demoClients.forEach((c: any) => addOrUpdate(c.first_name || c.client_first_name, c.last_name || c.client_last_name, c.email || c.client_email, c.phone || c.client_phone, c.dob, c.created_at));
+    const demoAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+    demoAppts.forEach((a: any) => addOrUpdate(a.client_first_name || a.first_name, a.client_last_name || a.last_name, a.client_email || a.email, a.client_phone || a.phone, null, a.start_at));
+  } catch { }
+
+  let list = Array.from(map.values()).filter((c) => !isTestPatient(c));
 
   if (q) {
     list = list.filter((c) => {

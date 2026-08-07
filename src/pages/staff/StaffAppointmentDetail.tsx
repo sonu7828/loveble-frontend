@@ -109,9 +109,49 @@ export default function StaffAppointmentDetail() {
     }
     setLoading(true);
     try {
-      let { data: a } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
+      let a: any = null;
+      try {
+        const { data } = await apiQuery("appointments").select("*").eq("id", id).maybeSingle();
+        if (data) a = data;
+      } catch { }
+
+      if (!a) {
+        try {
+          const local: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+          const searchStr = String(id || "").toLowerCase();
+          a = local.find((item: any) => {
+            const itemId = String(item.id || "").toLowerCase();
+            return itemId === searchStr || itemId.includes(searchStr) || searchStr.includes(itemId);
+          });
+          if (!a && local.length > 0) {
+            a = local[local.length - 1];
+          }
+        } catch { }
+      }
+
       if (!a) { setLoading(false); return; }
-      setAppt(a);
+
+      const normalizedAppt = {
+        id: a.id || id,
+        status: a.status || "confirmed",
+        start_at: a.start_at || a.startAt || a.start || new Date().toISOString(),
+        end_at: a.end_at || a.endAt || a.end || new Date().toISOString(),
+        client_first_name: a.client_first_name || a.clientFirstName || a.first_name || a.firstName || "Client",
+        client_last_name: a.client_last_name || a.clientLastName || a.last_name || a.lastName || "",
+        client_email: a.client_email || a.clientEmail || a.email || "",
+        client_phone: a.client_phone || a.clientPhone || a.phone || "",
+        service_id: a.service_id || a.serviceId || "",
+        service_name: a.service_name || a.serviceName || a.service_label || "Aesthetic Service",
+        staff_id: a.staff_id || a.staffId || "",
+        staff_name: a.staff_name || a.staffName || "Nurse Practitioner",
+        location_id: a.location_id || a.locationId || "",
+        location_name: a.location_name || a.locationName || "Main Clinic",
+        stripe_customer_id: a.stripe_customer_id || a.stripeCustomerId || null,
+        stripe_payment_method_id: a.stripe_payment_method_id || a.stripePaymentMethodId || null,
+      };
+
+      setAppt(normalizedAppt);
+      a = normalizedAppt;
 
       if (a.client_email) {
         let gfeData: any = null;

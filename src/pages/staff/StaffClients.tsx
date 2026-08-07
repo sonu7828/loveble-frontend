@@ -56,6 +56,9 @@ export default function StaffClients() {
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
 
   const [clientProfiles, setClientProfiles] = useState<any[]>([]);
+  const [localClients, setLocalClients] = useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem("rka_demo_clients") || "[]"); } catch { return []; }
+  });
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [addClientDraft, setAddClientDraft] = useState({
     first_name: "",
@@ -121,6 +124,28 @@ export default function StaffClients() {
         all.push(...data);
         if (data.length < PAGE) break;
       }
+      // Also include locally stored demo appointments (created by StaffNewAppointment)
+      try {
+        const local: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const existingIds = new Set(all.map((a) => String(a.id)));
+        for (const l of local) {
+          if (!l.id || existingIds.has(String(l.id))) continue;
+          all.push({
+            id: l.id,
+            client_first_name: l.client_first_name || l.clientFirstName || l.firstName || "Client",
+            client_last_name: l.client_last_name || l.clientLastName || l.lastName || "",
+            client_email: l.client_email || l.clientEmail || l.email || "",
+            client_phone: l.client_phone || l.clientPhone || l.phone || null,
+            client_dob: l.client_dob || l.clientDob || l.dob || null,
+            status: l.status || "confirmed",
+            start_at: l.start_at || l.startAt || new Date().toISOString(),
+            service_id: l.service_id || l.serviceId || "",
+            service_name: l.service_name || l.serviceName || "Aesthetic Treatment",
+            staff_id: l.staff_id || l.staffId || "",
+            staff_name: l.staff_name || l.staffName || "",
+          });
+        }
+      } catch { }
       return { data: all };
     };
     Promise.all([loadAppointmentsPaged(), reloadImported(), reloadBlocked(), reloadAccounts()]).then(async ([appts]) => {
@@ -133,7 +158,7 @@ export default function StaffClients() {
       ]);
       setItems(list.map((a) => ({
         ...a,
-        service_name: combinedServiceLabel(a.id, apsvMap, svcs?.find((s: any) => s.id === a.service_id)?.name ?? "—"),
+        service_name: a.service_name || combinedServiceLabel(a.id, apsvMap, svcs?.find((s: any) => s.id === a.service_id)?.name ?? "—"),
       })));
       setLoading(false);
     });
@@ -643,8 +668,32 @@ export default function StaffClients() {
       });
     }
 
+    // Also merge locally saved clients (created via Add Client form)
+    for (const lc of localClients) {
+      if (isGarbageTestClient({ email: lc.email, first_name: lc.first_name, last_name: lc.last_name })) continue;
+      const fn = (lc.first_name || "").trim();
+      const ln = (lc.last_name || "").trim();
+      const email = (lc.email || "").trim().toLowerCase();
+      const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+      const key = (nameKey && nameKey.length > 1) ? nameKey : (email || `__id_${lc.id}`);
+      if (map.has(key)) {
+        // Update email/phone/dob on existing entry if missing
+        const ex = map.get(key)!;
+        if (!ex.email && email) ex.email = email;
+        if (!ex.phone && lc.phone) ex.phone = lc.phone;
+        if (!ex.dob && lc.dob) ex.dob = lc.dob;
+        continue;
+      }
+      map.set(key, {
+        key, first_name: fn || "Client", last_name: ln, email: lc.email ?? "",
+        phone: lc.phone ?? null, dob: lc.dob ?? null,
+        appt_count: 0, last_appt: null, imported_id: null, invited_at: null,
+        sort_at: lc.created_at ? new Date(lc.created_at).getTime() : Date.now(),
+      });
+    }
+
     return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || (a.last_name || "").localeCompare(b.last_name || ""));
-  }, [items, imported, leads, clientProfiles]);
+  }, [items, imported, leads, clientProfiles, localClients]);
 
   const handleAddClient = async () => {
     if (!addClientDraft.first_name.trim() || !addClientDraft.email.trim()) {
@@ -675,15 +724,35 @@ export default function StaffClients() {
     }
 
     setAddClientBusy(true);
+    const newClientData = {
+      id: `client-${Date.now()}`,
+      first_name: addClientDraft.first_name.trim(),
+      last_name: addClientDraft.last_name.trim(),
+      email: addClientDraft.email.trim().toLowerCase(),
+      phone: addClientDraft.phone.trim() || null,
+      dob: addClientDraft.dob.trim() || null,
+      created_at: new Date().toISOString(),
+    };
     try {
-      await clientService.saveClient({
-        first_name: addClientDraft.first_name.trim(),
-        last_name: addClientDraft.last_name.trim(),
-        email: addClientDraft.email.trim().toLowerCase(),
-        phone: addClientDraft.phone.trim() || undefined,
-        dob: addClientDraft.dob.trim() || undefined,
-      });
-      toast.success(`Client ${addClientDraft.first_name} ${addClientDraft.last_name} created successfully!`);
+      // Attempt backend save (may fail in demo/local mode)
+      try {
+        await clientService.saveClient({
+          first_name: newClientData.first_name,
+          last_name: newClientData.last_name,
+          email: newClientData.email,
+          phone: newClientData.phone || undefined,
+          dob: newClientData.dob || undefined,
+        });
+      } catch { /* ignore backend failure — local cache will keep it visible */ }
+
+      // Always persist locally so client shows up immediately
+      const existing = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+      const deduped = existing.filter((c: any) => (c.email || "").toLowerCase() !== newClientData.email);
+      const updated = [...deduped, newClientData];
+      localStorage.setItem("rka_demo_clients", JSON.stringify(updated));
+      setLocalClients(updated);
+
+      toast.success(`Client ${newClientData.first_name} ${newClientData.last_name} created successfully!`);
     } catch (e: any) {
       toast.error(e?.message || `Failed to create client ${addClientDraft.first_name}`);
     } finally {

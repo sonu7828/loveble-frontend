@@ -23,7 +23,7 @@ import {
   GFE_ASSESSMENT_GROUPS, GFE_PLAN_GROUPS, GFE_QUICK_PRESETS,
 } from "@/lib/clinicalOptions";
 import { format, formatDistanceToNow } from "date-fns";
-
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 const uniqueStrings = (items?: string[] | null) => Array.from(new Set((items ?? []).filter(Boolean)));
 const normalizeDraftText = (value?: string | null) => (value ?? "").trim().toLowerCase();
@@ -172,11 +172,50 @@ export default function GFEForm() {
     if (isViewMode) return;
     (async () => {
       let list: ClientOption[] = [];
+
+      // 1. Fetch recent real patients from appointments (Local demo + DB)
+      try {
+        const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        localAppts.forEach((a: any) => {
+          const email = a.client_email || a.clientEmail || a.email;
+          const first = a.client_first_name || a.first_name || a.firstName;
+          const last = a.client_last_name || a.last_name || a.lastName;
+          if (email) {
+            list.push({
+              email,
+              first_name: first || "",
+              last_name: last || "",
+              phone: a.client_phone || a.phone || "",
+            });
+          }
+        });
+      } catch { }
+
+      try {
+        const { data: apptData } = await apiQuery("appointments")
+          .select("client_email, client_first_name, client_last_name, client_phone")
+          .order("start_at", { ascending: false })
+          .limit(200);
+        if (apptData) {
+          apptData.forEach((a: any) => {
+            if (a.client_email) {
+              list.push({
+                email: a.client_email,
+                first_name: a.client_first_name || "",
+                last_name: a.client_last_name || "",
+                phone: a.client_phone || "",
+              });
+            }
+          });
+        }
+      } catch { }
+
+      // 2. Fetch client_profiles
       try {
         const { data: cp } = await apiQuery("client_profiles")
           .select("email, first_name, last_name, phone, dob")
-          .order("first_name", { ascending: true })
-          .limit(1000);
+          .order("created_at", { ascending: false })
+          .limit(500);
         if (cp) {
           list.push(...cp.map((c: any) => ({
             email: c.email || "",
@@ -203,18 +242,18 @@ export default function GFEForm() {
         });
       } catch { }
 
-      // Deduplicate by email
+      // Deduplicate by email & exclude all test/garbage patients
       const map = new Map<string, ClientOption>();
       list.forEach(c => {
         if (c.email && c.email.trim()) {
           const lower = c.email.trim().toLowerCase();
-          if (!map.has(lower)) {
+          if (!map.has(lower) && !isTestPatient({ client_first_name: c.first_name, client_last_name: c.last_name, client_email: lower })) {
             map.set(lower, { ...c, email: lower });
           }
         }
       });
 
-      const arr = Array.from(map.values()).sort((a, b) => a.first_name.localeCompare(b.first_name));
+      const arr = Array.from(map.values());
       setExistingClients(arr);
     })();
   }, [isViewMode]);

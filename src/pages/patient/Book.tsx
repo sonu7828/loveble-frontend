@@ -229,6 +229,8 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
     const newAppointmentPayload = {
       client_first_name: client.firstName,
       client_last_name: client.lastName,
+      first_name: client.firstName,
+      last_name: client.lastName,
       client_email: client.email.toLowerCase(),
       client_phone: client.phone,
       client_dob: client.dob || null,
@@ -299,24 +301,38 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
         }
       } catch { }
 
-      // If backend returned 403 Forbidden or error, or if no token was returned:
+      const genId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `apt-${Date.now()}`;
       if (!createdToken) {
-        const genId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `apt-${Date.now()}`;
         createdToken = `bk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        createdAppt = {
-          id: genId,
-          booking_token: createdToken,
-          bookingToken: createdToken,
-          token: createdToken,
-          ...newAppointmentPayload,
-        };
-        try {
-          const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-          localList.unshift(createdAppt);
-          localStorage.setItem("rka_demo_appointments", JSON.stringify(localList));
-          window.dispatchEvent(new Event("rka_appointment_created"));
-        } catch { }
       }
+
+      const fullApptRecord = {
+        id: createdAppt?.id || genId,
+        booking_token: createdToken,
+        bookingToken: createdToken,
+        token: createdToken,
+        ...newAppointmentPayload,
+        ...(createdAppt || {}),
+        client_first_name: client.firstName,
+        client_last_name: client.lastName,
+        first_name: client.firstName,
+        last_name: client.lastName,
+        service_name: selectedSvcNames,
+        services_list: selectedServices,
+        total_amount_cents: totalAmountCents,
+      };
+
+      try {
+        const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const existingIdx = localList.findIndex((item: any) => item.id === fullApptRecord.id || item.booking_token === createdToken);
+        if (existingIdx >= 0) {
+          localList[existingIdx] = fullApptRecord;
+        } else {
+          localList.unshift(fullApptRecord);
+        }
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(localList));
+        window.dispatchEvent(new Event("rka_appointment_created"));
+      } catch { }
 
       // Record client profile on server or local storage
       try {
