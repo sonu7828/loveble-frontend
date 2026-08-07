@@ -7,8 +7,7 @@
  * NO localStorage / sessionStorage used for user, roles, tokens, or sessions.
  */
 
-import { useAuthContext, AuthContextType, AppRole } from "@/context/AuthContext";
-import { resolveLandingRoute } from "@/lib/authRoutes";
+import { useAuthContext, AuthContextType, AppRole, resolveLandingRoute } from "@/context/AuthContext";
 
 export type { AppRole, AuthContextType as AuthState };
 export { resolveLandingRoute };
@@ -16,4 +15,3 @@ export { resolveLandingRoute };
 export function useAuth(): AuthContextType {
   return useAuthContext();
 }
-

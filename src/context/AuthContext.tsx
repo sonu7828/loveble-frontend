@@ -61,6 +61,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_CHANNEL = "rka_auth_channel";
 
+export function resolveLandingRoute(roles: AppRole[]): string {
+  if (roles.includes("admin")) return "/admin/hub";
+  if (roles.includes("privacy_officer")) return "/staff/security-officer";
+  if (
+    roles.includes("nurse_practitioner") ||
+    roles.includes("medical_director") ||
+    roles.includes("rn_injector") ||
+    roles.includes("front_desk")
+  ) {
+    return "/staff/today";
+  }
+  if (roles.includes("patient")) return "/account";
+  return "/staff/today";
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
