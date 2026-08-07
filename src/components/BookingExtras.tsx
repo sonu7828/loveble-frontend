@@ -54,19 +54,19 @@ export function CalendarAndMap({
   const mapHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
 
   return (
-    <div className="mt-6 pt-6 border-t border-border">
-      <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline" size="sm" className="rounded-full">
+    <div className="pt-2.5 border-t border-border">
+      <div className="flex flex-wrap gap-2 text-xs">
+        <Button asChild variant="outline" size="sm" className="h-7 text-xs rounded-lg px-3">
           <a href={gcalUrl} target="_blank" rel="noopener noreferrer">
-            <CalendarPlus className="h-4 w-4 mr-1.5" /> Add to Google Calendar
+            <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Add to Google Calendar
           </a>
         </Button>
-        <Button variant="outline" size="sm" className="rounded-full" onClick={downloadIcs}>
-          <CalendarPlus className="h-4 w-4 mr-1.5" /> Apple / Outlook (.ics)
+        <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg px-3" onClick={downloadIcs}>
+          <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Apple / Outlook (.ics)
         </Button>
-        <Button asChild variant="outline" size="sm" className="rounded-full">
+        <Button asChild variant="outline" size="sm" className="h-7 text-xs rounded-lg px-3">
           <a href={mapHref} target="_blank" rel="noopener noreferrer">
-            <MapPin className="h-4 w-4 mr-1.5" /> Get directions
+            <MapPin className="h-3.5 w-3.5 mr-1" /> Get directions
           </a>
         </Button>
       </div>

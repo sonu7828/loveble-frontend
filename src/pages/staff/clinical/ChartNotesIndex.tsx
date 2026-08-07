@@ -68,6 +68,27 @@ export default function ChartNotesIndex() {
     dbRows.forEach((r) => map.set(r.id, r));
     localRows.forEach((r) => map.set(r.id, r));
 
+    try {
+      const gfes = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+      if (category === "all" || category === "gfe") {
+        gfes.forEach((g: any) => {
+          if (g.id) {
+            map.set(`gfe-${g.id}`, {
+              id: g.id,
+              client_email: g.client_email || "",
+              client_first_name: g.client_first_name || "",
+              client_last_name: g.client_last_name || "",
+              category: "gfe",
+              status: "signed",
+              signed_at: g.signed_at || null,
+              created_at: g.created_at || g.signed_at || new Date().toISOString(),
+              provider_name: g.np_name || "NP Practitioner",
+            });
+          }
+        });
+      }
+    } catch { }
+
     const sorted = Array.from(map.values())
       .filter((r) => !isTestPatient(r))
       .sort((a, b) => {
@@ -84,7 +105,13 @@ export default function ChartNotesIndex() {
     loadNotes();
     const handleUpdate = () => loadNotes();
     window.addEventListener("rka_chart_note_updated", handleUpdate);
-    return () => window.removeEventListener("rka_chart_note_updated", handleUpdate);
+    window.addEventListener("rka_gfe_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("rka_chart_note_updated", handleUpdate);
+      window.removeEventListener("rka_gfe_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, [category, range]);
 
   const filtered = useMemo(() => {

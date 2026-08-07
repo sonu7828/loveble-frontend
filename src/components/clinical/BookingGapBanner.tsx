@@ -16,11 +16,20 @@ export function BookingGapBanner({
 }: {
   appointmentId: string;
   clientEmail: string;
-  serviceCategory?: string | null;
+  serviceCategory?: string | any;
 }) {
   const [gfeOk, setGfeOk] = useState<boolean | null>(null);
   const [unsigned, setUnsigned] = useState(0);
-  const needsGfe = !!serviceCategory && GFE_CATEGORIES.has(serviceCategory.toLowerCase());
+
+  const catStr = typeof serviceCategory === "string"
+    ? serviceCategory
+    : typeof serviceCategory?.name === "string"
+      ? serviceCategory.name
+      : typeof serviceCategory?.category === "string"
+        ? serviceCategory.category
+        : "";
+
+  const needsGfe = !!catStr && GFE_CATEGORIES.has(catStr.toLowerCase());
 
   useEffect(() => {
     let cancel = false;
@@ -83,7 +92,7 @@ export function BookingGapBanner({
           <div className="text-sm flex-1">
             <div className="font-medium">Good Faith Exam missing or expired</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Booked for {serviceCategory} but no active GFE on file. Complete a GFE before treatment.
+              Booked for {catStr || "clinical service"} but no active GFE on file. Complete a GFE before treatment.
             </div>
           </div>
           <Link

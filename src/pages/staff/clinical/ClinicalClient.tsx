@@ -47,21 +47,49 @@ export default function ClinicalClient() {
       const g = gRes?.data;
       const n = nRes?.data;
       const e = eRes?.data;
-      const a = aRes?.data;
+      let a = aRes?.data;
 
-      setGfes((g as any[]) ?? []);
+      // 1. Merge GFEs (DB + Local demo)
+      let gList = (g as any[]) ?? [];
+      try {
+        const localGfes = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+        const matchLocalGfes = localGfes.filter((item: any) =>
+          (item.client_email || "").toLowerCase() === decoded.toLowerCase() ||
+          (`${item.client_first_name || ""} ${item.client_last_name || ""}`).toLowerCase().includes(decoded.toLowerCase())
+        );
+        const gMap = new Map<string, any>();
+        gList.forEach((item: any) => gMap.set(item.id, item));
+        matchLocalGfes.forEach((item: any) => gMap.set(item.id, item));
+        gList = Array.from(gMap.values());
+      } catch { }
+      setGfes(gList);
+
+      // 2. Merge Clinical Notes (DB + Local demo)
       let nList = (n as any[]) ?? [];
       try {
-        const local = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
-        const matchLocal = local.filter((item: any) =>
-          item.client_email?.toLowerCase() === decoded.toLowerCase()
+        const localNotes = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+        const matchLocalNotes = localNotes.filter((item: any) =>
+          (item.client_email || "").toLowerCase() === decoded.toLowerCase() ||
+          (`${item.client_first_name || ""} ${item.client_last_name || ""}`).toLowerCase().includes(decoded.toLowerCase())
         );
-        const map = new Map<string, any>();
-        nList.forEach((item: any) => map.set(item.id, item));
-        matchLocal.forEach((item: any) => map.set(item.id, item));
-        nList = Array.from(map.values());
+        const nMap = new Map<string, any>();
+        nList.forEach((item: any) => nMap.set(item.id, item));
+        matchLocalNotes.forEach((item: any) => nMap.set(item.id, item));
+        nList = Array.from(nMap.values());
       } catch { }
       setNotes(nList);
+
+      // 3. Fallback appointment info from Local demo
+      if (!a) {
+        try {
+          const localAppts = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+          a = localAppts.find((item: any) =>
+            (item.client_email || item.clientEmail || "").toLowerCase() === decoded.toLowerCase() ||
+            (`${item.client_first_name || item.first_name || ""} ${item.client_last_name || item.last_name || ""}`).toLowerCase().includes(decoded.toLowerCase())
+          );
+        } catch { }
+      }
+
       setEncounters(e ?? []);
       setLatestApt(a ?? null);
       setLoading(false);

@@ -586,10 +586,11 @@ function StandardStaffToday() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: appointmentRows } = await apiQuery("appointments")
+      const apptRes: any = await apiQuery("appointments")
         .select("*")
         .order("start_at", { ascending: true })
         .catch(() => ({ data: [] }));
+      const appointmentRows = apptRes?.data ?? [];
 
       let localAppts: any[] = [];
       try {
@@ -610,12 +611,16 @@ function StandardStaffToday() {
       });
       setAppts(fetchedAppts);
 
-      const { data: clientRows, error: clientErr } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false }).catch(() => ({ data: [] }));
+      const clientRes: any = await apiQuery("client_profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .catch(() => ({ data: [] }));
+      const clientRows = clientRes?.data ?? [];
 
       const uniquePatientsMap = new Map<string, any>();
 
       // Add DB client profiles
-      ((clientRows as any) ?? []).forEach((c: any) => {
+      (Array.isArray(clientRows) ? clientRows : []).forEach((c: any) => {
         if (isTestPatient(c)) return;
         const email = (c.email || "").toLowerCase();
         if (email) {

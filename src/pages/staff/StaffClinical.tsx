@@ -29,8 +29,17 @@ export default function StaffClinical() {
       const { data } = await apiQuery("clinical_notes")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(50);
       if (data) dbNotes = data;
+    } catch { }
+
+    let dbGfes: any[] = [];
+    try {
+      const { data } = await apiQuery("gfe_records")
+        .select("*")
+        .order("signed_at", { ascending: false })
+        .limit(50);
+      if (data) dbGfes = data;
     } catch { }
 
     let localNotes: any[] = [];
@@ -38,9 +47,35 @@ export default function StaffClinical() {
       localNotes = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
     } catch { }
 
+    let localGfes: any[] = [];
+    try {
+      localGfes = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+    } catch { }
+
     const map = new Map<string, any>();
+    
+    // Add DB & Local SOAP Clinical Notes
     dbNotes.forEach((n) => map.set(n.id, n));
     localNotes.forEach((n) => map.set(n.id, n));
+
+    // Add DB & Local GFEs mapped into chart note format
+    const formatGfe = (g: any) => ({
+      id: g.id,
+      client_email: g.client_email,
+      client_first_name: g.client_first_name,
+      client_last_name: g.client_last_name,
+      service_name: "California Good Faith Exam (GFE)",
+      category: "GFE",
+      provider_name: g.np_name || "NP Practitioner",
+      status: "signed",
+      signed_at: g.signed_at || g.created_at,
+      created_at: g.created_at || g.signed_at,
+      isGfe: true,
+    });
+
+    dbGfes.forEach((g) => { if (g.id) map.set(`gfe-${g.id}`, formatGfe(g)); });
+    localGfes.forEach((g) => { if (g.id) map.set(`gfe-${g.id}`, formatGfe(g)); });
+
     const merged = Array.from(map.values());
 
     const sorted = [...merged]
@@ -94,7 +129,11 @@ export default function StaffClinical() {
 
     const handleUpdate = () => loadRecentNotes();
     window.addEventListener("rka_chart_note_updated", handleUpdate);
-    return () => window.removeEventListener("rka_chart_note_updated", handleUpdate);
+    window.addEventListener("rka_gfe_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("rka_chart_note_updated", handleUpdate);
+      window.removeEventListener("rka_gfe_updated", handleUpdate);
+    };
   }, [user, authLoading, canSeeAll, staffId]);
 
   if (authLoading) return <div className="p-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -191,8 +230,43 @@ export default function StaffClinical() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            const v = lookup.trim();
-            if (v) navigate(`/staff/clinical/clients/${encodeURIComponent(v)}`);
+            const query = lookup.trim().toLowerCase();
+            if (!query) return;
+
+            let matchedEmail = "";
+            try {
+              const gfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+              const gfeMatch = gfes.find(g =>
+                (g.client_email || "").toLowerCase() === query ||
+                (`${g.client_first_name || ""} ${g.client_last_name || ""}`).toLowerCase().includes(query)
+              );
+              if (gfeMatch?.client_email) matchedEmail = gfeMatch.client_email;
+            } catch { }
+
+            if (!matchedEmail) {
+              try {
+                const notes: any[] = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+                const noteMatch = notes.find(n =>
+                  (n.client_email || "").toLowerCase() === query ||
+                  (`${n.client_first_name || ""} ${n.client_last_name || ""}`).toLowerCase().includes(query)
+                );
+                if (noteMatch?.client_email) matchedEmail = noteMatch.client_email;
+              } catch { }
+            }
+
+            if (!matchedEmail) {
+              try {
+                const appts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                const apptMatch = appts.find(a =>
+                  (a.client_email || a.clientEmail || "").toLowerCase() === query ||
+                  (`${a.client_first_name || a.first_name || ""} ${a.client_last_name || a.last_name || ""}`).toLowerCase().includes(query)
+                );
+                if (apptMatch?.client_email || apptMatch?.clientEmail) matchedEmail = apptMatch.client_email || apptMatch.clientEmail;
+              } catch { }
+            }
+
+            const target = matchedEmail || query;
+            navigate(`/staff/clinical/clients/${encodeURIComponent(target)}`);
           }}
           className="flex gap-2"
         >
@@ -297,11 +371,13 @@ function Section({ title, accent, children }: { title: string; accent?: boolean;
 function NoteRow({ n }: { n: any }) {
   const cls =
     n.status === "cosigned" || n.status === "locked" ? "bg-success-soft text-success-soft-foreground" :
-    n.status === "signed" ? "bg-warning-soft text-warning-soft-foreground" :
+    n.status === "signed" || n.isGfe ? "bg-emerald-600 text-white font-semibold" :
     "bg-secondary text-muted-foreground";
   const name = `${n.client_first_name ?? ""} ${n.client_last_name ?? ""}`.trim() || n.client_email || "Client";
+  const linkTo = n.isGfe ? `/staff/clinical/gfe/${n.id.replace(/^gfe-/, "")}` : `/staff/clinical/notes/${n.id}`;
+
   return (
-    <Link to={`/staff/clinical/notes/${n.id}`} className="block rounded-md border border-border p-3 hover:border-primary/40 hover:bg-secondary/40 transition">
+    <Link to={linkTo} className="block rounded-md border border-border p-3 hover:border-primary/40 hover:bg-secondary/40 transition">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -310,7 +386,7 @@ function NoteRow({ n }: { n: any }) {
             <p className="text-xs text-muted-foreground truncate">{n.provider_name || "Provider"} • {formatDateSafe(n.signed_at || n.created_at)}</p>
           </div>
         </div>
-        <span className={`text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0 ${cls}`}>{n.status || "signed"}</span>
+        <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded shrink-0 ${cls}`}>{n.isGfe ? "Signed GFE" : n.status || "signed"}</span>
       </div>
     </Link>
   );

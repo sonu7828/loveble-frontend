@@ -24,12 +24,23 @@ export function ClientFullChartModal({ open, onOpenChange, clientEmail, clientNa
   useEffect(() => {
     if (!open) return;
     try {
+      const queryStr = (clientEmail || clientName || "").toLowerCase().trim();
       const gfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
-      const foundGfe = gfes.find((g) => g.client_email?.toLowerCase() === clientEmail.toLowerCase()) || gfes[0];
+      const foundGfe = gfes.find((g) => {
+        if (!queryStr) return false;
+        const emailMatch = (g.client_email || "").toLowerCase().includes(queryStr);
+        const nameMatch = (`${g.client_first_name || ""} ${g.client_last_name || ""}`).toLowerCase().includes(queryStr);
+        return emailMatch || nameMatch;
+      }) || (gfes.length > 0 ? gfes[0] : null);
       setGfeRecord(foundGfe);
 
-      const notes: any[] = JSON.parse(localStorage.getItem("rka_demo_chart_notes") || "[]");
-      const clientNotes = notes.filter((n) => n.client_email?.toLowerCase() === clientEmail.toLowerCase());
+      const notes: any[] = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+      const clientNotes = notes.filter((n) => {
+        if (!queryStr) return true;
+        const emailMatch = (n.client_email || "").toLowerCase().includes(queryStr);
+        const nameMatch = (`${n.client_first_name || ""} ${n.client_last_name || ""}`).toLowerCase().includes(queryStr);
+        return emailMatch || nameMatch;
+      });
       setChartNotes(clientNotes);
     } catch {}
   }, [open, clientEmail]);

@@ -73,7 +73,7 @@ export default function StaffCalendar() {
   const navigate = useNavigate();
   const { canSeeAll, staffId } = useAuth();
   const isMobile = useIsMobile();
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const [weekStart, setWeekStart] = useState(() => new Date());
   const [staff, setStaff] = useState<StaffP[]>([]);
   const [services, setServices] = useState<{ id: string; name: string }[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
@@ -89,6 +89,7 @@ export default function StaffCalendar() {
   const [dayDate, setDayDate] = useState<Date>(() => new Date());
   const [monthDate, setMonthDate] = useState<Date>(() => startOfMonth(new Date()));
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // On phone-sized viewports, force single-day view so the data effect
   // fetches just that day's appointments for the "today list" UI below.
@@ -138,35 +139,111 @@ export default function StaffCalendar() {
       startLocal.setHours(0, 0, 0, 0);
       const start = startLocal.toISOString();
       const end = endLocal.toISOString();
-      const [a, o, sc] = await Promise.all([
-        apiQuery("appointments").select("*").gte("start_at", start).lt("start_at", end),
-        apiQuery("schedule_overrides").select("*").gte("start_at", start).lt("start_at", end),
-        apiQuery("weekly_schedules").select("*").eq("is_active", true),
-      ]);
-      setAppts(a.data ?? []);
-      setOverrides(o.data ?? []);
-      setSchedules(sc.data ?? []);
-      const ids = (a.data ?? []).map((x: any) => x.id);
+
+      let dbAppts: any[] = [];
+      let oData: any[] = [];
+      let scData: any[] = [];
+
+      try {
+        const resA = await apiQuery("appointments").select("*").gte("start_at", start).lt("start_at", end);
+        if (resA && (resA as any).data) dbAppts = (resA as any).data;
+      } catch { }
+
+      try {
+        const resO = await apiQuery("schedule_overrides").select("*").gte("start_at", start).lt("start_at", end);
+        if (resO && (resO as any).data) oData = (resO as any).data;
+      } catch { }
+
+      try {
+        const resSc = await apiQuery("weekly_schedules").select("*").eq("is_active", true);
+        if (resSc && (resSc as any).data) scData = (resSc as any).data;
+      } catch { }
+
+      let localAppts: any[] = [];
+      try {
+        const raw = localStorage.getItem("rka_demo_appointments") || "[]";
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          localAppts = parsed.map((item: any) => ({
+            id: item.id || `local-${Math.random()}`,
+            status: item.status || "confirmed",
+            start_at: item.start_at || item.startAt || item.start || new Date().toISOString(),
+            end_at: item.end_at || item.endAt || item.end || new Date().toISOString(),
+            client_first_name: item.client_first_name || item.clientFirstName || item.first_name || item.firstName || "Client",
+            client_last_name: item.client_last_name || item.clientLastName || item.last_name || item.lastName || "",
+            service_id: item.service_id || item.serviceId || "",
+            service_name: item.service_name || item.serviceName || item.service_label || "",
+            staff_id: item.staff_id || item.staffId || "",
+            staff_name: item.staff_name || item.staffName || "",
+            location_id: item.location_id || item.locationId || "",
+          }));
+        }
+      } catch { }
+
+      const map = new Map<string, any>();
+      dbAppts.forEach(x => { if (x.id) map.set(x.id, x); });
+      localAppts.forEach(x => {
+        if (x.id) {
+          const apptTime = new Date(x.start_at).getTime();
+          const startTime = new Date(start).getTime();
+          const endTime = new Date(end).getTime();
+          if (apptTime >= startTime && apptTime <= endTime) {
+            map.set(x.id, x);
+          }
+        }
+      });
+
+      const mergedAppts = Array.from(map.values());
+      setAppts(mergedAppts);
+      setOverrides(oData);
+      setSchedules(scData);
+
+      const ids = mergedAppts.map((x: any) => x.id);
       if (ids.length > 0) {
-        const { data: aps } = await apiQuery
-          .from("appointment_services")
-          .select("appointment_id, display_order, service_id")
-          .in("appointment_id", ids)
-          .order("display_order", { ascending: true });
-        const map: Record<string, string[]> = {};
+        let apsData: any[] = [];
+        try {
+          const resAps = await apiQuery
+            .from("appointment_services")
+            .select("appointment_id, display_order, service_id")
+            .in("appointment_id", ids)
+            .order("display_order", { ascending: true });
+          if (resAps && (resAps as any).data) apsData = (resAps as any).data;
+        } catch { }
+
+        const serviceMap: Record<string, string[]> = {};
         const serviceNames = new Map((sv.data ?? []).map((service) => [service.id, service.name]));
-        for (const r of (aps ?? []) as any[]) {
+        for (const r of apsData) {
           const nm = serviceNames.get(r.service_id) as string | undefined;
           if (!nm) continue;
-          (map[r.appointment_id] ||= []).push(nm);
+          (serviceMap[r.appointment_id] ||= []).push(nm);
         }
-        setApptServices(map);
+
+        // Also add fallback service_name from local demo appointments
+        mergedAppts.forEach(ma => {
+          if (ma.service_name && !serviceMap[ma.id]) {
+            serviceMap[ma.id] = [ma.service_name];
+          }
+        });
+
+        setApptServices(serviceMap);
       } else {
         setApptServices({});
       }
       setLoading(false);
     })();
-  }, [weekStart, view, dayDate, monthGridStart]);
+  }, [weekStart, view, dayDate, monthGridStart, refreshTrigger]);
+
+  useEffect(() => {
+    const handleUpdate = () => setRefreshTrigger((n) => n + 1);
+    window.addEventListener("rka_demo_appointments_updated", handleUpdate);
+    window.addEventListener("rka_chart_note_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("rka_demo_appointments_updated", handleUpdate);
+      window.removeEventListener("rka_chart_note_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, []);
 
   // If user is staff-only (not admin/scheduler), force filter to self
   const effectiveFilter = canSeeAll ? filterStaff : (staffId ?? "");
@@ -205,7 +282,7 @@ export default function StaffCalendar() {
       : setDayDate(addDays(dayDate, 1));
   const goToday = () => {
     const t = new Date();
-    setWeekStart(startOfWeek(t, { weekStartsOn: 0 }));
+    setWeekStart(t);
     setDayDate(t);
     setMonthDate(startOfMonth(t));
   };
@@ -214,7 +291,7 @@ export default function StaffCalendar() {
     if (!dStr) return;
     const picked = new Date(dStr + "T12:00:00");
     setDayDate(picked);
-    setWeekStart(startOfWeek(picked, { weekStartsOn: 0 }));
+    setWeekStart(picked);
     setMonthDate(startOfMonth(picked));
   };
 
@@ -401,7 +478,7 @@ export default function StaffCalendar() {
             <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <input
               type="date"
-              value={format(view === "week" ? weekStart : view === "month" ? monthDate : dayDate, "yyyy-MM-dd")}
+              value={format(dayDate, "yyyy-MM-dd")}
               onChange={(e) => handleDatePick(e.target.value)}
               className="h-9 pl-8 pr-2.5 rounded-full border border-input bg-background text-xs font-medium cursor-pointer hover:border-primary/50 transition-colors shadow-2xs"
               title="Select specific date"
@@ -537,7 +614,7 @@ export default function StaffCalendar() {
                           style={{ borderLeftColor: sp?.color ?? "#c97c5d", background: style.bg }}
                           title={`${format(new Date(a.start_at), "h:mm a")} ${a.client_first_name} ${a.client_last_name} (${style.label})`}
                         >
-                          {format(new Date(a.start_at), "h:mma")} {a.client_first_name}
+                          {format(new Date(a.start_at), "h:mma")} {a.client_first_name} {a.client_last_name ? a.client_last_name[0] + "." : ""}
                         </button>
                       );
                     })}
@@ -572,8 +649,19 @@ export default function StaffCalendar() {
             const dayOver = visibleOverrides.filter((o) => isSameDay(new Date(o.start_at), day));
             const dateParam = format(day, "yyyy-MM-dd");
             const goBook = () => navigate(`/staff/appointments/new?date=${dateParam}`);
+            const isToday = isSameDay(day, new Date());
+            const isSelected = isSameDay(day, dayDate);
             return (
-              <div key={day.toISOString()} className={`rounded-xl border border-border bg-card group ${view === "week" ? "min-h-[280px]" : "min-h-[400px]"}`}>
+              <div
+                key={day.toISOString()}
+                className={`rounded-xl border transition-all group ${
+                  isToday
+                    ? "border-2 border-primary bg-primary/5 shadow-xs"
+                    : isSelected
+                      ? "border-2 border-primary/50 bg-accent/20"
+                      : "border-border bg-card"
+                } ${view === "week" ? "min-h-[280px]" : "min-h-[400px]"}`}
+              >
                 <button
                   type="button"
                   onClick={goBook}
@@ -583,7 +671,7 @@ export default function StaffCalendar() {
                   <div className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">{format(day, view === "week" ? "EEE" : "EEEE")}</div>
                   <div className="flex items-center gap-1.5">
                     <Plus className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-                    <span className={`text-sm font-serif ${isSameDay(day, new Date()) ? "text-primary font-bold" : ""}`}>{format(day, "MMM d")}</span>
+                    <span className={`text-sm font-serif ${isToday ? "text-primary font-bold" : ""}`}>{format(day, "MMM d")}</span>
                   </div>
                 </button>
                 <div className="p-2 space-y-1.5">
@@ -598,24 +686,31 @@ export default function StaffCalendar() {
                     const names = apptServices[a.id];
                     const label = names && names.length > 0
                       ? names.join(" + ")
-                      : (services.find((s) => s.id === a.service_id)?.name ?? "");
+                      : ((a as any).service_name || services.find((s) => s.id === a.service_id)?.name || "Aesthetic Treatment");
                     const style = getStatusBadgeStyle(a.status);
+                    const clientFullName = `${a.client_first_name || ""} ${a.client_last_name || ""}`.trim() || "Patient";
+
                     return (
                       <button
                         key={a.id}
                         type="button"
                         onClick={() => navigate(`/staff/appointments/${a.id}`)}
-                        className="w-full text-left text-[11px] rounded-lg p-2 border-l-3 hover:ring-1 hover:ring-foreground/20 transition-all shadow-2xs"
+                        className="w-full text-left rounded-lg p-2.5 border-l-4 hover:ring-2 hover:ring-primary/40 transition-all shadow-xs space-y-1 block"
                         style={{ borderLeftColor: sp?.color ?? "#c97c5d", background: style.bg }}
                       >
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <div className="font-semibold text-foreground text-[11px]">{format(new Date(a.start_at), "h:mm a")}</div>
-                          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${style.badgeClass}`}>
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="font-bold text-foreground text-[11px] leading-tight">{format(new Date(a.start_at), "h:mm a")}</div>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${style.badgeClass}`}>
                             {style.label}
                           </span>
                         </div>
-                        <div className="truncate font-medium text-[11px]" title={label}>{label}</div>
-                        <div className="truncate text-muted-foreground text-[10px]">{a.client_first_name} {a.client_last_name?.[0] ?? ""}.</div>
+                        <div className="font-semibold text-foreground text-xs leading-snug truncate" title={clientFullName}>
+                          {clientFullName}
+                        </div>
+                        <div className="truncate text-muted-foreground text-[11px] leading-tight" title={label}>
+                          {label}
+                        </div>
+                        {sp && <div className="text-[10px] text-muted-foreground/80 truncate">w/ {sp.full_name}</div>}
                       </button>
                     );
                   })}
