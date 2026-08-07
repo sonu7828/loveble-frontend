@@ -33,7 +33,7 @@ export default function AdminHub() {
       try {
         const [
           { data: servicesData },
-          rawData,
+          { data: staffData },
           { data: phiLogs },
         ] = await Promise.all([
           apiQuery("services" as any).select("id"),
