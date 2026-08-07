@@ -481,23 +481,67 @@ export default function StaffClients() {
 
     setBusyEmail(c.email);
     try {
+      const emailLower = (c.email || "").trim().toLowerCase();
+      const fnLower = (c.first_name || "").trim().toLowerCase();
+      const lnLower = (c.last_name || "").trim().toLowerCase();
+
       if (c.id && !c.id.startsWith("client-")) {
-        await clientService.deleteClient(c.id);
-      } else {
-        const emailLower = (c.email || "").toLowerCase();
-        if (c.imported_id) {
-          await apiQuery("imported_clients").delete().eq("id", c.imported_id);
-        }
-        if (emailLower) {
-          await apiQuery("client_profiles").delete().eq("email", emailLower);
-          await apiQuery("appointments").delete().eq("client_email", emailLower);
-        }
+        try { await clientService.deleteClient(c.id); } catch { }
+      }
+      if (c.imported_id) {
+        try { await apiQuery("imported_clients").delete().eq("id", c.imported_id); } catch { }
+      }
+      if (emailLower) {
+        try { await apiQuery("client_profiles").delete().eq("email", emailLower); } catch { }
+        try { await apiQuery("appointments").delete().eq("client_email", emailLower); } catch { }
       }
 
+      // Purge matching demo appointments from localStorage
+      try {
+        const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const updatedAppts = localAppts.filter((a: any) => {
+          const aEmail = (a.client_email || a.clientEmail || a.email || "").trim().toLowerCase();
+          const aFn = (a.client_first_name || a.clientFirstName || a.firstName || "").trim().toLowerCase();
+          const aLn = (a.client_last_name || a.clientLastName || a.lastName || "").trim().toLowerCase();
+          if (emailLower && aEmail === emailLower) return false;
+          if (fnLower && aFn === fnLower && lnLower && aLn === lnLower) return false;
+          return true;
+        });
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(updatedAppts));
+      } catch { }
+
+      // Purge matching demo clients from localStorage
+      try {
+        const localClientsArr: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+        const updatedClients = localClientsArr.filter((lc: any) => {
+          const lcEmail = (lc.email || "").trim().toLowerCase();
+          const lcFn = (lc.first_name || "").trim().toLowerCase();
+          const lcLn = (lc.last_name || "").trim().toLowerCase();
+          if (emailLower && lcEmail === emailLower) return false;
+          if (fnLower && lcFn === fnLower && lnLower && lcLn === lnLower) return false;
+          return true;
+        });
+        localStorage.setItem("rka_demo_clients", JSON.stringify(updatedClients));
+        setLocalClients(updatedClients);
+      } catch { }
+
+      // Update component state
+      setItems((prev) => prev.filter((a) => {
+        const aEmail = (a.client_email || "").trim().toLowerCase();
+        const aFn = (a.client_first_name || "").trim().toLowerCase();
+        const aLn = (a.client_last_name || "").trim().toLowerCase();
+        if (emailLower && aEmail === emailLower) return false;
+        if (fnLower && aFn === fnLower && lnLower && aLn === lnLower) return false;
+        return true;
+      }));
+      setClientProfiles((prev) => prev.filter((cp) => (cp.email || "").trim().toLowerCase() !== emailLower));
+      setImported((prev) => prev.filter((imp) => (imp.email || "").trim().toLowerCase() !== emailLower && imp.id !== c.imported_id));
+
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
       await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
-      toast.success("Client deleted");
+      toast.success(`Client ${name} deleted`);
     } catch (e: any) {
-      toast.error(e.message ?? "Failed to delete");
+      toast.error(e.message ?? "Failed to delete client");
     } finally {
       setBusyEmail(null);
     }
@@ -515,7 +559,19 @@ export default function StaffClients() {
       return;
 
     try {
-      await apiQuery("appointments").delete().eq("id", apptId);
+      try { await apiQuery("appointments").delete().eq("id", apptId); } catch { }
+
+      // Clean up from localStorage
+      try {
+        const local: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const updated = local.filter((a: any) => String(a.id) !== String(apptId));
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      } catch { }
+
+      // Clean up from component state
+      setItems((prev) => prev.filter((a) => String(a.id) !== String(apptId)));
+
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
       await Promise.all([reloadImported(), reloadBlocked(), reloadAccounts()]);
       toast.success("Appointment deleted successfully");
     } catch (e: any) {
@@ -973,6 +1029,13 @@ export default function StaffClients() {
                           <Ban className="h-3.5 w-3.5 mr-2" /> Block from booking
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => deleteClient({ id: c.id, email: c.email, first_name: c.first_name, last_name: c.last_name, imported_id: c.imported_id })}
+                        className="text-destructive focus:text-destructive font-medium"
+                      >
+                        <UserX className="h-3.5 w-3.5 mr-2" /> Delete client profile
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

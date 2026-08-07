@@ -277,8 +277,36 @@ export default function StaffClientDetail() {
     }))) return;
     setBusyAction(true);
     try {
-      const { error } = await apiQuery("imported_clients").delete().eq("id", imported.id);
-      if (error) throw error;
+      if (imported?.id) {
+        try { await apiQuery("imported_clients").delete().eq("id", imported.id); } catch { }
+      }
+      if (profile?.id) {
+        try { await apiQuery("client_profiles").delete().eq("id", profile.id); } catch { }
+      }
+      if (decodedEmail) {
+        try { await apiQuery("appointments").delete().eq("client_email", decodedEmail.toLowerCase()); } catch { }
+      }
+
+      // Purge matching demo items from localStorage
+      try {
+        const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const updatedAppts = localAppts.filter((a: any) => {
+          const aEmail = (a.client_email || a.clientEmail || a.email || "").trim().toLowerCase();
+          return aEmail !== decodedEmail.toLowerCase();
+        });
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(updatedAppts));
+      } catch { }
+
+      try {
+        const localClientsArr: any[] = JSON.parse(localStorage.getItem("rka_demo_clients") || "[]");
+        const updatedClients = localClientsArr.filter((lc: any) => {
+          const lcEmail = (lc.email || "").trim().toLowerCase();
+          return lcEmail !== decodedEmail.toLowerCase();
+        });
+        localStorage.setItem("rka_demo_clients", JSON.stringify(updatedClients));
+      } catch { }
+
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
       toast.success("Client deleted");
       navigate("/staff/clients");
     } catch (e: any) { toast.error(e.message ?? "Failed to delete"); }
