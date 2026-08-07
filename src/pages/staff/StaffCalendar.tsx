@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchUnifiedStaffMembers, isClinicalProvider } from "@/lib/unifiedStaff";
-import { isTestPatient } from "@/lib/testPatientFilter";
+import { isTestPatient, purgeLocalTestPatients } from "@/lib/testPatientFilter";
 
 interface Appt {
   id: string; status: string; start_at: string; end_at: string;
@@ -114,6 +114,7 @@ export default function StaffCalendar() {
 
   useEffect(() => {
     (async () => {
+      purgeLocalTestPatients();
       setLoading(true);
       const [s, sv, l] = await Promise.all([
         fetchUnifiedStaffMembers(),
