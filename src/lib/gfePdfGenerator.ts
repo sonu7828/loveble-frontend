@@ -9,23 +9,37 @@ export interface GfeRecordPdfData {
   client_phone?: string | null;
   client_dob?: string | null;
   np_name?: string | null;
+  np_license?: string | null;
   signed_at?: string | null;
   expires_at?: string | null;
   chief_concerns?: string[] | null;
-  chief_concerns_other?: string | null;
+  chief_concerns_notes?: string | null;
   treatment_goals?: string[] | null;
-  treatment_goals_other?: string | null;
   medical_history?: string[] | null;
   medical_history_other?: string | null;
   allergies?: string[] | null;
   allergies_other?: string | null;
   current_medications?: string[] | null;
   current_medications_other?: string | null;
+  prior_treatments?: string[] | null;
+  prior_treatments_last_date?: string | null;
+  fitzpatrick?: string | null;
+  skin_assessment?: string[] | null;
+  bp_systolic?: string | number | null;
+  bp_diastolic?: string | number | null;
+  heart_rate?: string | number | null;
+  height_in?: number | null;
+  weight_lb?: number | null;
   vital_signs?: {
     bp_sys?: string;
     bp_dia?: string;
     pulse?: string;
+    height?: string;
+    weight?: string;
   } | null;
+  pregnancy_status?: string | null;
+  photo_consent?: boolean | null;
+  np_assessment_plan?: string | null;
   cleared_for_treatments?: string[] | null;
   cleared_other?: string | null;
   estimates?: Array<{
@@ -33,6 +47,7 @@ export interface GfeRecordPdfData {
     cpt?: string;
     cost: number;
   }> | null;
+  signature_png?: string | null;
   provider_signature_png?: string | null;
   patient_signature_png?: string | null;
   status?: string | null;
@@ -72,15 +87,20 @@ export function generateGfePDF(record: GfeRecordPdfData): jsPDF {
   // Patient & Exam Info Card
   doc.setFillColor(250, 248, 246);
   doc.setDrawColor(226, 218, 210);
-  doc.roundedRect(margin, y, contentWidth, 75, 6, 6, "FD");
+  doc.roundedRect(margin, y, contentWidth, 80, 6, 6, "FD");
 
   const name = `${record.client_first_name || ""} ${record.client_last_name || ""}`.trim() || "Patient";
   const email = record.client_email || "N/A";
   const phone = record.client_phone || "N/A";
   const dob = record.client_dob ? record.client_dob.slice(0, 10) : "N/A";
-  const signedDate = record.signed_at ? format(new Date(record.signed_at), "PPP p") : (record.created_at ? format(new Date(record.created_at), "PPP p") : "N/A");
+  const signedDate = record.signed_at
+    ? format(new Date(record.signed_at), "PPP p")
+    : record.created_at
+    ? format(new Date(record.created_at), "PPP p")
+    : "N/A";
   const expiresDate = record.expires_at ? format(new Date(record.expires_at), "PPP") : "N/A";
-  const provider = record.np_name || "Licensed Nurse Practitioner";
+  const provider = record.np_name || "Nurse Practitioner";
+  const license = record.np_license ? ` (Lic. ${record.np_license})` : "";
 
   doc.setTextColor(30, 25, 20);
   doc.setFont("helvetica", "bold");
@@ -90,10 +110,10 @@ export function generateGfePDF(record: GfeRecordPdfData): jsPDF {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   doc.text(`Email: ${email}  |  Phone: ${phone}  |  DOB: ${dob}`, margin + 14, y + 40);
-  doc.text(`Examined By: ${provider}`, margin + 14, y + 55);
-  doc.text(`Signed: ${signedDate}  (Valid until: ${expiresDate})`, margin + 14, y + 68);
+  doc.text(`Examined By: ${provider}${license}`, margin + 14, y + 55);
+  doc.text(`Signed: ${signedDate}  (Valid until: ${expiresDate})`, margin + 14, y + 70);
 
-  y += 90;
+  y += 95;
 
   const renderSectionHeader = (title: string) => {
     checkAddPage(35);
@@ -107,11 +127,11 @@ export function generateGfePDF(record: GfeRecordPdfData): jsPDF {
   };
 
   const renderListOrText = (label: string, items?: string[] | null, other?: string | null) => {
-    checkAddPage(30);
+    checkAddPage(25);
     const combined = [
       ...(Array.isArray(items) ? items : []),
       ...(other ? [other] : [])
-    ].join(", ");
+    ].filter(Boolean).join(", ");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9.5);
@@ -120,35 +140,107 @@ export function generateGfePDF(record: GfeRecordPdfData): jsPDF {
     
     doc.setFont("helvetica", "normal");
     doc.setTextColor(30, 30, 30);
-    const textLines = doc.splitTextToSize(combined || "None reported", contentWidth - 140);
-    doc.text(textLines, margin + 140, y);
+    const textLines = doc.splitTextToSize(combined || "None reported", contentWidth - 160);
+    doc.text(textLines, margin + 160, y);
     y += Math.max(18, textLines.length * 12 + 4);
   };
 
-  // Section 1: Clinical Assessment
-  renderSectionHeader("Clinical Evaluation & History");
+  // Section 1: Clinical Evaluation & History
+  renderSectionHeader("Clinical Evaluation & Medical History");
 
-  renderListOrText("Chief Concerns", record.chief_concerns, record.chief_concerns_other);
-  renderListOrText("Treatment Goals", record.treatment_goals, record.treatment_goals_other);
+  renderListOrText("Chief Concerns", record.chief_concerns, record.chief_concerns_notes);
+  renderListOrText("Treatment Goals", record.treatment_goals);
   renderListOrText("Medical History", record.medical_history, record.medical_history_other);
-  renderListOrText("Known Allergies", record.allergies, record.allergies_other);
   renderListOrText("Current Medications", record.current_medications, record.current_medications_other);
+  renderListOrText("Known Allergies", record.allergies, record.allergies_other);
+  renderListOrText(
+    "Prior Aesthetic Treatments",
+    record.prior_treatments,
+    record.prior_treatments_last_date ? `Last: ${record.prior_treatments_last_date}` : null
+  );
 
-  if (record.vital_signs) {
-    const bp = record.vital_signs.bp_sys && record.vital_signs.bp_dia ? `${record.vital_signs.bp_sys}/${record.vital_signs.bp_dia} mmHg` : "N/A";
-    const hr = record.vital_signs.pulse ? `${record.vital_signs.pulse} bpm` : "N/A";
-    renderListOrText("Vital Signs", [`BP: ${bp}`, `Pulse: ${hr}`]);
+  y += 10;
+
+  // Section 2: Skin Assessment & Vitals
+  renderSectionHeader("Physical Exam, Skin Assessment & Vitals");
+
+  const fitz = record.fitzpatrick ? `Fitzpatrick Scale: ${record.fitzpatrick}` : "";
+  renderListOrText("Skin Assessment", record.skin_assessment, fitz);
+
+  // Formatted Vitals
+  const bpSys = record.bp_systolic || record.vital_signs?.bp_sys;
+  const bpDia = record.bp_diastolic || record.vital_signs?.bp_dia;
+  const bp = bpSys && bpDia ? `${bpSys}/${bpDia} mmHg` : bpSys ? `${bpSys} mmHg` : "N/A";
+  const hr = record.heart_rate || record.vital_signs?.pulse ? `${record.heart_rate || record.vital_signs?.pulse} bpm` : "N/A";
+  
+  let ht = "N/A";
+  if (record.height_in) {
+    const feet = Math.floor(record.height_in / 12);
+    const inches = record.height_in % 12;
+    ht = `${feet}′${inches}″`;
+  } else if (record.vital_signs?.height) {
+    ht = record.vital_signs.height;
   }
 
+  const wt = record.weight_lb ? `${record.weight_lb} lb` : record.vital_signs?.weight ? record.vital_signs.weight : "N/A";
+
+  renderListOrText("Vital Signs", [`BP: ${bp}`, `Pulse: ${hr}`, `Height: ${ht}`, `Weight: ${wt}`]);
+  renderListOrText("Pregnancy / Lactation", record.pregnancy_status ? [record.pregnancy_status] : ["Not applicable"]);
+  renderListOrText("Photo Consent", [record.photo_consent ? "Granted" : "Declined"]);
+
   y += 10;
 
-  // Section 2: Medical Clearance & Approved Treatments
-  renderSectionHeader("Approved Aesthetic Treatments");
-  renderListOrText("Cleared Procedures", record.cleared_for_treatments, record.cleared_other);
+  // Section 3: NP Assessment & Plan
+  if (record.np_assessment_plan || record.cleared_for_treatments?.length) {
+    renderSectionHeader("NP Clinical Assessment & Treatment Plan");
 
-  y += 10;
+    if (record.cleared_for_treatments?.length) {
+      renderListOrText("Approved Procedures", record.cleared_for_treatments, record.cleared_other);
+    }
 
-  // Section 3: Cost Estimates
+    if (record.np_assessment_plan) {
+      checkAddPage(40);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+
+      const planLines = record.np_assessment_plan.split("\n");
+      planLines.forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          y += 6;
+          return;
+        }
+
+        checkAddPage(15);
+        if (
+          trimmed.startsWith("VISIT MODALITY:") ||
+          trimmed.startsWith("ASSESSMENT:") ||
+          trimmed.startsWith("BOOKED TREATMENTS:") ||
+          trimmed.startsWith("ADDITIONALLY APPROVED TREATMENTS:") ||
+          trimmed.startsWith("PLAN:") ||
+          trimmed.startsWith("NOTES:") ||
+          trimmed.startsWith("TELEVISIT ATTESTATIONS:")
+        ) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9.5);
+          doc.setTextColor(70, 50, 40);
+          doc.text(trimmed, margin, y);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 30, 30);
+          y += 14;
+        } else {
+          const textLines = doc.splitTextToSize(trimmed, contentWidth - 10);
+          doc.text(textLines, margin + 5, y);
+          y += textLines.length * 12 + 3;
+        }
+      });
+      y += 10;
+    }
+  }
+
+  // Section 4: Cost Estimates (if present)
   if (Array.isArray(record.estimates) && record.estimates.length > 0) {
     renderSectionHeader("Good Faith Itemized Cost Estimate");
     
@@ -193,21 +285,25 @@ export function generateGfePDF(record: GfeRecordPdfData): jsPDF {
     y += 25;
   }
 
-  // Section 4: Signatures
+  // Section 5: Signatures & Authorization
   checkAddPage(110);
   renderSectionHeader("Practitioner Authorization & Signatures");
 
-  const sigBoxY = y;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(100, 90, 80);
-  doc.text("I certify that I have conducted a Good Faith Exam for this patient and evaluated their medical history prior to prescribing aesthetic procedures.", margin, sigBoxY);
+  doc.text(
+    "I certify that I have conducted a Good Faith Exam for this patient and evaluated their medical history prior to prescribing aesthetic procedures.",
+    margin,
+    y
+  );
 
   y += 20;
 
-  if (record.provider_signature_png) {
+  const sigImg = record.signature_png || record.provider_signature_png;
+  if (sigImg) {
     try {
-      doc.addImage(record.provider_signature_png, "PNG", margin, y, 160, 45);
+      doc.addImage(sigImg, "PNG", margin, y, 160, 45);
     } catch {
       doc.setFont("helvetica", "bold");
       doc.text("[ Signed Electronically ]", margin, y + 25);
@@ -226,16 +322,20 @@ export function generateGfePDF(record: GfeRecordPdfData): jsPDF {
     }
   }
 
-  y += 50;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  y += 55;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
   doc.setTextColor(40, 40, 40);
-  doc.text(`Provider: ${provider}`, margin, y);
-  if (record.signed_at) {
-    doc.text(`Date: ${format(new Date(record.signed_at), "PPP")}`, margin + 260, y);
+  doc.text(`Nurse Practitioner: ${provider}${license}`, margin, y);
+  if (record.signed_at || record.created_at) {
+    doc.text(
+      `Date Signed: ${format(new Date(record.signed_at || record.created_at!), "PPP p")}`,
+      margin + 260,
+      y
+    );
   }
 
-  // Footer
+  // Footer Page Numbers
   const totalPages = doc.internal.pages.length - 1;
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);

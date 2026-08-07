@@ -684,29 +684,14 @@ export default function GFEForm() {
     if (!record) return;
     setPdfBusy(true);
     try {
-      let url: string | null = null;
-      try {
-        const { data } = await ApiClient.post("generate-clinical-pdf", {
-          kind: "gfe",
-          id: record.id,
-        });
-        url = (data as any)?.url ?? null;
-      } catch {
-        /* fallback to client-side PDF */
-      }
-
       void import("@/lib/phiAudit").then(({ logPhiAccess }) =>
         logPhiAccess({ resourceType: "gfe", resourceId: record.id, clientEmail: record.client_email, action: "download" })
       );
 
-      if (url) {
-        openPdf(url, `GFE-${record.client_last_name || "Patient"}-${record.client_first_name || ""}.pdf`);
-      } else {
-        // Reliable client-side PDF fallback via jsPDF
-        const pdfDoc = generateGfePDF(record);
-        pdfDoc.save(`GFE-${record.client_last_name || "Patient"}-${record.client_first_name || ""}.pdf`);
-        toast.success("GFE PDF downloaded successfully");
-      }
+      // Generate complete client-side PDF with full clinical examination details
+      const pdfDoc = generateGfePDF(record);
+      pdfDoc.save(`GFE-${record.client_last_name || "Patient"}-${record.client_first_name || ""}.pdf`);
+      toast.success("Complete GFE PDF downloaded successfully");
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to download PDF");
     } finally { setPdfBusy(false); }
