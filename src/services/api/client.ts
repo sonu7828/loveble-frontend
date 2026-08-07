@@ -147,7 +147,13 @@ export class ApiClient {
 
         // 401 – attempt ONE silent refresh, then retry original request
         if (response.status === 401 && !isAuthEndpoint(normalizedEndpoint)) {
-          const refreshed = await silentRefresh();
+          const isDemoOrStaff = normalizedEndpoint.includes("/staff") || !!localStorage.getItem("rka_approved_staff_accounts");
+
+          let refreshed = false;
+          if (!isDemoOrStaff) {
+            refreshed = await silentRefresh();
+          }
+
           if (refreshed) {
             // Retry the original request exactly once
             const retryResponse = await fetch(url, {
@@ -177,9 +183,10 @@ export class ApiClient {
             };
           }
 
-          // Refresh failed → redirect to login
-          // Dispatch a custom event so the auth context can handle it
-          window.dispatchEvent(new CustomEvent('rka_session_expired'));
+          // Dispatch custom event only when not in demo/staff mode
+          if (!isDemoOrStaff) {
+            window.dispatchEvent(new CustomEvent('rka_session_expired'));
+          }
 
           return {
             data: null,

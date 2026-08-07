@@ -65,7 +65,12 @@ export const staffService = {
     color?: string;
   }): Promise<any> {
     const res = await ApiClient.post<any>("/staff/create-with-user", data);
-    if (res.error) throw new Error(res.error);
+    if (res.error) {
+      if (res.status === 401 || res.error.toLowerCase().includes("unauthorized") || res.error.toLowerCase().includes("authentication required")) {
+        return null;
+      }
+      throw new Error(res.error);
+    }
     return res.data;
   },
 

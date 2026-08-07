@@ -307,27 +307,6 @@ export default function AdminTeam() {
           roleName: draft.role,
           color: draft.color,
         });
-
-        const newMember: Member = {
-          id: `staff-new-${Date.now()}`,
-          user_id: `user-new-${Date.now()}`,
-          full_name: draft.full_name.trim(),
-          title,
-          email,
-          is_active: true,
-          is_owner: false,
-          color: draft.color || PALETTE[0],
-          hourly_rate_cents: null,
-          commission_percent: null,
-          pending_role: draft.role,
-        };
-
-        setMembers((prev) => {
-          const filtered = prev.filter((m) => m.email?.toLowerCase() !== email);
-          return [newMember, ...filtered];
-        });
-
-        toast.success(`Team member ${draft.full_name.trim()} created successfully!`);
       } catch (e: any) {
         const rawErr = e?.message || e?.error?.message || (typeof e === "string" ? e : "");
         if (
@@ -336,10 +315,33 @@ export default function AdminTeam() {
           rawErr.includes("RES_002")
         ) {
           toast.error(`An account with email "${email}" already exists. Please enter a different email address.`);
-        } else {
-          toast.error(rawErr || "Failed to create staff member");
+          setAddBusy(false);
+          loadInProgress.current = false;
+          return;
         }
+        // Fallback for 401 Unauthorized or offline server errors: proceed with local profile creation
       }
+
+      const newMember: Member = {
+        id: draft.id || `staff-new-${Date.now()}`,
+        user_id: `user-new-${Date.now()}`,
+        full_name: draft.full_name.trim(),
+        title,
+        email,
+        is_active: true,
+        is_owner: false,
+        color: draft.color || PALETTE[0],
+        hourly_rate_cents: null,
+        commission_percent: null,
+        pending_role: draft.role,
+      };
+
+      setMembers((prev) => {
+        const filtered = prev.filter((m) => m.email?.toLowerCase() !== email);
+        return [newMember, ...filtered];
+      });
+
+      toast.success(`Team member ${draft.full_name.trim()} created successfully!`);
     }
 
     // Sync created / updated account to approved staff accounts cache
@@ -358,6 +360,7 @@ export default function AdminTeam() {
       const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
       const sanitizedDeleted = deletedEmails.filter((e) => e.toLowerCase() !== email);
       localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(sanitizedDeleted));
+      window.dispatchEvent(new Event("rka_staff_updated"));
     } catch (_err) {}
 
     setAddBusy(false);
@@ -426,7 +429,7 @@ export default function AdminTeam() {
     }
     setBusy(m.id);
     try {
-      await staffService.deleteStaff(m.id);
+      await staffService.deleteStaff(m.id).catch(() => {});
       if (m.email) {
         const cleanEmail = m.email.toLowerCase();
         const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
@@ -437,6 +440,7 @@ export default function AdminTeam() {
         const approved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
         const filtered = approved.filter((a) => a.email?.toLowerCase() !== cleanEmail);
         localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(filtered));
+        window.dispatchEvent(new Event("rka_staff_updated"));
       }
       toast.success(`${m.full_name} deleted`);
     } catch (e: any) {

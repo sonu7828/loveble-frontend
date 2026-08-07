@@ -33,19 +33,38 @@ export default function AdminHub() {
       try {
         const [
           { data: servicesData },
-          { data: staffData },
+          rawData,
           { data: phiLogs },
         ] = await Promise.all([
           apiQuery("services" as any).select("id"),
-          apiQuery("staff_profiles" as any).select("id").eq("deleted_at", null),
+          staffService.getStaffProfiles(false).catch(() => []),
           apiQuery("phi_access_log" as any).select("id, action, resource, created_at, user_id").order("created_at", { ascending: false }).limit(5),
         ]);
 
-        const dbCount = Array.isArray(staffData) ? staffData.length : 1;
+        const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+        const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
+
+        const approvedList: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
+        const validApproved = approvedList.filter(
+          (a) => a.email && !deletedSet.has(a.email.toLowerCase())
+        );
+
+        const dataList: any[] = Array.isArray(rawData) ? rawData : (rawData as any)?.data || (rawData as any)?.staff || [];
+        const validStaff = dataList.filter((x: any) => {
+          const email = (x.email || x.user?.email || "").toLowerCase();
+          return email && !deletedSet.has(email) && email !== "admin@gmail.com";
+        });
+
+        const combinedEmails = new Set([
+          ...validStaff.map((s: any) => (s.email || s.user?.email || "").toLowerCase()).filter(Boolean),
+          ...validApproved.map((a: any) => a.email.toLowerCase()).filter(Boolean),
+        ]);
+
+        if (!isMounted) return;
 
         setCounts({
           modelApps: 0,
-          staffCount: dbCount,
+          staffCount: combinedEmails.size,
           servicesCount: Array.isArray(servicesData) ? servicesData.length : 60,
           auditLogCount: Array.isArray(phiLogs) ? phiLogs.length : 0,
         });
@@ -67,7 +86,12 @@ export default function AdminHub() {
     };
 
     fetchAdminOverview();
-    return () => { isMounted = false; };
+    const handleUpdate = () => fetchAdminOverview();
+    window.addEventListener("rka_staff_updated", handleUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("rka_staff_updated", handleUpdate);
+    };
   }, []);
 
   const CORE_MODULES = [
