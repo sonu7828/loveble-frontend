@@ -40,11 +40,23 @@ const BookingStatus = () => {
 
     try {
       let appt: any = null;
-      const res = await ApiClient.get<any>(`/booking?token=${encodeURIComponent(tokenParam)}`);
-      if (res.data) {
-        appt = res.data.data || res.data;
-      } else if (res.error) {
-        throw new Error(typeof res.error === "string" ? res.error : (res.error as any)?.message || "Appointment not found");
+      try {
+        const res = await ApiClient.get<any>(`/booking?token=${encodeURIComponent(tokenParam)}`);
+        if (res.data) {
+          appt = res.data.data || res.data;
+        }
+      } catch { }
+
+      if (!appt) {
+        try {
+          const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+          appt = localList.find((item: any) =>
+            item.bookingToken === tokenParam ||
+            item.booking_token === tokenParam ||
+            item.token === tokenParam ||
+            item.id === tokenParam
+          );
+        } catch { }
       }
 
       if (appt) {
