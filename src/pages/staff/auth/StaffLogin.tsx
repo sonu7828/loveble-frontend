@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { authService, ApiClient } from "@/services/api";
+import { authService, ApiClient, staffService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,14 +63,35 @@ export default function StaffLogin() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState<string>("");
+  const [activeStaffList, setActiveStaffList] = useState<Array<{ email: string; defaultName: string; role: string }>>([]);
 
-  // On mount or tab switch, show login portal ready & clear form inputs
+  // On mount, load active staff profiles from DB for quick demo credentials
   useEffect(() => {
     setMode("ready");
     setStep("credentials");
     setEmail("");
     setPassword("");
     setCode("");
+
+    staffService.getStaffProfiles(true).then((res: any) => {
+      const list = Array.isArray(res) ? res : res?.data || res?.staff || [];
+      const formatted = list
+        .filter((s: any) => s.is_active !== false)
+        .map((s: any) => {
+          const roles = s.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
+          const primaryRole = roles.find((r: string) => r !== "staff") || roles[0] || s.title?.toLowerCase() || "staff";
+          return {
+            email: s.email || s.user?.email || "",
+            defaultName: s.fullName || s.full_name || s.name || s.email?.split("@")[0],
+            role: primaryRole,
+          };
+        })
+        .filter((s: any) => s.email && s.email.toLowerCase() !== "admin@gmail.com" && s.email.toLowerCase() !== "phase1-admin@radiantilyk.com");
+
+      if (formatted.length > 0) {
+        setActiveStaffList(formatted);
+      }
+    }).catch(() => {});
   }, []);
 
   const beginMfa = async (_cancelled?: boolean) => {
@@ -308,27 +329,12 @@ export default function StaffLogin() {
 
 
                 {activeRole === "staff" && (() => {
-                  const defaultStaffList = [
-                    { email: "medicaldirector@gmail.com", defaultName: "Dr. Dhruva (MD)", role: "medical_director" },
-                    { email: "nurseprectitioner@gmail.com", defaultName: "Kiem Vukadinovic, NP", role: "nurse_practitioner" },
-                    { email: "injector@gmail.com", defaultName: "Girish, RN Injector", role: "rn_injector" },
-                    { email: "securityofficer@gmail.com", defaultName: "Bob Stane (Security Officer)", role: "privacy_officer" },
-                    { email: "scheduler@gmail.com", defaultName: "Front Desk Coordinator", role: "front_desk" },
-                  ];
-                  const approvedStaff: Array<{ email: string; full_name?: string; role: string }> =
-                    JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
-
-                  const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-                  const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
-
-                  const combinedRaw: Array<{ email: string; defaultName?: string; full_name?: string; role: string }> = [...defaultStaffList];
-                  approvedStaff.forEach((a) => {
-                    if (a.role === "admin" || (a.email && a.email.toLowerCase() === "admin@gmail.com")) return; // Filter out admin accounts
-                    if (a.email && !combinedRaw.some((c) => c.email.toLowerCase() === a.email.toLowerCase())) {
-                      combinedRaw.push({ email: a.email, defaultName: a.full_name, role: a.role });
-                    }
-                  });
-                  const combined = combinedRaw.filter((c) => c.email && !deletedSet.has(c.email.toLowerCase()));
+                  const combined = activeStaffList.length > 0
+                    ? activeStaffList
+                    : [
+                        { email: "injector@gmail.com", defaultName: "RN Injector", role: "rn_injector" },
+                        { email: "security@gmail.com", defaultName: "Security Officer", role: "privacy_officer" },
+                      ];
 
                   const roleEmoji: Record<string, string> = {
                     admin: "👑", medical_director: "🩺", privacy_officer: "🛡️",
@@ -345,7 +351,7 @@ export default function StaffLogin() {
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
                       {combined.map((s) => {
-                        const displayName = s.defaultName || s.full_name || s.email.split("@")[0];
+                        const displayName = s.defaultName || s.email.split("@")[0];
                         return (
                           <button
                             key={s.email}
