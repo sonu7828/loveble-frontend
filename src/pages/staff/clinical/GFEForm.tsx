@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { openPdf } from "@/lib/openPdf";
+import { generateGfePDF } from "@/lib/gfePdfGenerator";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -644,18 +645,31 @@ export default function GFEForm() {
     if (!record) return;
     setPdfBusy(true);
     try {
-      const { data, error } = await ApiClient.post("generate-clinical-pdf", {
-        body: { kind: "gfe", id: record.id },
-      });
-      if (error) throw error;
-      const url = (data as any)?.url;
-      if (!url) throw new Error("No URL returned");
+      let url: string | null = null;
+      try {
+        const { data } = await ApiClient.post("generate-clinical-pdf", {
+          kind: "gfe",
+          id: record.id,
+        });
+        url = (data as any)?.url ?? null;
+      } catch {
+        /* fallback to client-side PDF */
+      }
+
       void import("@/lib/phiAudit").then(({ logPhiAccess }) =>
         logPhiAccess({ resourceType: "gfe", resourceId: record.id, clientEmail: record.client_email, action: "download" })
       );
-      openPdf(url, `GFE-${record.client_last_name}-${record.client_first_name}.pdf`);
+
+      if (url) {
+        openPdf(url, `GFE-${record.client_last_name || "Patient"}-${record.client_first_name || ""}.pdf`);
+      } else {
+        // Reliable client-side PDF fallback via jsPDF
+        const pdfDoc = generateGfePDF(record);
+        pdfDoc.save(`GFE-${record.client_last_name || "Patient"}-${record.client_first_name || ""}.pdf`);
+        toast.success("GFE PDF downloaded successfully");
+      }
     } catch (e: any) {
-      toast.error(e.message ?? "PDF failed");
+      toast.error(e?.message ?? "Failed to download PDF");
     } finally { setPdfBusy(false); }
   }
 
@@ -667,9 +681,25 @@ export default function GFEForm() {
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/staff/today")}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
-          <Button onClick={downloadPdf} disabled={pdfBusy} size="sm">
-            {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />} PDF
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (record.client_email) params.set("email", record.client_email);
+                if (record.client_first_name) params.set("first", record.client_first_name);
+                if (record.client_last_name) params.set("last", record.client_last_name);
+                if (record.client_dob) params.set("dob", record.client_dob.slice(0, 10));
+                params.set("gfeId", record.id);
+                navigate(`/staff/clinical/notes/new?${params.toString()}`);
+              }}
+            >
+              Use for New Chart Note
+            </Button>
+            <Button onClick={downloadPdf} disabled={pdfBusy} size="sm" variant="outline">
+              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />} PDF
+            </Button>
+          </div>
         </div>
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">California Good Faith Exam</div>

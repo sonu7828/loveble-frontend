@@ -32,13 +32,38 @@ export function LotPicker({ product, category, unit = "unit", value, onChange, l
   const load = useCallback(async () => {
     if (!product) { setLots([]); return; }
     setLoading(true);
-    const { data } = await apiQuery
-      .from("product_lots")
-      .select("id, product_name, lot_number, expiration_date, quantity_remaining, unit, low_stock_threshold")
-      .ilike("product_name", product)
-      .eq("is_active", true)
-      .order("expiration_date", { ascending: true, nullsFirst: false });
-    setLots((data ?? []) as LotOption[]);
+    let dbList: LotOption[] = [];
+    try {
+      const { data } = await apiQuery
+        .from("product_lots")
+        .select("id, product_name, lot_number, expiration_date, quantity_remaining, unit, low_stock_threshold")
+        .ilike("product_name", product)
+        .eq("is_active", true)
+        .order("expiration_date", { ascending: true });
+      if (data) dbList = data as LotOption[];
+    } catch { }
+
+    let localList: LotOption[] = [];
+    try {
+      const local = JSON.parse(localStorage.getItem("rka_demo_product_lots") || "[]");
+      localList = local
+        .filter((l: any) => l.product_name?.toLowerCase() === product.toLowerCase() && l.is_active !== false)
+        .map((l: any) => ({
+          id: l.id,
+          product_name: l.product_name,
+          lot_number: l.lot_number,
+          expiration_date: l.expiration_date || null,
+          quantity_remaining: l.quantity_remaining ?? l.quantity ?? 0,
+          unit: l.unit || "unit",
+          low_stock_threshold: l.low_stock_threshold ?? 10,
+        }));
+    } catch { }
+
+    const map = new Map<string, LotOption>();
+    dbList.forEach(l => map.set(l.id, l));
+    localList.forEach(l => map.set(l.id, l));
+
+    setLots(Array.from(map.values()));
     setLoading(false);
   }, [product]);
 

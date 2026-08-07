@@ -119,14 +119,20 @@ function MedicalDirectorDashboard() {
         apiQuery("clinical_orders").select("*").catch(() => ({ data: [] })),
       ]);
 
-      const rawNotes = (notesRes?.data ?? []).filter((n: any) => n.status !== "cosigned");
       const noteMap = new Map<string, any>();
-      rawNotes.forEach((n: any) => { if (n.id) noteMap.set(n.id, n); });
+      (notesRes?.data ?? []).forEach((n: any) => { if (n.id && n.status !== "cosigned") noteMap.set(n.id, n); });
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+        local.forEach((n: any) => { if (n.id && n.status !== "cosigned") noteMap.set(n.id, n); });
+      } catch { }
       const allNotes = Array.from(noteMap.values());
 
-      const rawGfes = (gfeRes?.data ?? []).filter((g: any) => g.status !== "cosigned");
       const gfeMap = new Map<string, any>();
-      rawGfes.forEach((g: any) => { if (g.id) gfeMap.set(g.id, g); });
+      (gfeRes?.data ?? []).forEach((g: any) => { if (g.id && g.status !== "cosigned") gfeMap.set(g.id, g); });
+      try {
+        const localGfes = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
+        localGfes.forEach((g: any) => { if (g.id && g.status !== "cosigned") gfeMap.set(g.id, g); });
+      } catch { }
       const allGfes = Array.from(gfeMap.values());
 
       const notes = allNotes.map((n: any) => ({
@@ -136,7 +142,7 @@ function MedicalDirectorDashboard() {
         provider: n.provider_name || "Clinician",
         service: n.service_name || n.category || "Clinical Service",
         type: "SOAP Chart Note",
-        date: n.created_at ? new Date(n.created_at).toLocaleDateString() : "Recent",
+        date: n.created_at || n.signed_at ? new Date(n.created_at || n.signed_at).toLocaleDateString() : "Recent",
       }));
 
       const gfes = allGfes.map((g: any) => ({
@@ -146,7 +152,7 @@ function MedicalDirectorDashboard() {
         provider: g.np_name || g.provider_name || "Clinician",
         service: "Good Faith Exam (GFE)",
         type: "Medical Assessment",
-        date: g.created_at ? new Date(g.created_at).toLocaleDateString() : "Recent",
+        date: g.created_at || g.signed_at ? new Date(g.created_at || g.signed_at).toLocaleDateString() : "Recent",
       }));
 
       const combined = [...notes, ...gfes];
@@ -167,9 +173,13 @@ function MedicalDirectorDashboard() {
     loadData();
     window.addEventListener("rka_orders_updated", loadData);
     window.addEventListener("rka_cosign_updated", loadData);
+    window.addEventListener("rka_chart_note_updated", loadData);
+    window.addEventListener("rka_gfe_updated", loadData);
     return () => {
       window.removeEventListener("rka_orders_updated", loadData);
       window.removeEventListener("rka_cosign_updated", loadData);
+      window.removeEventListener("rka_chart_note_updated", loadData);
+      window.removeEventListener("rka_gfe_updated", loadData);
     };
   }, [loadData]);
 

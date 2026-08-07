@@ -30,20 +30,84 @@ export default function StaffCosignQueue() {
   const fetchQueue = async () => {
     try {
       const queue = await clinicalService.getCosignQueue();
-      const mapped = queue.map((item: any) => ({
-        id: item.note?.id || item.noteId,
-        appointment_id: item.note?.appointmentId || null,
-        client_email: item.note?.patient?.email || "—",
-        client_first_name: item.note?.patient?.firstName || "",
-        client_last_name: item.note?.patient?.lastName || "",
-        service_name: item.note?.serviceName || "Clinical Note",
-        category: item.note?.category || "soap",
-        provider_name: item.author?.fullName || "RN Injector",
-        provider_role: item.author?.title || "RN",
-        signed_at: item.note?.signedAt || item.requestedAt,
-        status: item.note?.status || "pending_cosign",
-      }));
-      setNotes(mapped);
+      let dbNotes: any[] = [];
+      try {
+        const { data } = await apiQuery("clinical_notes").select("*").order("created_at", { ascending: false }).limit(50);
+        if (data) dbNotes = data;
+      } catch { }
+
+      let localNotes: any[] = [];
+      try {
+        localNotes = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+      } catch { }
+
+      const map = new Map<string, any>();
+
+      // Queue items
+      queue.forEach((item: any) => {
+        const noteId = item.note?.id || item.noteId;
+        if (noteId) {
+          map.set(noteId, {
+            id: noteId,
+            appointment_id: item.note?.appointmentId || null,
+            client_email: item.note?.patient?.email || "—",
+            client_first_name: item.note?.patient?.firstName || "",
+            client_last_name: item.note?.patient?.lastName || "",
+            service_name: item.note?.serviceName || "Clinical Note",
+            category: item.note?.category || "soap",
+            provider_name: item.author?.fullName || "RN Injector",
+            provider_role: item.author?.title || "RN",
+            signed_at: item.note?.signedAt || item.requestedAt,
+            status: item.note?.status || "pending_cosign",
+          });
+        }
+      });
+
+      // DB notes
+      dbNotes.forEach((n: any) => {
+        if (n.id) {
+          map.set(n.id, {
+            id: n.id,
+            appointment_id: n.appointment_id || null,
+            client_email: n.client_email || "—",
+            client_first_name: n.client_first_name || "",
+            client_last_name: n.client_last_name || "",
+            service_name: n.service_name || n.category || "Clinical Note",
+            category: n.category || "soap",
+            provider_name: n.provider_name || "Clinician",
+            provider_role: n.provider_role || "Provider",
+            signed_at: n.signed_at || n.created_at,
+            status: n.status || "signed",
+          });
+        }
+      });
+
+      // Local notes
+      localNotes.forEach((n: any) => {
+        if (n.id) {
+          map.set(n.id, {
+            id: n.id,
+            appointment_id: n.appointment_id || null,
+            client_email: n.client_email || "—",
+            client_first_name: n.client_first_name || "",
+            client_last_name: n.client_last_name || "",
+            service_name: n.service_name || n.category || "Clinical Note",
+            category: n.category || "soap",
+            provider_name: n.provider_name || "Clinician",
+            provider_role: n.provider_role || "Provider",
+            signed_at: n.signed_at || n.created_at,
+            status: n.status || "signed",
+          });
+        }
+      });
+
+      const sorted = Array.from(map.values()).sort((a, b) => {
+        const tA = new Date(a.signed_at || 0).getTime();
+        const tB = new Date(b.signed_at || 0).getTime();
+        return tB - tA;
+      });
+
+      setNotes(sorted);
     } catch (e) {
       setNotes([]);
     } finally {
@@ -54,6 +118,13 @@ export default function StaffCosignQueue() {
   useEffect(() => {
     if (loading) return;
     fetchQueue();
+    const handleUpdate = () => fetchQueue();
+    window.addEventListener("rka_chart_note_updated", handleUpdate);
+    window.addEventListener("rka_cosign_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("rka_chart_note_updated", handleUpdate);
+      window.removeEventListener("rka_cosign_updated", handleUpdate);
+    };
   }, [loading]);
 
   if (loading) return <div className="p-8"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>;
@@ -121,9 +192,9 @@ export default function StaffCosignQueue() {
                       )}
                     </div>
                   </div>
-                  <Button size="sm" variant="outline">
+                  <span className="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-1.5 pointer-events-none shrink-0">
                     Review <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
+                  </span>
                 </div>
               </Link>
             );

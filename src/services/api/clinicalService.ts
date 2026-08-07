@@ -188,15 +188,54 @@ export const clinicalService = {
    * Get pending cosign queue (Supervising MD / NP only).
    */
   async getCosignQueue(): Promise<CosignQueueItem[]> {
+    let apiItems: CosignQueueItem[] = [];
     try {
       const res = await ApiClient.get<CosignQueueItem[]>("/clinical/cosign-queue");
       if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-        return res.data;
+        apiItems = res.data;
       }
-      return MOCK_COSIGN_QUEUE;
-    } catch {
-      return MOCK_COSIGN_QUEUE;
-    }
+    } catch { }
+
+    let localItems: CosignQueueItem[] = [];
+    try {
+      const localNotes = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+      localItems = localNotes
+        .map((n: any) => ({
+          id: `cosign-${n.id}`,
+          noteId: n.id,
+          authorId: n.provider_staff_id || n.provider_user_id || "st-rn",
+          status: "pending" as const,
+          requestedAt: n.signed_at || n.created_at || new Date().toISOString(),
+          note: {
+            id: n.id,
+            subjective: n.summary || n.indication || "SOAP Clinical Chart Note",
+            objective: n.post_assessment || "No contraindications noted.",
+            assessment: n.service_name || n.category || "Aesthetic Treatment",
+            plan: n.provider_notes || "Documented treatment.",
+            status: n.status || "pending_cosign",
+            createdAt: n.created_at || new Date().toISOString(),
+            signedAt: n.signed_at || null,
+            patient: {
+              id: n.client_id || "p-local",
+              firstName: n.client_first_name || "Patient",
+              lastName: n.client_last_name || "User",
+              email: n.client_email || "patient@example.com",
+            },
+          },
+          author: {
+            id: n.provider_staff_id || "st-rn",
+            fullName: n.provider_name || "Injector / NP",
+            title: n.provider_role || "RN / NP",
+          },
+        }));
+    } catch { }
+
+    const combinedMap = new Map<string, CosignQueueItem>();
+    apiItems.forEach(i => combinedMap.set(i.noteId || i.id, i));
+    localItems.forEach(i => combinedMap.set(i.noteId || i.id, i));
+
+    const finalQueue = Array.from(combinedMap.values());
+    return finalQueue;
   },
 
   /**

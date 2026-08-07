@@ -45,7 +45,29 @@ export default function ChartNotesIndex() {
       if (data) dbRows = data as Note[];
     } catch { }
 
-    const sorted = [...dbRows].sort((a, b) => {
+    let localRows: Note[] = [];
+    try {
+      const local = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+      localRows = local
+        .filter((n: any) => category === "all" || n.category === category)
+        .map((n: any) => ({
+          id: n.id,
+          client_email: n.client_email || "",
+          client_first_name: n.client_first_name || "",
+          client_last_name: n.client_last_name || "",
+          category: n.category || "consult",
+          status: n.status || "signed",
+          signed_at: n.signed_at || null,
+          created_at: n.created_at || new Date().toISOString(),
+          provider_name: n.provider_name || "",
+        }));
+    } catch { }
+
+    const map = new Map<string, Note>();
+    dbRows.forEach((r) => map.set(r.id, r));
+    localRows.forEach((r) => map.set(r.id, r));
+
+    const sorted = Array.from(map.values()).sort((a, b) => {
       const timeA = new Date(a.signed_at || a.created_at || 0).getTime();
       const timeB = new Date(b.signed_at || b.created_at || 0).getTime();
       return timeB - timeA;

@@ -32,7 +32,17 @@ export default function StaffClinical() {
       if (data) dbNotes = data;
     } catch { }
 
-    const sorted = [...dbNotes].sort((a, b) => {
+    let localNotes: any[] = [];
+    try {
+      localNotes = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
+    } catch { }
+
+    const map = new Map<string, any>();
+    dbNotes.forEach((n) => map.set(n.id, n));
+    localNotes.forEach((n) => map.set(n.id, n));
+    const merged = Array.from(map.values());
+
+    const sorted = [...merged].sort((a, b) => {
       const tA = new Date(a.signed_at || a.created_at || 0).getTime();
       const tB = new Date(b.signed_at || b.created_at || 0).getTime();
       return tB - tA;
