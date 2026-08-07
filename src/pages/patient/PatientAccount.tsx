@@ -170,7 +170,40 @@ export default function PatientAccount() {
           consent_pdf_url: null,
         }));
 
-        setAppts(mappedAppts);
+        // Also check local demo storage for any bookings created in demo mode
+        let localDemoAppts: any[] = [];
+        try {
+          const raw = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+          if (Array.isArray(raw)) {
+            localDemoAppts = raw
+              .filter((da: any) => da.client_email?.toLowerCase() === resolvedProfile.email?.toLowerCase())
+              .map((da: any) => ({
+                id: da.id || da.booking_token,
+                start_at: da.start_at || da.startAt || new Date().toISOString(),
+                end_at: da.end_at || da.endAt || new Date().toISOString(),
+                status: (da.status || "PENDING").toLowerCase(),
+                client_first_name: da.client_first_name || resolvedProfile.first_name,
+                client_last_name: da.client_last_name || resolvedProfile.last_name,
+                client_email: da.client_email || resolvedProfile.email,
+                client_phone: da.client_phone || resolvedProfile.phone,
+                service_id: da.service_id || da.serviceId || "svc-01",
+                staff_id: da.staff_id || da.staffId || "staff-01",
+                location_id: da.location_id || da.locationId || "loc-01",
+                consent_pdf_url: null,
+              }));
+          }
+        } catch { }
+
+        // Combine DB appointments + local demo appointments, avoiding duplicate IDs
+        const existingIds = new Set(mappedAppts.map((a: any) => a.id));
+        const combinedAppts = [...mappedAppts];
+        for (const demoAppt of localDemoAppts) {
+          if (!existingIds.has(demoAppt.id)) {
+            combinedAppts.push(demoAppt);
+          }
+        }
+
+        setAppts(combinedAppts);
         setConsents(csResult || []);
         setServices(Object.fromEntries((sv ?? []).map((s: any) => [s.id, s.name])));
         setStaff(Object.fromEntries((st ?? []).map((s: any) => [s.id, { name: s.full_name, title: s.title }])));

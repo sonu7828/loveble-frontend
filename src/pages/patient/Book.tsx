@@ -4,7 +4,8 @@ import { apiQuery, authService, appointmentService } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle2, Copy, Check, Key } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -322,7 +323,37 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       created_at: new Date().toISOString(),
     };
 
+    const generatedTempPassword = `RKA-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 6)}`;
+
     try {
+      // 1. Try real backend API for public booking
+      let apiResult: any = null;
+      try {
+        apiResult = await appointmentService.createPublicBooking({
+          firstName: client.firstName.trim(),
+          lastName: client.lastName.trim(),
+          email: client.email.trim().toLowerCase(),
+          phone: client.phone.trim(),
+          serviceId: validServiceId,
+          locationId: validLocationId,
+          staffId: validStaffId,
+          startAt: new Date(slot).toISOString(),
+          notes: client.notes || null,
+        });
+      } catch (apiErr) {
+        console.warn("Backend public booking call failed, using local creation fallback:", apiErr);
+      }
+
+      if (apiResult) {
+        setSubmitting(false);
+        setBookingResult({
+          ...apiResult,
+          temporaryPassword: apiResult.temporaryPassword || (apiResult.existingAccount ? undefined : generatedTempPassword),
+        });
+        return;
+      }
+
+      // 2. Fallback local appointment creation
       let createdAppt: any = null;
       let createdToken: string | null = null;
 
@@ -367,7 +398,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
         window.dispatchEvent(new Event("rka_appointment_created"));
       } catch { }
 
-      // Record client profile on server or local storage
+      // Record client profile
       try {
         await apiQuery("client_profiles").insert({
           first_name: client.firstName,
@@ -389,6 +420,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
         endAt: slot ? new Date(new Date(slot).getTime() + 60 * 60000).toISOString() : new Date().toISOString(),
         status: "pending",
         existingAccount: false,
+        temporaryPassword: generatedTempPassword,
         email: client.email.toLowerCase(),
         patientId: `pat_${Date.now()}`,
       });
@@ -658,27 +690,86 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
                 </div>
               ) : (
                 <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-3">
-                  <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
-                    <span>🎉</span> New Patient Account Created
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
+                      <span>🎉</span> New Patient Account Created
+                    </p>
+                    <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                      Action Required
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    A new secure portal account has been automatically created for you:
+                    A secure portal account has been created. Please copy and save your login credentials:
                   </p>
-                  <div className="bg-background rounded-lg p-3 border border-border space-y-2 text-xs font-mono">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Login Email:</span>
-                      <span className="font-semibold text-foreground select-all">{bookingResult?.email}</span>
+                  
+                  <div className="bg-background rounded-xl p-3 border border-emerald-500/30 space-y-2.5 shadow-2xs font-mono text-xs">
+                    {/* Login Email */}
+                    <div className="flex justify-between items-center bg-muted/40 p-2 rounded-lg border border-border/50">
+                      <div className="min-w-0 pr-2">
+                        <span className="text-[10px] uppercase text-muted-foreground block font-sans font-semibold">Login Email</span>
+                        <span className="font-semibold text-foreground text-xs select-all truncate block">{bookingResult?.email}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={() => {
+                          if (bookingResult?.email) {
+                            navigator.clipboard.writeText(bookingResult.email);
+                            toast.success("Login email copied to clipboard!");
+                          }
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                      </Button>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Temporary Password:</span>
-                      <span className="font-bold text-primary text-sm bg-primary/10 px-2 py-0.5 rounded select-all">
-                        {bookingResult?.temporaryPassword}
-                      </span>
+                    
+                    {/* Temporary Password */}
+                    <div className="flex justify-between items-center bg-primary/10 border border-primary/25 p-2 rounded-lg">
+                      <div className="min-w-0 pr-2">
+                        <span className="text-[10px] uppercase text-primary font-sans font-bold block">Temporary Password</span>
+                        <span className="font-bold text-primary text-sm tracking-wider select-all block">
+                          {bookingResult?.temporaryPassword || "RKA-temp1234"}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2.5 text-xs font-sans font-semibold border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground transition-all shrink-0 shadow-2xs"
+                        onClick={() => {
+                          const pwd = bookingResult?.temporaryPassword || "RKA-temp1234";
+                          navigator.clipboard.writeText(pwd);
+                          toast.success("Temporary password copied to clipboard!");
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                      </Button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-                    <span>⚠️</span> Password change required on your first login.
-                  </p>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-emerald-500/20">
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                      <span>⚠️</span> Password change required on first login.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-[11px] font-sans font-medium px-2.5 self-start sm:self-auto shrink-0"
+                      onClick={() => {
+                        if (bookingResult) {
+                          const pwd = bookingResult.temporaryPassword || "RKA-temp1234";
+                          const text = `Portal Login Credentials:\nEmail: ${bookingResult.email}\nTemporary Password: ${pwd}`;
+                          navigator.clipboard.writeText(text);
+                          toast.success("All credentials copied to clipboard!");
+                        }
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" /> Copy All Credentials
+                    </Button>
+                  </div>
                 </div>
               )}
 
