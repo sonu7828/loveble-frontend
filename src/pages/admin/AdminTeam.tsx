@@ -137,8 +137,9 @@ export default function AdminTeam() {
       
       const fetchedMembers: Member[] = dataList
         .filter((x: any) => {
-          const email = (x.email || x.user?.email || "").toLowerCase();
-          return !email || !deletedSet.has(email);
+          const email = (x.email || x.user?.email || "").toLowerCase().trim();
+          if (!email) return true;
+          return !deletedSet.has(email);
         })
         .map((x: any) => {
           const rolesList = x.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
@@ -503,7 +504,6 @@ export default function AdminTeam() {
     if (!m.email || !m.email.trim()) return true;
     const em = m.email.toLowerCase().trim();
     if (em.includes("no email")) return true;
-    if (em === "admin@gmail.com") return true;
     return false;
   };
 
