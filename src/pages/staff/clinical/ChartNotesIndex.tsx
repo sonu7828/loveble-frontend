@@ -5,6 +5,7 @@ import { apiQuery, authService, ApiClient } from "@/services/api";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 type Note = {
   id: string;
@@ -67,11 +68,13 @@ export default function ChartNotesIndex() {
     dbRows.forEach((r) => map.set(r.id, r));
     localRows.forEach((r) => map.set(r.id, r));
 
-    const sorted = Array.from(map.values()).sort((a, b) => {
-      const timeA = new Date(a.signed_at || a.created_at || 0).getTime();
-      const timeB = new Date(b.signed_at || b.created_at || 0).getTime();
-      return timeB - timeA;
-    });
+    const sorted = Array.from(map.values())
+      .filter((r) => !isTestPatient(r))
+      .sort((a, b) => {
+        const timeA = new Date(a.signed_at || a.created_at || 0).getTime();
+        const timeB = new Date(b.signed_at || b.created_at || 0).getTime();
+        return timeB - timeA;
+      });
 
     setRows(sorted);
     setLoading(false);

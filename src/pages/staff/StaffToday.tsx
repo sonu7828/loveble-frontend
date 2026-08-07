@@ -25,6 +25,7 @@ import ProviderDashboard from "./ProviderDashboard";
 import { getStoredOrders, saveStoredOrders, PrescriptionOrder } from "./StaffOrders";
 import { MdSignatureBoard } from "@/components/clinical/MdSignatureBoard";
 import { ClinicalChartReviewSummary } from "@/components/clinical/ClinicalChartReviewSummary";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 type Appt = {
   id: string; status: string; start_at: string;
@@ -155,7 +156,7 @@ function MedicalDirectorDashboard() {
         date: g.created_at || g.signed_at ? new Date(g.created_at || g.signed_at).toLocaleDateString() : "Recent",
       }));
 
-      const combined = [...notes, ...gfes];
+      const combined = [...notes, ...gfes].filter((r: any) => !isTestPatient({ client_email: r.email, fullName: r.client, service_name: r.service }));
       setReviews(combined);
 
       // Prescription orders
@@ -587,26 +588,35 @@ function StandardStaffToday() {
     try {
       const { data: appointmentRows } = await apiQuery("appointments")
         .select("*")
-        .order("start_at", { ascending: true });
+        .order("start_at", { ascending: true })
+        .catch(() => ({ data: [] }));
 
-      // Only remove truly garbage rows:
-      // 1. start_at is missing/null/unparseable (would display as "Invalid Date")
-      // 2. No patient identifier at all (no name AND no email — pure ghost/test rows)
-      const fetchedAppts = ((appointmentRows ?? []) as Appt[]).filter((a) => {
+      let localAppts: any[] = [];
+      try {
+        localAppts = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      } catch { }
+
+      const apptMap = new Map<string, Appt>();
+      ((appointmentRows ?? []) as Appt[]).forEach((a) => { if (a.id) apptMap.set(a.id, a); });
+      localAppts.forEach((a: any) => { if (a.id) apptMap.set(a.id, a); });
+
+      const mergedAppts = Array.from(apptMap.values());
+      const fetchedAppts = mergedAppts.filter((a) => {
         if (!a.start_at) return false;
         if (isNaN(new Date(a.start_at).getTime())) return false;
+        if (isTestPatient(a)) return false;
         const hasPatient = !!(a.client_first_name?.trim() || a.client_last_name?.trim() || a.client_email?.trim());
         return hasPatient;
       });
       setAppts(fetchedAppts);
 
-      const { data: clientRows, error: clientErr } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false });
-      if (clientErr) throw clientErr;
+      const { data: clientRows, error: clientErr } = await apiQuery("client_profiles").select("*").order("created_at", { ascending: false }).catch(() => ({ data: [] }));
 
       const uniquePatientsMap = new Map<string, any>();
 
       // Add DB client profiles
-      (clientRows ?? []).forEach((c: any) => {
+      ((clientRows as any) ?? []).forEach((c: any) => {
+        if (isTestPatient(c)) return;
         const email = (c.email || "").toLowerCase();
         if (email) {
           uniquePatientsMap.set(email, {
@@ -621,6 +631,7 @@ function StandardStaffToday() {
 
       // Add clients from appointments
       fetchedAppts.forEach((a: any) => {
+        if (isTestPatient(a)) return;
         const email = (a.client_email || "").toLowerCase();
         const clientName = `${a.client_first_name || ""} ${a.client_last_name || ""}`.trim() || "Patient";
         if (email) {

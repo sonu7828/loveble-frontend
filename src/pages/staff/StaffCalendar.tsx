@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchUnifiedStaffMembers, isClinicalProvider } from "@/lib/unifiedStaff";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 interface Appt {
   id: string; status: string; start_at: string; end_at: string;
@@ -170,6 +171,7 @@ export default function StaffCalendar() {
   // If user is staff-only (not admin/scheduler), force filter to self
   const effectiveFilter = canSeeAll ? filterStaff : (staffId ?? "");
   const visibleAppts = appts.filter((a) => {
+    if (isTestPatient(a)) return false;
     if (effectiveFilter && a.staff_id !== effectiveFilter) return false;
     if (filterLocation && a.location_id !== filterLocation) return false;
     if (filterService && a.service_id !== filterService) return false;

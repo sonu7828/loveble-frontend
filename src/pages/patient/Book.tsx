@@ -221,6 +221,11 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
     const selectedLoc = locations.find((l) => l.id === locationId) || locations[0];
     const selectedStaffObj = staff.find((s) => s.id === staffId);
 
+    const totalAmountCents = selectedServices.reduce((sum, s) => {
+      const p = s.price_cents ?? (s as any).priceCents ?? ((s as any).price ? Math.round((s as any).price * 100) : 15000);
+      return sum + p;
+    }, 0);
+
     const newAppointmentPayload = {
       client_first_name: client.firstName,
       client_last_name: client.lastName,
@@ -232,6 +237,7 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       start_at: slot,
       service_id: serviceIds[0] || "svc-01",
       service_name: selectedSvcNames,
+      total_amount_cents: totalAmountCents,
       services: {
         id: serviceIds[0] || "svc-01",
         name: selectedSvcNames,
@@ -257,23 +263,25 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       staff_id: staffId,
       staff_name: selectedStaffObj
         ? selectedStaffObj.full_name
-        : staffId === "any-available"
+        : staffId === "any-available" || !staffId
           ? "Any Available Provider"
-          : "Girish",
+          : (staffId.toLowerCase().includes("np") || staffId.toLowerCase().includes("nurse"))
+            ? "Nurse Practitioner"
+            : "Nurse Practitioner",
       staff_profiles: selectedStaffObj
         ? {
           id: selectedStaffObj.id,
           full_name: selectedStaffObj.full_name,
           title: selectedStaffObj.title,
         }
-        : staffId === "any-available"
+        : staffId === "any-available" || !staffId
           ? {
             full_name: "Any Available Provider",
             title: "First available specialist",
           }
           : {
-            full_name: "Girish",
-            title: "Provider",
+            full_name: "Nurse Practitioner",
+            title: "Nurse Practitioner",
           },
       stripe_payment_method_id: cardData?.paymentMethodId || null,
       created_at: new Date().toISOString(),

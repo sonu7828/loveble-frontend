@@ -1,7 +1,7 @@
 const DEFAULT_DEMO_NAMES: Record<string, string> = {
   "medicaldirector@gmail.com": "Dr. Dhruva (MD)",
   "nurseprectitioner@gmail.com": "Kiem Vukadinovic, NP",
-  "injector@gmail.com": "Girish, RN Injector",
+  "injector@gmail.com": "RN Injector",
   "securityofficer@gmail.com": "Bob Stane (Security Officer)",
   "scheduler@gmail.com": "Front Desk Coordinator",
   "admin@gmail.com": "ADMIN",
