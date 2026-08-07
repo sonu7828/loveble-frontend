@@ -117,53 +117,34 @@ export default function AdminTeam() {
     setLoading(true);
 
     try {
-      const removedSampleEmails = [
-        "medicaldirector@gmail.com",
-        "securityofficer@gmail.com",
-        "injector@gmail.com",
-        "nurseprectitioner@gmail.com",
-      ];
-      const deletedEmailsList: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
-      removedSampleEmails.forEach((e) => {
-        if (!deletedEmailsList.some((d) => d.toLowerCase() === e.toLowerCase())) {
-          deletedEmailsList.push(e);
-        }
-      });
-      localStorage.setItem("rka_deleted_staff_emails", JSON.stringify(deletedEmailsList));
-      const deletedSet = new Set(deletedEmailsList.map((e) => e.toLowerCase()));
+      // Clear legacy deleted emails cache so real DB members are never hidden
+      try { localStorage.removeItem("rka_deleted_staff_emails"); } catch {}
 
       const rawData = await staffService.getStaffProfiles(false);
       const dataList: any[] = Array.isArray(rawData) ? rawData : (rawData as any)?.data || (rawData as any)?.staff || [];
       
-      const fetchedMembers: Member[] = dataList
-        .filter((x: any) => {
-          const email = (x.email || x.user?.email || "").toLowerCase().trim();
-          if (!email) return true;
-          return !deletedSet.has(email);
-        })
-        .map((x: any) => {
-          const rolesList = x.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
-          const primaryRole = rolesList.find((r: string) => r !== "staff") || rolesList[0] || x.role || "staff";
-          return {
-            id: x.id,
-            user_id: x.userId || x.user_id || x.user?.id || null,
-            full_name: getDynamicProfileName(x.email || x.user?.email, x.fullName || x.full_name || resolveName(x)),
-            title: x.title || "Team Member",
-            email: x.email || x.user?.email || "",
-            is_active: x.isActive !== undefined ? x.isActive : true,
-            is_owner: x.isOwner || false,
-            color: x.color || PALETTE[0],
-            hourly_rate_cents: x.hourlyRateCents || null,
-            commission_percent: x.commissionPercent || null,
-            pending_role: primaryRole as Role,
-          };
-        });
+      const fetchedMembers: Member[] = dataList.map((x: any) => {
+        const rolesList = x.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
+        const primaryRole = rolesList.find((r: string) => r !== "staff") || rolesList[0] || x.role || "staff";
+        return {
+          id: x.id,
+          user_id: x.userId || x.user_id || x.user?.id || null,
+          full_name: getDynamicProfileName(x.email || x.user?.email, x.fullName || x.full_name || resolveName(x)),
+          title: x.title || "Team Member",
+          email: x.email || x.user?.email || "",
+          is_active: x.isActive !== undefined ? x.isActive : true,
+          is_owner: x.isOwner || false,
+          color: x.color || PALETTE[0],
+          hourly_rate_cents: x.hourlyRateCents || null,
+          commission_percent: x.commissionPercent || null,
+          pending_role: primaryRole as Role,
+        };
+      });
 
       // Merge default staff members if not present AND not deleted
       DEFAULT_STAFF_MEMBERS.forEach((d) => {
         if (
           d.email &&
-          !deletedSet.has(d.email.toLowerCase()) &&
           !fetchedMembers.some((m) => m.email?.toLowerCase() === d.email.toLowerCase())
         ) {
           fetchedMembers.push({
