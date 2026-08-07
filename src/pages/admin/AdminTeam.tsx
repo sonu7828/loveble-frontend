@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { staffService } from "@/services/api/staffService";
+import { patientAccountService } from "@/services/api/patientAccountService";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -777,8 +778,66 @@ export default function AdminTeam() {
                       (user?.id && (m.user_id === user.id || m.id === user.id))
                     );
                     const isAdminMember = primaryRole === "admin";
+                    const isFrontDeskMember = primaryRole === "front_desk";
+                    const memberRoles = (roles[m.id] || []) as string[];
+                    const hasManagerRole = memberRoles.includes("patient_account_manager");
+
                     return (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
+                        {isAdmin && isFrontDeskMember && (
+                          hasManagerRole ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                setBusy(m.id);
+                                try {
+                                  await patientAccountService.revokeManagerAccess(m.id);
+                                  toast.success(`Revoked Patient Account Manager access from ${m.full_name}`);
+                                  setRoles((prev) => ({
+                                    ...prev,
+                                    [m.id]: (prev[m.id] || []).filter((r) => (r as string) !== "patient_account_manager"),
+                                  }));
+                                } catch (e: any) {
+                                  toast.error(e.message || "Failed to revoke manager access");
+                                } finally {
+                                  setBusy(null);
+                                }
+                              }}
+                              disabled={busy === m.id}
+                              className="h-7 text-[11px] text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
+                              title="Revoke Patient Account Manager Role"
+                            >
+                              <ShieldCheck className="w-3 h-3 mr-1" /> Revoke Patient Account Manager
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                setBusy(m.id);
+                                try {
+                                  await patientAccountService.grantManagerAccess(m.id);
+                                  toast.success(`Granted Patient Account Manager access to ${m.full_name}`);
+                                  setRoles((prev) => ({
+                                    ...prev,
+                                    [m.id]: [...(prev[m.id] || []), "patient_account_manager" as any],
+                                  }));
+                                } catch (e: any) {
+                                  toast.error(e.message || "Failed to grant manager access");
+                                } finally {
+                                  setBusy(null);
+                                }
+                              }}
+                              disabled={busy === m.id}
+                              className="h-7 text-[11px] text-primary border-primary/30 hover:bg-primary/10"
+                              title="Grant Patient Account Manager Role"
+                            >
+                              <ShieldCheck className="w-3 h-3 mr-1" /> Grant Patient Account Manager
+                            </Button>
+                          )
+                        )}
+
                         <Button size="icon" variant="ghost" onClick={() => openEdit(m, primaryRole)} className="h-8 w-8 rounded-full" title={isAdminMember ? "View / Edit Admin Credentials" : "Edit Profile Details"}>
                           {isAdminMember ? <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" /> : <Pencil className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />}
                         </Button>

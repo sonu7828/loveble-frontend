@@ -1,10 +1,17 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { apiQuery, authService } from "@/services/api";
+import { apiQuery, authService, appointmentService } from "@/services/api";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { NurseDiscountBanner } from "@/components/NurseDiscountBanner";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { z } from "zod";
 import { type CardOnFileHandle } from "@/components/CardOnFile";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -103,6 +110,19 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
   const cardRef = useRef<CardOnFileHandle>(null);
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftBanner, setDraftBanner] = useState<{ when: number; step: Step } | null>(null);
+  const [bookingResult, setBookingResult] = useState<{
+    bookingToken: string;
+    appointmentId: string;
+    patientName: string;
+    serviceName: string;
+    startAt: string;
+    endAt: string;
+    status: string;
+    existingAccount: boolean;
+    temporaryPassword?: string;
+    email: string;
+    patientId: string;
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -217,113 +237,31 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       }
     }
 
-    const selectedSvcNames = selectedServices.map((s) => s.name).join(" + ");
-    const selectedLoc = locations.find((l) => l.id === locationId) || locations[0];
-    const selectedStaffObj = staff.find((s) => s.id === staffId);
+    const validServiceId = serviceIds[0] || services[0]?.id;
+    const validLocationId = locationId || locations[0]?.id;
+    const validStaffId = staffId && staffId !== "any-available" ? staffId : (staff[0]?.id || "00000000-0000-0000-0000-000000000000");
 
-    const newAppointmentPayload = {
-      client_first_name: client.firstName,
-      client_last_name: client.lastName,
-      client_email: client.email.toLowerCase(),
-      client_phone: client.phone,
-      client_dob: client.dob || null,
-      notes: client.notes || null,
-      status: "pending",
-      start_at: slot,
-      service_id: serviceIds[0] || "svc-01",
-      service_name: selectedSvcNames,
-      services: {
-        id: serviceIds[0] || "svc-01",
-        name: selectedSvcNames,
-      },
-      services_list: selectedServices,
-      location_id: locationId,
-      locations: selectedLoc
-        ? {
-          id: selectedLoc.id,
-          name: selectedLoc.name,
-          address: selectedLoc.address,
-          city: selectedLoc.city,
-          state: "CA",
-          zip: "95124",
-        }
-        : {
-          name: "San Jose Clinic",
-          address: "2100 Curtner Ave, Ste 1B",
-          city: "San Jose",
-          state: "CA",
-          zip: "95124",
-        },
-      staff_id: staffId,
-      staff_name: selectedStaffObj
-        ? selectedStaffObj.full_name
-        : staffId === "any-available"
-          ? "Any Available Provider"
-          : "Girish",
-      staff_profiles: selectedStaffObj
-        ? {
-          id: selectedStaffObj.id,
-          full_name: selectedStaffObj.full_name,
-          title: selectedStaffObj.title,
-        }
-        : staffId === "any-available"
-          ? {
-            full_name: "Any Available Provider",
-            title: "First available specialist",
-          }
-          : {
-            full_name: "Girish",
-            title: "Provider",
-          },
-      stripe_payment_method_id: cardData?.paymentMethodId || null,
-      created_at: new Date().toISOString(),
-    };
+    if (!validServiceId || !validLocationId || !slot) {
+      setCardError("Please select a service, location, and date/time slot before confirming.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
-      let createdAppt: any = null;
-      let createdToken: string | null = null;
-
-      try {
-        const res = await apiQuery("appointments").insert(newAppointmentPayload).single();
-        if (!res.error && res.data) {
-          createdAppt = res.data;
-          createdToken = createdAppt?.bookingToken || createdAppt?.booking_token || createdAppt?.token || createdAppt?.id;
-        }
-      } catch { }
-
-      // If backend returned 403 Forbidden or error, or if no token was returned:
-      if (!createdToken) {
-        const genId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `apt-${Date.now()}`;
-        createdToken = `bk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        createdAppt = {
-          id: genId,
-          booking_token: createdToken,
-          bookingToken: createdToken,
-          token: createdToken,
-          ...newAppointmentPayload,
-        };
-        try {
-          const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-          localList.unshift(createdAppt);
-          localStorage.setItem("rka_demo_appointments", JSON.stringify(localList));
-          window.dispatchEvent(new Event("rka_appointment_created"));
-        } catch { }
-      }
-
-      // Record client profile on server or local storage
-      try {
-        await apiQuery("client_profiles").insert({
-          first_name: client.firstName,
-          last_name: client.lastName,
-          email: client.email.toLowerCase(),
-          phone: client.phone,
-          dob: client.dob || null,
-          created_at: new Date().toISOString(),
-        });
-      } catch (_e) { }
+      const result = await appointmentService.createPublicBooking({
+        firstName: client.firstName.trim(),
+        lastName: client.lastName.trim(),
+        email: client.email.trim().toLowerCase(),
+        phone: client.phone.trim(),
+        serviceId: validServiceId,
+        locationId: validLocationId,
+        staffId: validStaffId,
+        startAt: new Date(slot).toISOString(),
+        notes: client.notes || null,
+      });
 
       setSubmitting(false);
-      navigate(`/booking-confirmation?token=${encodeURIComponent(createdToken)}&new=1`);
+      setBookingResult(result);
     } catch (err: any) {
       setCardError(err?.message || "An unexpected error occurred while processing your booking. Please try again.");
       setSubmitting(false);
@@ -562,6 +500,80 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
             />
           )}
         </Suspense>
+
+        {/* Booking Result Modal (New vs Existing Account) */}
+        <Dialog open={!!bookingResult} onOpenChange={() => {}}>
+          <DialogContent className="sm:max-w-md bg-background border border-border p-6 rounded-2xl shadow-xl">
+            <DialogHeader className="text-center sm:text-left">
+              <div className="mx-auto sm:mx-0 w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-3">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl font-serif font-bold text-foreground">
+                Booking Confirmed!
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground mt-1">
+                Your appointment for <span className="font-semibold text-foreground">{bookingResult?.serviceName}</span> has been successfully booked in our system.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="my-4 space-y-3 text-sm border-t border-b border-border/60 py-4">
+              {bookingResult?.existingAccount ? (
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2">
+                  <p className="font-semibold text-foreground text-sm flex items-center gap-2">
+                    <span>👤</span> Existing Account Detected
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Your appointment has been added to your existing patient account (<strong>{bookingResult.email}</strong>). Please log in using your existing credentials to view details.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+                  <p className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
+                    <span>🎉</span> New Patient Account Created
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    A new secure portal account has been automatically created for you:
+                  </p>
+                  <div className="bg-background rounded-lg p-3 border border-border space-y-2 text-xs font-mono">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Login Email:</span>
+                      <span className="font-semibold text-foreground select-all">{bookingResult?.email}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Temporary Password:</span>
+                      <span className="font-bold text-primary text-sm bg-primary/10 px-2 py-0.5 rounded select-all">
+                        {bookingResult?.temporaryPassword}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                    <span>⚠️</span> Password change required on your first login.
+                  </p>
+                </div>
+              )}
+
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p><strong>Booking Reference:</strong> {bookingResult?.bookingToken}</p>
+                <p><strong>Patient Name:</strong> {bookingResult?.patientName}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <Button
+                className="w-full bg-primary text-primary-foreground font-medium"
+                onClick={() => {
+                  if (bookingResult) {
+                    const token = bookingResult.bookingToken;
+                    setBookingResult(null);
+                    navigate(`/booking-confirmation?token=${encodeURIComponent(token)}&new=1`);
+                  }
+                }}
+              >
+                View Confirmation Page
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
       {!isEmbedded && <SiteFooter />}
     </div>

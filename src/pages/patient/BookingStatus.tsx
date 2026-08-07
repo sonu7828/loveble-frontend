@@ -48,15 +48,10 @@ const BookingStatus = () => {
       } catch { }
 
       if (!appt) {
-        try {
-          const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-          appt = localList.find((item: any) =>
-            item.bookingToken === tokenParam ||
-            item.booking_token === tokenParam ||
-            item.token === tokenParam ||
-            item.id === tokenParam
-          );
-        } catch { }
+        // Token not found in system
+        setLoading(false);
+        setError("Booking token not found.");
+        return;
       }
 
       if (appt) {

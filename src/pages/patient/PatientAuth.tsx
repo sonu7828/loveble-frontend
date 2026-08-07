@@ -47,7 +47,7 @@ export default function PatientAuth() {
       const cleanEmail = (overrideEmail || form.email).trim().toLowerCase();
       const pass = overridePassword || form.password;
 
-      const { error } = await authService.signInWithPassword({
+      const { data, error } = await authService.signInWithPassword({
         email: cleanEmail, password: pass,
       });
 
@@ -61,6 +61,13 @@ export default function PatientAuth() {
         }
         return;
       }
+
+      // Check if forced password change is required
+      if ((data as any)?.mustChangePassword) {
+        navigate("/account/change-password", { replace: true });
+        return;
+      }
+
       await refreshCurrentUser();
       navigate("/account", { replace: true });
       return;

@@ -49,8 +49,10 @@ import StaffNewAppointment from "./pages/staff/StaffNewAppointment.tsx";
 import StaffClients from "./pages/staff/StaffClients.tsx";
 import StaffClientDetail from "./pages/staff/StaffClientDetail.tsx";
 import PatientConsents from "./pages/patient/PatientConsents.tsx";
+import PatientAccountsView from "./pages/staff/PatientAccountsView.tsx";
 import PatientIntake from "./pages/patient/PatientIntake.tsx";
 import PatientAuth from "./pages/patient/PatientAuth.tsx";
+import ForcePasswordChange from "./pages/patient/ForcePasswordChange.tsx";
 import PatientAccount from "./pages/patient/PatientAccount.tsx";
 import Unsubscribe from "./pages/public/Unsubscribe.tsx";
 import Privacy from "./pages/public/Privacy.tsx";
@@ -196,6 +198,7 @@ const App = () => (
                   <Route path="device-inventory" element={<AdminOrPrivacyOnly><AdminDevicePresets /></AdminOrPrivacyOnly>} />
                   <Route path="treatment-plans" element={<AdminOnly><AdminTreatmentPlans /></AdminOnly>} />
                   <Route path="team" element={<AdminOnly><AdminTeam /></AdminOnly>} />
+                  <Route path="patient-accounts" element={<AdminOnly><PatientAccountsView /></AdminOnly>} />
                   <Route path="security-officer" element={<Navigate to="/staff/security-officer" replace />} />
                   <Route path="audit-report" element={<Navigate to="/staff/audit-report" replace />} />
                   <Route path="hipaa-policies" element={<Navigate to="/staff/hipaa-policies" replace />} />
@@ -258,6 +261,7 @@ const App = () => (
                   <Route path="appointments/new" element={<StaffNewAppointment />} />
                   <Route path="appointments/:id" element={<StaffAppointmentDetail />} />
                   <Route path="clients" element={<StaffClients />} />
+                  <Route path="patient-accounts" element={<PatientAccountsView />} />
                   <Route path="clients/:email" element={<StaffClientDetail />} />
                   <Route path="waitlist" element={<Navigate to="/staff/inbox?tab=waitlist" replace />} />
                   <Route path="feedback" element={<StaffFeedback />} />
@@ -300,6 +304,7 @@ const App = () => (
               </Route>
               <Route path="/waitlist" element={<Waitlist />} />
               <Route path="/account/auth" element={<PatientAuth />} />
+              <Route path="/account/change-password" element={<ForcePasswordChange />} />
               <Route path="/account" element={<PatientAccount />} />
               <Route path="/consents/:token" element={<PatientConsents />} />
               <Route path="/unsubscribe" element={<Unsubscribe />} />

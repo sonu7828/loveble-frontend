@@ -15,4 +15,22 @@ export const patientService = {
     if (res.error) throw new Error(res.error);
     return res.data;
   },
+
+  async getMe(): Promise<any> {
+    const res = await ApiClient.get<any>("/patient/me");
+    if (res.error) throw new Error(res.error);
+    return res.data?.data || res.data;
+  },
+
+  async getMyAppointments(): Promise<any[]> {
+    const res = await ApiClient.get<any>("/patient/my-appointments");
+    if (res.error) throw new Error(res.error);
+    return res.data?.data || res.data || [];
+  },
+
+  async getMyConsents(): Promise<any[]> {
+    const res = await ApiClient.get<any>("/patient/my-consents");
+    if (res.error) throw new Error(res.error);
+    return res.data?.data || res.data || [];
+  },
 };

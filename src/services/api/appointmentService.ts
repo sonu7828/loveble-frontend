@@ -163,5 +163,37 @@ export const appointmentService = {
     }
 
     return res.data?.count ?? 0;
+  },
+
+  async createPublicBooking(payload: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    staffId: string;
+    locationId: string;
+    serviceId: string;
+    startAt: string;
+    notes?: string | null;
+  }): Promise<{
+    bookingToken: string;
+    appointmentId: string;
+    patientName: string;
+    serviceName: string;
+    startAt: string;
+    endAt: string;
+    status: string;
+    existingAccount: boolean;
+    temporaryPassword?: string;
+    email: string;
+    patientId: string;
+  }> {
+    const res = await ApiClient.post<any>("/appointments/public-booking", payload);
+
+    if (res.error) {
+      throw new Error(res.error);
+    }
+
+    return res.data?.data || res.data;
   }
 };
