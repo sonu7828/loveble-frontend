@@ -47,38 +47,7 @@ interface PendingRequest {
 
 const PALETTE = ["#c97c5d", "#7c9dd1", "#a8c084", "#d4a3c4", "#e8b94b", "#8b7ec4", "#d97c7c", "#5db8a8"];
 
-const DEFAULT_STAFF_MEMBERS: Member[] = [
-  {
-    id: "staff-md-1", user_id: "user-md-1",
-    full_name: getDynamicProfileName("medicaldirector@gmail.com", "Dr. Dhruva (MD)"),
-    title: "Medical Director & Supervising Physician", email: "medicaldirector@gmail.com",
-    is_active: true, is_owner: false, color: "#8b7ec4", hourly_rate_cents: null, commission_percent: null, pending_role: "medical_director"
-  },
-  {
-    id: "staff-np-1", user_id: "user-np-1",
-    full_name: getDynamicProfileName("nurseprectitioner@gmail.com", "Kiem Vukadinovic, NP"),
-    title: "Nurse Practitioner & Lead Injector", email: "nurseprectitioner@gmail.com",
-    is_active: true, is_owner: false, color: "#7c9dd1", hourly_rate_cents: null, commission_percent: null, pending_role: "nurse_practitioner"
-  },
-  {
-    id: "staff-rn-1", user_id: "user-rn-1",
-    full_name: getDynamicProfileName("injector@gmail.com", "Girish, RN Injector"),
-    title: "Registered Nurse Injector", email: "injector@gmail.com",
-    is_active: true, is_owner: false, color: "#5db8a8", hourly_rate_cents: null, commission_percent: null, pending_role: "rn_injector"
-  },
-  {
-    id: "staff-po-1", user_id: "user-po-1",
-    full_name: getDynamicProfileName("securityofficer@gmail.com", "Bob Stane (Security Officer)"),
-    title: "Privacy & Security Officer & Founder", email: "securityofficer@gmail.com",
-    is_active: true, is_owner: false, color: "#a8c084", hourly_rate_cents: null, commission_percent: null, pending_role: "privacy_officer"
-  },
-  {
-    id: "staff-fd-1", user_id: "user-fd-1",
-    full_name: getDynamicProfileName("scheduler@gmail.com", "Front Desk Coordinator"),
-    title: "Front Desk Coordinator & Scheduler", email: "scheduler@gmail.com",
-    is_active: true, is_owner: false, color: "#e8b94b", hourly_rate_cents: null, commission_percent: null, pending_role: "front_desk"
-  }
-];
+const DEFAULT_STAFF_MEMBERS: Member[] = [];
 
 const getInitials = (name?: string | null): string => {
   if (!name) return "??";
@@ -156,8 +125,9 @@ export default function AdminTeam() {
       
       const fetchedMembers: Member[] = dataList
         .filter((x: any) => {
-          const email = (x.email || x.user?.email || "").toLowerCase();
-          return !email || !deletedSet.has(email);
+          const email = (x.email || x.user?.email || "").toLowerCase().trim();
+          if (!email) return true;
+          return !deletedSet.has(email);
         })
         .map((x: any) => {
           const rolesList = x.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
@@ -522,7 +492,6 @@ export default function AdminTeam() {
     if (!m.email || !m.email.trim()) return true;
     const em = m.email.toLowerCase().trim();
     if (em.includes("no email")) return true;
-    if (em === "admin@gmail.com") return true;
     return false;
   };
 
