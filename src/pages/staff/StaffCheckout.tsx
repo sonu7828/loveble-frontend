@@ -156,33 +156,73 @@ export default function StaffCheckout() {
   const startAppointmentSale = useCallback(async () => {
     if (!appointmentId) return;
     setLoading(true);
-    let sId: string | null = null;
 
     try {
-      const res = await ApiClient.post("/billing/checkout", {
-        appointmentId,
-        status: "unpaid",
-        items: [{ description: "Clinical Appointment Service", unitPriceCents: 15000, quantity: 1 }],
-      });
-      if (res.data?.saleId || (res.data as any)?.id) {
-        sId = res.data?.saleId || (res.data as any)?.id;
-      }
-    } catch {
-      /* ignore and fallback to live appointment query below */
-    }
+      // 1. Fetch appointment details from local demo storage or database
+      let appt: any = null;
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        appt = local.find((a: any) => a.id === appointmentId);
+      } catch {}
 
-    if (sId) {
-      setSaleId(sId);
-      await loadSaleData(sId);
-    } else {
-      // Direct query from live Railway MySQL database
-      const { data: appt } = await apiQuery("appointments").select("*").eq("id", appointmentId).single();
+      if (!appt) {
+        const { data } = await apiQuery("appointments").select("*").eq("id", appointmentId).single().catch(() => ({ data: null }));
+        appt = data;
+      }
+
       const clientEmail = appt?.client_email || appt?.patient?.email || "";
       const clientFirstName = appt?.client_first_name || appt?.patient?.firstName || "Client";
       const clientLastName = appt?.client_last_name || appt?.patient?.lastName || "";
       const clientPhone = appt?.client_phone || appt?.patient?.phone || null;
       const serviceName = appt?.service_name || appt?.service?.name || "Clinical Service";
-      const priceCents = appt?.service?.priceCents || appt?.service?.price_cents || 15000;
+
+      // 2. Build line items for ALL selected services
+      let liveItems: LineItem[] = [];
+
+      if (Array.isArray(appt?.services_list) && appt.services_list.length > 0) {
+        liveItems = appt.services_list.map((s: any, idx: number) => {
+          const itemPrice = s.price_cents ?? s.priceCents ?? (s.price ? Math.round(s.price * 100) : 15000);
+          return {
+            kind: "service",
+            reference_id: s.id || `svc-${idx}`,
+            label: s.name || `Service ${idx + 1}`,
+            quantity: 1,
+            unit_price_cents: itemPrice,
+            line_total_cents: itemPrice,
+            tippable: true,
+            taxable: false,
+          };
+        });
+      } else if (serviceName.includes(" + ")) {
+        // Split service names like "Sculptra + Hormone Replacement Therapy"
+        const names = serviceName.split(" + ");
+        liveItems = names.map((n: string, idx: number) => ({
+          kind: "service",
+          reference_id: `svc-${idx}`,
+          label: n.trim(),
+          quantity: 1,
+          unit_price_cents: 15000,
+          line_total_cents: 15000,
+          tippable: true,
+          taxable: false,
+        }));
+      } else {
+        const priceCents = appt?.total_amount_cents || appt?.service?.priceCents || appt?.service?.price_cents || 15000;
+        liveItems = [
+          {
+            kind: "service",
+            reference_id: appt?.service_id || appt?.serviceId || "svc-01",
+            label: serviceName,
+            quantity: 1,
+            unit_price_cents: priceCents,
+            line_total_cents: priceCents,
+            tippable: true,
+            taxable: false,
+          },
+        ];
+      }
+
+      const totalCents = liveItems.reduce((sum, item) => sum + item.line_total_cents, 0);
 
       const liveSale = {
         id: `sale-${appointmentId}`,
@@ -192,39 +232,26 @@ export default function StaffCheckout() {
         client_email: clientEmail,
         client_phone: clientPhone,
         status: "open",
-        subtotal_cents: priceCents,
+        subtotal_cents: totalCents,
         discount_cents: 0,
         tip_cents: 0,
         processing_fee_cents: 0,
-        total_cents: priceCents,
-        amount_due_cents: priceCents,
+        total_cents: totalCents,
+        amount_due_cents: totalCents,
         created_at: new Date().toISOString(),
       };
-
-      const liveItems: LineItem[] = [
-        {
-          kind: "service",
-          reference_id: appt?.service_id || appt?.serviceId || "svc-01",
-          label: serviceName,
-          quantity: 1,
-          unit_price_cents: priceCents,
-          line_total_cents: priceCents,
-          tippable: true,
-          taxable: false,
-        },
-      ];
 
       setSaleId(`sale-${appointmentId}`);
       setSale(liveSale);
       setItems(liveItems);
       setTotals({
-        subtotal_cents: priceCents,
+        subtotal_cents: totalCents,
         discount_cents: 0,
         tip_cents: 0,
         processing_fee_cents: 0,
         voucher_applied_cents: 0,
-        total_cents: priceCents,
-        amount_due_cents: priceCents,
+        total_cents: totalCents,
+        amount_due_cents: totalCents,
       });
 
       if (clientEmail) {
@@ -238,6 +265,9 @@ export default function StaffCheckout() {
         const c = (cards as any[])?.[0];
         setWalkInCardOnFile(c ? { brand: c.brand, last4: c.last4 } : null);
       }
+    } catch (_e) {
+      /* ignore */
+    } finally {
       setLoading(false);
     }
   }, [appointmentId, loadSaleData]);

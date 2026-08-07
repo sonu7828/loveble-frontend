@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchIncompleteCharts, type IncompleteChart } from "@/lib/incompleteCharts";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 export default function StaffClinical() {
   const { user, isClinicalStaff, isNP, isMedicalDirector, isAdmin, canSeeAll, staffId, loading: authLoading } = useAuth();
@@ -42,11 +43,13 @@ export default function StaffClinical() {
     localNotes.forEach((n) => map.set(n.id, n));
     const merged = Array.from(map.values());
 
-    const sorted = [...merged].sort((a, b) => {
-      const tA = new Date(a.signed_at || a.created_at || 0).getTime();
-      const tB = new Date(b.signed_at || b.created_at || 0).getTime();
-      return tB - tA;
-    });
+    const sorted = [...merged]
+      .filter((n) => !isTestPatient(n))
+      .sort((a, b) => {
+        const tA = new Date(a.signed_at || a.created_at || 0).getTime();
+        const tB = new Date(b.signed_at || b.created_at || 0).getTime();
+        return tB - tA;
+      });
 
     setRecentNotes(sorted);
   };
@@ -65,19 +68,21 @@ export default function StaffClinical() {
           fetchIncompleteCharts({ canSeeAll, staffId }),
         ]);
         if (gexRes.error) console.error("[StaffClinical] gfe query error:", gexRes.error);
-        const mappedCosign = cosQueue.map((item: any) => ({
-          id: item.note?.id || item.noteId,
-          client_first_name: item.note?.patient?.firstName || "",
-          client_last_name: item.note?.patient?.lastName || "",
-          client_email: item.note?.patient?.email || "—",
-          service_name: item.note?.serviceName || "Clinical Note",
-          provider_name: item.author?.fullName || "RN Injector",
-          signed_at: item.note?.signedAt || item.requestedAt,
-          status: item.note?.status || "pending_cosign",
-        }));
+        const mappedCosign = cosQueue
+          .map((item: any) => ({
+            id: item.note?.id || item.noteId,
+            client_first_name: item.note?.patient?.firstName || "",
+            client_last_name: item.note?.patient?.lastName || "",
+            client_email: item.note?.patient?.email || "—",
+            service_name: item.note?.serviceName || "Clinical Note",
+            provider_name: item.author?.fullName || "RN Injector",
+            signed_at: item.note?.signedAt || item.requestedAt,
+            status: item.note?.status || "pending_cosign",
+          }))
+          .filter((n: any) => !isTestPatient(n));
         setNeedsCosign(mappedCosign);
-        setExpiringGfes(gexRes.data ?? []);
-        setIncomplete(incompleteRows);
+        setExpiringGfes((gexRes.data ?? []).filter((g: any) => !isTestPatient(g)));
+        setIncomplete(incompleteRows.filter((r) => !isTestPatient(r.appointment)));
         await loadRecentNotes();
       } catch (e) {
         console.error("[StaffClinical] load failed:", e);

@@ -163,10 +163,10 @@ export default function StaffAppointmentDetail() {
             if (found) {
               staffInfo = { full_name: found.full_name, title: found.title, email: found.email };
             } else {
-              staffInfo = { full_name: a.staff_name || "Girish", title: a.staff_title || "Provider", email: null };
+              staffInfo = { full_name: a.staff_name || "Nurse Practitioner", title: a.staff_title || "Nurse Practitioner", email: null };
             }
           } catch (_e) {
-            staffInfo = { full_name: a.staff_name || "Girish", title: a.staff_title || "Provider", email: null };
+            staffInfo = { full_name: a.staff_name || "Nurse Practitioner", title: a.staff_title || "Nurse Practitioner", email: null };
           }
         }
       }
@@ -461,7 +461,7 @@ export default function StaffAppointmentDetail() {
                 : "Scheduled Time"}
             </span>
             <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{meta?.location?.name || "San Jose Clinic"}</span>
-            <span className="flex items-center gap-1.5"><UserIcon className="h-3.5 w-3.5" />{meta?.staff?.full_name || "Girish"}</span>
+            <span className="flex items-center gap-1.5"><UserIcon className="h-3.5 w-3.5" />{meta?.staff?.full_name || "Nurse Practitioner"}</span>
           </div>
         </div>
       </div>

@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
   Calendar as CalIcon, Clock, UserCheck, FileEdit, MessageSquare,
-  Users, Plus, ChevronRight, Stethoscope, Bell, FileText, Activity, CheckCircle2, AlertCircle, RefreshCw, Filter
+  Users, Plus, ChevronRight, Stethoscope, Bell, FileText, Activity, CheckCircle2, AlertCircle, RefreshCw, Filter,
+  Trash2, CheckSquare
 } from "lucide-react";
 
 import { startOfDay, endOfDay } from "date-fns";
 import { getDynamicProfileName } from "@/lib/userProfile";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 interface Appt {
   id: string;
@@ -28,6 +30,7 @@ interface Appt {
   staff_id?: string;
   staff_profiles?: { id?: string; full_name?: string; title?: string };
   checked_in_at: string | null;
+  checked_out_at?: string | null;
 }
 
 interface Patient {
@@ -80,8 +83,8 @@ export function ProviderDashboard() {
   const [unsignedNotesCount, setUnsignedNotesCount] = useState<number>(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<ClinicalNotification[]>([]);
-  const [activeTab, setActiveTab] = useState<"upcoming" | "today" | "all">("upcoming");
-  const [filterScope, setFilterScope] = useState<"mine" | "all">("mine");
+  const [activeTab, setActiveTab] = useState<"upcoming" | "today" | "history">("upcoming");
+  const [filterScope] = useState<"mine" | "all">("mine");
 
   // Resolve provider name dynamically from user profile (e.g. Thomas, Kiem, Girish)
   const providerName = getDynamicProfileName(user, "Thomas");
@@ -89,16 +92,31 @@ export function ProviderDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Fetch only today + future appointments (no old garbage)
+      // 1. Fetch DB + local demo appointments
       const todayStartIso = startOfDay(new Date()).toISOString();
-      const { data: rawApptData } = await apiQuery("appointments")
+      const apptRes: any = await apiQuery("appointments")
         .select("*")
         .gte("start_at", todayStartIso)
-        .order("start_at", { ascending: true });
+        .order("start_at", { ascending: true })
+        .catch(() => ({ data: [] }));
+      const rawApptData = apptRes?.data ?? [];
       
-      // Strip records with missing or unparseable start_at
-      const apptArray: Appt[] = (Array.isArray(rawApptData) ? rawApptData : []).filter(
-        (a) => a.start_at && !isNaN(new Date(a.start_at).getTime())
+      let localAppts: any[] = [];
+      try {
+        localAppts = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      } catch { }
+
+      const apptMap = new Map<string, Appt>();
+      (Array.isArray(rawApptData) ? rawApptData : []).forEach((a: any) => {
+        if (a.id) apptMap.set(a.id, a);
+      });
+      localAppts.forEach((a: any) => {
+        if (a.id) apptMap.set(a.id, a);
+      });
+
+      const mergedAppts = Array.from(apptMap.values());
+      const apptArray: Appt[] = mergedAppts.filter(
+        (a) => a.start_at && !isNaN(new Date(a.start_at).getTime()) && !isTestPatient(a)
       );
       
       // Separate into today vs upcoming
@@ -114,9 +132,11 @@ export function ProviderDashboard() {
       setTodayAppts(todayList);
 
       // 2. Fetch unsigned draft notes count
-      const { data: draftNotes } = await apiQuery("clinical_notes")
+      const draftRes: any = await apiQuery("clinical_notes")
         .select("id")
-        .eq("status", "draft");
+        .eq("status", "draft")
+        .catch(() => ({ data: [] }));
+      const draftNotes = draftRes?.data ?? [];
       setUnsignedNotesCount(Array.isArray(draftNotes) ? draftNotes.length : 0);
 
       // 3. Fetch unread messages count if available
@@ -129,9 +149,11 @@ export function ProviderDashboard() {
         setUnreadMessagesCount(0);
       }
 
-      // 4. Generate live clinical notifications
+      // 4. Generate live clinical notifications (filter test patients & match provider)
       const liveAlerts: ClinicalNotification[] = [];
-      const checkedIn = apptArray.filter((a) => a.status === "arrived" || a.checked_in_at);
+      const checkedIn = apptArray.filter(
+        (a) => (a.status === "arrived" || a.checked_in_at) && a.status !== "completed" && !isTestPatient(a) && isMatchForProvider(a)
+      );
       for (const c of checkedIn) {
         liveAlerts.push({
           id: `ci-${c.id}`,
@@ -157,7 +179,7 @@ export function ProviderDashboard() {
       setUnsignedNotesCount(0);
       setUnreadMessagesCount(0);
       setNotifications([]);
-    } fontally: {
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -206,8 +228,18 @@ export function ProviderDashboard() {
       } catch {}
     }
 
-    // Always show unassigned slots to all providers if no specific provider was selected by patient
-    if (apptStaffId === "any-available" || (!apptStaffId && !rawStaffName)) return true;
+    // 4. Always show unassigned / Nurse Practitioner / General Provider slots to Nurse Practitioner
+    if (
+      apptStaffId === "any-available" ||
+      !apptStaffId ||
+      rawStaffName.includes("nurse") ||
+      rawStaffName.includes("practitioner") ||
+      rawStaffName.includes("provider") ||
+      rawStaffName.includes("any available") ||
+      !rawStaffName
+    ) {
+      return true;
+    }
 
     return false;
   };
@@ -216,13 +248,14 @@ export function ProviderDashboard() {
   const filteredTodayAppts = todayAppts.filter(isMatchForProvider);
 
   // Compute displayed list depending on active tab
+  const historyAppts = filteredAllAppts.filter(a => a.status === "completed" || a.status === "checked_out");
   const displayedAppts = activeTab === "today"
-    ? filteredTodayAppts
+    ? filteredTodayAppts.filter(a => a.status !== "completed")
     : activeTab === "upcoming"
-      ? filteredAllAppts.filter(a => a.status !== "cancelled" && a.status !== "denied")
-      : filteredAllAppts;
+      ? filteredAllAppts.filter(a => a.status !== "cancelled" && a.status !== "denied" && a.status !== "completed")
+      : historyAppts;
 
-  const waitingPatientsCount = filteredTodayAppts.filter(a => a.status === "arrived" || a.checked_in_at).length;
+  const waitingPatientsCount = filteredTodayAppts.filter(a => (a.status === "arrived" || a.checked_in_at) && a.status !== "completed").length;
 
   const providerRoleBadge = isNP
     ? "Nurse Practitioner & Lead Injector"
@@ -234,50 +267,81 @@ export function ProviderDashboard() {
 
   const handleCheckIn = async (apptId: string) => {
     try {
-      await apiQuery("appointments").update({ status: "arrived", checked_in_at: new Date().toISOString() }).eq("id", apptId);
-      toast.success("Patient marked as checked in!");
+      const nowIso = new Date().toISOString();
+      await apiQuery("appointments").update({ status: "arrived", checked_in_at: nowIso }).eq("id", apptId).catch(() => {});
+      const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      const updated = local.map((a: any) => (a.id === apptId ? { ...a, status: "arrived", checked_in_at: nowIso } : a));
+      localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      toast.success("Patient marked as checked-in!");
       loadData();
     } catch {
       toast.error("Could not update check-in status");
     }
   };
 
+  const handleCheckout = async (apptId: string) => {
+    try {
+      const nowIso = new Date().toISOString();
+      await apiQuery("appointments").update({ status: "completed", checked_out_at: nowIso }).eq("id", apptId).catch(() => {});
+      const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      const updated = local.map((a: any) => (a.id === apptId ? { ...a, status: "completed", checked_out_at: nowIso } : a));
+      localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      toast.success("Patient checked-out & payment completed! Saved to Patient History.");
+      loadData();
+    } catch {
+      toast.error("Could not complete checkout");
+    }
+  };
+
+  const handleDeleteAppt = async (apptId: string) => {
+    if (!window.confirm("Are you sure you want to delete this patient appointment record?")) return;
+    try {
+      await apiQuery("appointments").delete().eq("id", apptId).catch(() => {});
+      const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      const filtered = local.filter((a: any) => a.id !== apptId);
+      localStorage.setItem("rka_demo_appointments", JSON.stringify(filtered));
+      toast.success("Appointment record deleted.");
+      loadData();
+    } catch {
+      toast.error("Could not delete appointment");
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-      {/* Provider Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-blue-900/10 via-primary/5 to-card border border-border shadow-xs">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Top Banner & Quick Actions */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-secondary/60 via-background to-secondary/30 border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-serif text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-              Welcome back, {providerName}
-            </h1>
-            <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30 px-2.5 py-0.5 text-xs font-medium">
-              <Stethoscope className="h-3.5 w-3.5 mr-1 text-blue-600" /> {providerRoleBadge}
+          <h1 className="text-2xl font-bold font-serif text-foreground">
+            Welcome back, {providerName}
+          </h1>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 text-xs gap-1">
+              <Stethoscope className="h-3 w-3" /> {providerRoleBadge}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-2 max-w-xl">
             Clinical workspace — manage your patient appointments, review medical charts, and record clinical notes.
           </p>
         </div>
 
-        {/* Quick Actions Header Buttons */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => loadData()}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => loadData()} disabled={loading} className="gap-1.5 text-xs">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button size="sm" variant="default" className="text-xs gap-1.5 shadow-xs" onClick={() => navigate("/staff/clinical/notes/new")}>
-            <Plus className="h-4 w-4" /> Create Clinical Note
+          <Button size="sm" onClick={() => navigate("/staff/clinical/notes/new")} className="gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs">
+            <Plus className="h-3.5 w-3.5" /> Create Clinical Note
           </Button>
-          <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => navigate("/staff/clients")}>
-            <Users className="h-4 w-4" /> View Patients
+          <Button variant="outline" size="sm" onClick={() => navigate("/staff/clients")} className="gap-1.5 text-xs">
+            <Users className="h-3.5 w-3.5" /> View Patients
           </Button>
-          <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => navigate("/staff/calendar")}>
-            <CalIcon className="h-4 w-4" /> Today's Schedule
+          <Button variant="outline" size="sm" onClick={() => navigate("/staff/calendar")} className="gap-1.5 text-xs">
+            <CalIcon className="h-3.5 w-3.5" /> Today's Schedule
           </Button>
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Today's Appointments */}
         <Card 
@@ -291,7 +355,7 @@ export function ProviderDashboard() {
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl font-bold font-serif">{filteredTodayAppts.length}</span>
+            <span className="text-2xl font-bold font-serif text-foreground">{filteredTodayAppts.filter(a => a.status !== "completed").length}</span>
             <span className="text-[11px] text-muted-foreground">Scheduled today</span>
           </div>
         </Card>
@@ -308,7 +372,7 @@ export function ProviderDashboard() {
             </div>
           </div>
           <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl font-bold font-serif text-blue-700 dark:text-blue-300">{filteredAllAppts.length}</span>
+            <span className="text-2xl font-bold font-serif text-blue-700 dark:text-blue-300">{filteredAllAppts.filter(a => a.status !== "completed").length}</span>
             <Badge className="bg-blue-600 text-white text-[10px]">Total Booked</Badge>
           </div>
         </Card>
@@ -351,7 +415,7 @@ export function ProviderDashboard() {
               <div>
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-base font-serif font-medium">
-                    {activeTab === "today" ? "Today's Patient Schedule" : activeTab === "upcoming" ? "Nurse Appointments (Upcoming & Scheduled)" : "All Practice Appointments"}
+                    {activeTab === "today" ? "Today's Patient Schedule" : activeTab === "upcoming" ? "Nurse Appointments (Upcoming & Scheduled)" : "Patient History (Checked-Out)"}
                   </CardTitle>
                   <Badge variant="outline" className="text-[10px] font-semibold">
                     {displayedAppts.length} total
@@ -362,46 +426,36 @@ export function ProviderDashboard() {
                 </p>
               </div>
 
-              {/* Controls & Filter */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex rounded-lg bg-muted/60 p-0.5 text-xs font-medium border border-border">
+              {/* Controls & Filter - Single Line */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-lg bg-muted/60 p-0.5 text-xs font-medium border border-border">
                   <button
                     type="button"
                     onClick={() => setActiveTab("upcoming")}
-                    className={`px-2.5 py-1 rounded-md transition ${activeTab === "upcoming" ? "bg-background text-foreground shadow-2xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`px-3 py-1 rounded-md transition ${activeTab === "upcoming" ? "bg-primary text-primary-foreground font-semibold shadow-2xs" : "text-muted-foreground hover:text-foreground"}`}
                   >
                     Upcoming & All
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab("today")}
-                    className={`px-2.5 py-1 rounded-md transition ${activeTab === "today" ? "bg-background text-foreground shadow-2xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`px-3 py-1 rounded-md transition ${activeTab === "today" ? "bg-primary text-primary-foreground font-semibold shadow-2xs" : "text-muted-foreground hover:text-foreground"}`}
                   >
                     Today Only
                   </button>
-                </div>
-
-                <div className="flex rounded-lg bg-muted/60 p-0.5 text-xs font-medium border border-border">
                   <button
                     type="button"
-                    onClick={() => setFilterScope("mine")}
-                    className={`px-2 py-1 rounded-md transition ${filterScope === "mine" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setActiveTab("history")}
+                    className={`px-3 py-1 rounded-md transition ${activeTab === "history" ? "bg-primary text-primary-foreground font-semibold shadow-2xs" : "text-muted-foreground hover:text-foreground"}`}
                   >
-                    My Appointments
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterScope("all")}
-                    className={`px-2 py-1 rounded-md transition ${filterScope === "all" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    All Clinic
+                    Patient History ({historyAppts.length})
                   </button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase text-[10px]">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/50 text-muted-foreground border-b border-border uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="p-3 font-semibold">Date & Time</th>
                     <th className="p-3 font-semibold">Patient Name</th>
@@ -439,7 +493,9 @@ export function ProviderDashboard() {
                           </Badge>
                         </td>
                         <td className="p-3">
-                          {a.status === "arrived" || a.checked_in_at ? (
+                          {a.status === "completed" ? (
+                            <Badge className="bg-blue-600 text-white text-[10px] uppercase">Completed & Paid</Badge>
+                          ) : a.status === "arrived" || a.checked_in_at ? (
                             <Badge className="bg-emerald-600 text-white text-[10px] uppercase">Checked-In</Badge>
                           ) : a.status === "approved" ? (
                             <Badge className="bg-success-soft text-success-soft-foreground text-[10px] uppercase">Approved</Badge>
@@ -450,7 +506,7 @@ export function ProviderDashboard() {
                           )}
                         </td>
                         <td className="p-3 text-right whitespace-nowrap space-x-1.5">
-                          {a.status !== "arrived" && !a.checked_in_at && (
+                          {a.status !== "arrived" && !a.checked_in_at && a.status !== "completed" && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -460,6 +516,15 @@ export function ProviderDashboard() {
                               Check In
                             </Button>
                           )}
+                          {(a.status === "arrived" || a.checked_in_at) && a.status !== "completed" && (
+                            <Button
+                              size="sm"
+                              className="h-7 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white gap-1 shadow-2xs"
+                              onClick={() => handleCheckout(a.id)}
+                            >
+                              <CheckSquare className="h-3 w-3" /> Checkout & Complete
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="default"
@@ -467,6 +532,15 @@ export function ProviderDashboard() {
                             onClick={() => navigate(`/staff/clinical/clients/${encodeURIComponent(a.client_email || "patient@example.com")}`)}
                           >
                             <FileText className="h-3 w-3" /> Open Chart
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0 border-destructive/30 text-destructive hover:bg-destructive/10"
+                            title="Delete patient appointment record"
+                            onClick={() => handleDeleteAppt(a.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </td>
                       </tr>

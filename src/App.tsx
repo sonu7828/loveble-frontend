@@ -285,6 +285,7 @@ const App = () => (
                   <Route path="perks" element={<Navigate to="/admin/marketing-hub?tab=perks" replace />} />
                   <Route path="quick-phrases" element={<Navigate to="/admin/clinical-templates?tab=quick-phrases" replace />} />
                   <Route path="outcomes" element={<Navigate to="/admin/reports?tab=outcomes" replace />} />
+                  <Route path="clinical/clients" element={<Navigate to="/staff/clients" replace />} />
                   <Route path="clinical/clients/:email" element={<ClinicalClient />} />
                   <Route path="clinical/gfe/new" element={<ClinicalErrorBoundary><GFEForm /></ClinicalErrorBoundary>} />
                   <Route path="clinical/gfe/:id" element={<ClinicalErrorBoundary><GFEForm /></ClinicalErrorBoundary>} />

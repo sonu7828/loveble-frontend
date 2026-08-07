@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 type ImportRow = {
   first_name: string; last_name: string; email: string;
@@ -526,13 +527,7 @@ export default function StaffClients() {
   };
 
   const isGarbageTestClient = (c: { email?: string; first_name?: string; last_name?: string }) => {
-    const email = (c.email || "").toLowerCase();
-    const fullName = `${c.first_name || ""} ${c.last_name || ""}`.toLowerCase();
-    if (email.includes("@example.com")) return true;
-    if (email.includes("phase2a") || fullName.includes("phase2a")) return true;
-    if (fullName.includes("testpatient") || fullName.includes("test patient")) return true;
-    if (fullName.includes("admin test") || fullName.includes("demo test")) return true;
-    return false;
+    return isTestPatient(c);
   };
 
   const allClients = useMemo<UnifiedClient[]>(() => {

@@ -6,6 +6,7 @@ import { Loader2, ClipboardCheck, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { isTestPatient } from "@/lib/testPatientFilter";
 
 type Note = {
   id: string;
@@ -101,11 +102,13 @@ export default function StaffCosignQueue() {
         }
       });
 
-      const sorted = Array.from(map.values()).sort((a, b) => {
-        const tA = new Date(a.signed_at || 0).getTime();
-        const tB = new Date(b.signed_at || 0).getTime();
-        return tB - tA;
-      });
+      const sorted = Array.from(map.values())
+        .filter((n) => !isTestPatient(n))
+        .sort((a, b) => {
+          const tA = new Date(a.signed_at || 0).getTime();
+          const tB = new Date(b.signed_at || 0).getTime();
+          return tB - tA;
+        });
 
       setNotes(sorted);
     } catch (e) {

@@ -53,7 +53,7 @@ const MOCK_COSIGN_QUEUE: CosignQueueItem[] = [
   {
     id: "cosign-01",
     noteId: "chart-101",
-    authorId: "st-girish",
+    authorId: "st-np",
     status: "pending",
     requestedAt: new Date().toISOString(),
     note: {
@@ -66,7 +66,7 @@ const MOCK_COSIGN_QUEUE: CosignQueueItem[] = [
       createdAt: new Date().toISOString(),
       patient: { id: "p-1", firstName: "Sarah", lastName: "Jenkins", email: "sarah.j@example.com" },
     },
-    author: { id: "st-girish", fullName: "Girish", title: "Nurse Practitioner" },
+    author: { id: "st-np", fullName: "Nurse Practitioner", title: "Nurse Practitioner" },
   },
   {
     id: "cosign-02",

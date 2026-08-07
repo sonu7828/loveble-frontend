@@ -72,11 +72,17 @@ const BookingStatus = () => {
         };
 
         // Fallback provider object
-        const staffName = enriched.staff_profiles?.full_name || enriched.staff_name || (enriched.staff_id === "any-available" ? "Any Available Provider" : "Girish");
-        const staffTitle = enriched.staff_profiles?.title || enriched.staff_title || (enriched.staff_id === "any-available" ? "First available specialist" : "Provider");
+        let rawStaffName = enriched.staff_profiles?.full_name || enriched.staff_name;
+        if (!rawStaffName || rawStaffName === "Girish") {
+          rawStaffName = enriched.staff_id === "any-available" ? "Any Available Provider" : "Nurse Practitioner";
+        }
+        let rawStaffTitle = enriched.staff_profiles?.title || enriched.staff_title;
+        if (!rawStaffTitle || rawStaffTitle === "Provider") {
+          rawStaffTitle = rawStaffName.includes("Nurse") ? "Nurse Practitioner" : "Nurse Practitioner";
+        }
         enriched.staff_profiles = {
-          full_name: staffName,
-          title: staffTitle,
+          full_name: rawStaffName,
+          title: rawStaffTitle,
         };
 
         // Fallback service object
@@ -212,8 +218,12 @@ const BookingStatus = () => {
                     : (data.services?.name || data.service_name || "Medical Consultation")}
                 </Row>
                 <Row label="Provider">
-                  {data.staff_profiles?.full_name || data.staff_name || "Girish"}
-                  <span className="text-muted-foreground"> · {data.staff_profiles?.title || data.staff_title || "Provider"}</span>
+                  {data.staff_profiles?.full_name && data.staff_profiles.full_name !== "Girish"
+                    ? data.staff_profiles.full_name
+                    : data.staff_name && data.staff_name !== "Girish"
+                      ? data.staff_name
+                      : "Nurse Practitioner"}
+                  <span className="text-muted-foreground"> · {data.staff_profiles?.title || data.staff_title || "Nurse Practitioner"}</span>
                 </Row>
                 <Row label="When">
                   <span className="flex items-center gap-1.5">
