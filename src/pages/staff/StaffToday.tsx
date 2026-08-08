@@ -855,7 +855,17 @@ function StandardStaffToday() {
       );
       try {
         const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-        const updated = local.map((item: any) => (item.id === apptId ? { ...item, status: "arrived", checked_in_at: nowIso } : item));
+        const apptObj = appts.find((a) => a.id === apptId);
+        const exists = local.some((item: any) => item.id === apptId);
+        let updated: any[];
+        if (exists) {
+          updated = local.map((item: any) => (item.id === apptId ? { ...item, status: "arrived", checked_in_at: nowIso } : item));
+        } else {
+          updated = [
+            { ...(apptObj || {}), id: apptId, status: "arrived", checked_in_at: nowIso },
+            ...local,
+          ];
+        }
         localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
       } catch {}
       window.dispatchEvent(new Event("rka_demo_appointments_updated"));

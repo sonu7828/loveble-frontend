@@ -30,41 +30,41 @@ function getStatusBadgeStyle(status: string) {
   if (s === "pending") {
     return {
       bg: "#fef3c7", // Soft Amber
-      badgeClass: "bg-amber-500/20 text-amber-900 border border-amber-500/30",
+      badgeClass: "bg-amber-600 text-white font-bold border border-amber-700 shadow-xs",
       label: "Pending",
     };
   }
   if (s === "confirmed" || s === "approved") {
     return {
-      bg: "#dbeafe", // Distinct Sky Blue
+      bg: "#e0f2fe", // Distinct Sky Blue
       badgeClass: "bg-sky-600 text-white font-bold border border-sky-700 shadow-xs",
       label: "Confirmed",
     };
   }
   if (s === "arrived" || s === "checked_in") {
     return {
-      bg: "#ccfbf1", // Soft Teal
-      badgeClass: "bg-teal-500/20 text-teal-900 border border-teal-500/30",
+      bg: "#ccfbf1", // Vibrant Teal / Mint Green background for checked-in
+      badgeClass: "bg-teal-600 text-white font-bold border border-teal-700 shadow-xs",
       label: "Checked-in",
     };
   }
   if (s === "completed") {
     return {
       bg: "#dcfce7", // Soft Emerald Green
-      badgeClass: "bg-emerald-500/20 text-emerald-900 border border-emerald-500/30",
+      badgeClass: "bg-emerald-600 text-white font-bold border border-emerald-700 shadow-xs",
       label: "Completed",
     };
   }
   if (s === "cancelled" || s === "no_show" || s === "denied") {
     return {
       bg: "#ffe4e6", // Soft Rose Red
-      badgeClass: "bg-rose-500/20 text-rose-900 border border-rose-500/30",
+      badgeClass: "bg-rose-600 text-white font-bold border border-rose-700 shadow-xs",
       label: s === "no_show" ? "No-show" : "Cancelled",
     };
   }
   return {
     bg: "#f3f4f6",
-    badgeClass: "bg-secondary text-foreground",
+    badgeClass: "bg-secondary text-foreground font-bold",
     label: status,
   };
 }
@@ -161,13 +161,18 @@ export default function StaffCalendar() {
       } catch { }
 
       let localAppts: any[] = [];
+      const localMap = new Map<string, any>();
       try {
         const raw = localStorage.getItem("rka_demo_appointments") || "[]";
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
+          parsed.forEach((item: any) => {
+            if (item.id) localMap.set(item.id, item);
+          });
           localAppts = parsed.map((item: any) => ({
             id: item.id || `local-${Math.random()}`,
             status: item.status || "confirmed",
+            checked_in_at: item.checked_in_at,
             start_at: item.start_at || item.startAt || item.start || new Date().toISOString(),
             end_at: item.end_at || item.endAt || item.end || new Date().toISOString(),
             client_first_name: item.client_first_name || item.clientFirstName || item.first_name || item.firstName || "Client",
@@ -182,7 +187,28 @@ export default function StaffCalendar() {
       } catch { }
 
       const map = new Map<string, any>();
-      dbAppts.forEach(x => { if (x.id) map.set(x.id, x); });
+      dbAppts.forEach(x => {
+        if (x.id) {
+          let localItem = localMap.get(x.id);
+          if (!localItem) {
+            const clientNameKey = `${x.client_first_name || ""} ${x.client_last_name || ""}`.trim().toLowerCase();
+            if (clientNameKey) {
+              localItem = Array.from(localMap.values()).find((item: any) => {
+                const name = `${item.client_first_name || ""} ${item.client_last_name || ""}`.trim().toLowerCase();
+                return name === clientNameKey && (item.status === "arrived" || item.checked_in_at);
+              });
+            }
+          }
+          const localStatus = (localItem?.status || "").toLowerCase();
+          const dbStatus = (x.status || "").toLowerCase();
+          const isCompleted = localStatus === "completed" || dbStatus === "completed";
+          const isCheckin = !isCompleted && (localStatus === "arrived" || localStatus === "checked_in" || dbStatus === "arrived" || dbStatus === "checked_in" || !!localItem?.checked_in_at || !!x.checked_in_at);
+
+          const effectiveStatus = isCompleted ? "completed" : isCheckin ? "arrived" : (dbStatus || localStatus || "confirmed");
+          map.set(x.id, { ...x, status: effectiveStatus, checked_in_at: localItem?.checked_in_at || x.checked_in_at });
+        }
+      });
+
       localAppts.forEach(x => {
         if (x.id) {
           const apptTime = new Date(x.start_at).getTime();
@@ -190,9 +216,20 @@ export default function StaffCalendar() {
           const endTime = new Date(end).getTime();
           if (apptTime >= startTime && apptTime <= endTime) {
             if (map.has(x.id)) {
-              // DB appointment takes precedence for updated status (e.g. confirmed)
               const dbItem = map.get(x.id);
-              map.set(x.id, { ...x, ...dbItem });
+              const localStatus = (x.status || "").toLowerCase();
+              const dbStatus = (dbItem.status || "").toLowerCase();
+              
+              const isLocalCompleted = localStatus === "completed" || dbStatus === "completed";
+              const isLocalCheckin = !isLocalCompleted && (localStatus === "arrived" || localStatus === "checked_in" || dbStatus === "arrived" || dbStatus === "checked_in" || !!x.checked_in_at);
+              
+              const effectiveStatus = isLocalCompleted
+                ? "completed"
+                : isLocalCheckin
+                ? "arrived"
+                : (dbStatus || localStatus || "confirmed");
+
+              map.set(x.id, { ...dbItem, ...x, status: effectiveStatus });
             } else {
               map.set(x.id, x);
             }
