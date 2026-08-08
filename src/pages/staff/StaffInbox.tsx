@@ -60,9 +60,9 @@ export default function StaffInbox() {
       apiQuery("services").select("id, name"),
     ]);
 
-    const fetchedAppts = (a.data ?? []) as Appt[];
+    const fetchedAppts = ((a.data ?? []) as Appt[]).filter((item: any) => !isTestPatient(item));
     setAppts(fetchedAppts);
-    setWaitlist(wl.data ?? []);
+    setWaitlist(((wl.data ?? []) as any[]).filter((item: any) => !isTestPatient(item)));
     setAllServices(allSvc.data ?? []);
 
     const sids = [...new Set(fetchedAppts.map((x: any) => x.service_id).filter(Boolean))];

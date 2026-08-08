@@ -29,15 +29,15 @@ export function isTestPatient(c: {
   const staffId = (c.staff_id || "").toLowerCase();
 
   // 1. Test patient & test service checks
-  if (email.includes("@example.com") || email.includes("@radiantilyk.local") || email.includes("walkin-")) return true;
+  if (email.includes("@example.com") || email.includes("@radiantilyk.local") || email.includes("walkin-") || email.includes("concurrent") || email.includes("test.")) return true;
   if (email.includes("phase2a") || fullName.includes("phase2a")) return true;
-  if (fullName.includes("testpatient") || fullName.includes("test patient") || fullName.includes("walk-in") || fullName.includes("walkin")) return true;
-  if (fullName.includes("admin test") || fullName.includes("demo test") || fullName.includes("patient 001") || fullName.includes("patient001")) return true;
+  if (fullName.includes("testpatient") || fullName.includes("test patient") || fullName.includes("testfirst") || fullName.includes("testlast") || fullName.includes("walk-in") || fullName.includes("walkin") || fullName.includes("concurrent")) return true;
+  if (fullName.includes("admin test") || fullName.includes("demo test") || fullName.includes("patient 001") || fullName.includes("patient001") || fullName.includes("test")) return true;
   if (fullName.includes("user4") || fullName.includes("user4 resu") || fullName.includes("resu")) return true;
-  if (fullName.includes("omm kapoor") || fullName.includes("om kapoor") || fullName.includes("jully romareo") || fullName.includes("jully")) return true;
+  if (fullName.includes("omm kapoor") || fullName.includes("om kapoor") || fullName.includes("jully romareo") || fullName.includes("jully") || fullName.includes("jessica shergil")) return true;
   if (fullName.includes("tony stark") || fullName.includes("stark") || fullName.includes("rajnandani") || fullName.includes("sinnghaniya")) return true;
   if (fullName.includes("drake farma") || fullName.includes("faaaaaa") || fullName.includes("jimmy jam") || fullName.includes("jimmy has") || fullName.includes("saaf saaf")) return true;
-  if (email.includes("drake@gmail.com") || email.includes("faa@gmail.com") || email.includes("jimmy@gmail.com") || email.includes("jimm@gmail.com") || email.includes("saaf@gmail.com") || email.includes("tony@gmail.com") || email.includes("rajnandani@gmail.com") || email.includes("jully@gmail.com") || email.includes("patient001@gmail.com")) return true;
+  if (email.includes("drake@gmail.com") || email.includes("faa@gmail.com") || email.includes("jimmy@gmail.com") || email.includes("jimm@gmail.com") || email.includes("saaf@gmail.com") || email.includes("tony@gmail.com") || email.includes("rajnandani@gmail.com") || email.includes("jully@gmail.com") || email.includes("patient001@gmail.com") || email.includes("om@gmail.com") || email.includes("jessica@gmail.com")) return true;
   if (serviceName.includes("phase2a") || serviceName.includes("admin test service") || serviceName.includes("1785925484857")) return true;
 
   // 2. Deleted staff member checks (Thor, Thomas, Girish, etc.)
