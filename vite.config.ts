@@ -13,9 +13,11 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       "/api": {
-        target: process.env.VITE_BACKEND_URL || "https://sonulovablebackend-production.up.railway.app",
+        target: process.env.VITE_BACKEND_URL || "http://localhost:5000",
         changeOrigin: true,
         secure: false,
+        timeout: 30000,
+        proxyTimeout: 30000,
         configure: (proxy) => {
           proxy.on("error", (err, _req, res) => {
             if (res && !res.headersSent && 'writeHead' in res) {
