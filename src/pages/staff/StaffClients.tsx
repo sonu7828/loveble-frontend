@@ -651,20 +651,23 @@ export default function StaffClients() {
     if (isTestPatient(c)) return true;
     if (!c.email) return false;
     const em = c.email.toLowerCase().trim();
-    const knownStaff = [
-      "admin@gmail.com",
-      "frontdesk@gmail.com",
-      "nurse@gmail.com",
-      "medical@gmail.com",
-      "injector@gmail.com",
-      "nursepractitioner@gmail.com",
-      "medicaldirector@gmail.com",
-      "security@gmail.com",
-      "thor@gmail.com",
-      "thomas@gmail.com",
+    const staffKeywords = [
+      "admin",
+      "nurse",
+      "frontdesk",
+      "medical",
+      "injector",
+      "practitioner",
+      "director",
+      "security",
+      "receptionist",
+      "provider",
+      "staff",
+      "thor",
+      "thomas",
+      "phase1-",
     ];
-    if (knownStaff.includes(em)) return true;
-    if (em.endsWith("@radiantilyk.com") || em.startsWith("phase1-")) return true;
+    if (em.endsWith("@radiantilyk.com") || staffKeywords.some((k) => em.includes(k))) return true;
     return false;
   };
 
