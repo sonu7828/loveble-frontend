@@ -985,14 +985,11 @@ function StandardStaffToday() {
         </Card>
       </div>
 
-      {/* ── Main Grid: Left Main Sections (2 Cols) + Right Sidebar (1 Col) ──── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ── Main Schedule & Appointments List ──── */}
+      <div className="space-y-6">
 
-        {/* LEFT MAIN SECTIONS */}
-        <div className="lg:col-span-2 space-y-6">
-
-          {/* Section 1: Today's Schedule */}
-          <Card className="p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
+        {/* Section 1: Today's Schedule */}
+        <Card className="p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <h2 className="font-serif text-lg font-normal tracking-tight flex items-center gap-2">
@@ -1155,73 +1152,6 @@ function StandardStaffToday() {
               </div>
             </div>
           </Card>
-
-        </div>
-
-        {/* SMALL RIGHT SIDEBAR (1 COL) */}
-        <div className="space-y-6">
-
-          {/* 1. My Tasks */}
-          <Card className="p-4 sm:p-5 border border-border bg-card shadow-xs space-y-4 rounded-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-serif text-base font-normal tracking-tight flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-primary" /> My Tasks
-              </h3>
-              <Badge variant="outline" className="text-[10px]">{myTasks.length} Pending</Badge>
-            </div>
-
-            {myTasks.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-border rounded-xl bg-muted/10 space-y-1">
-                <Inbox className="h-7 w-7 text-muted-foreground/40 mx-auto" />
-                <p className="text-xs font-medium text-foreground">No pending staff tasks.</p>
-                <p className="text-[11px] text-muted-foreground">Assigned clinical notes and follow-ups will appear here.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {myTasks.map((t) => (
-                  <div key={t.id} className="p-2.5 rounded-xl border border-border bg-muted/20 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={t.done}
-                        onChange={() => toggleStaffTask(t.id)}
-                        className="h-3.5 w-3.5 rounded border-border text-primary"
-                      />
-                      <span className={t.done ? "line-through text-muted-foreground" : "text-foreground"}>{t.title}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* 2. Notifications */}
-          <Card className="p-4 sm:p-5 border border-border bg-card shadow-xs space-y-3.5 rounded-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-serif text-base font-normal tracking-tight flex items-center gap-2">
-                <Bell className="h-4 w-4 text-amber-600" /> Notifications
-              </h3>
-              <Badge variant="outline" className="text-[10px]">{notifications.length} New</Badge>
-            </div>
-
-            {notifications.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-border rounded-xl bg-muted/10 space-y-1">
-                <Bell className="h-7 w-7 text-muted-foreground/40 mx-auto" />
-                <p className="text-xs font-medium text-foreground">No unread notifications.</p>
-                <p className="text-[11px] text-muted-foreground">Lab results, consent updates, and appointment alerts will display here.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {notifications.map((n, i) => (
-                  <div key={i} className="p-2.5 rounded-xl border border-border bg-muted/20 text-xs text-foreground">
-                    {n.text}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-        </div>
 
       </div>
     </div>
