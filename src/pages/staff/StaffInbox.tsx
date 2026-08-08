@@ -51,10 +51,6 @@ export default function StaffInbox() {
     let aq = apiQuery("appointments").select("*").eq("status", "pending").order("created_at", { ascending: true });
     if (!canSeeAll && staffId) aq = aq.eq("staff_id", staffId);
 
-<<<<<<< HEAD
-    const a = await aq;
-    const fetchedAppts = ((a.data ?? []) as Appt[]).filter((x) => !isTestPatient(x));
-=======
     const [a, wl, allSvc] = await Promise.all([
       aq,
       apiQuery("waitlist_entries").select("*"),
@@ -62,7 +58,6 @@ export default function StaffInbox() {
     ]);
 
     const fetchedAppts = (a.data ?? []) as Appt[];
->>>>>>> a7057e0d8fd3b6bb1446b655e3a92e49851e6a7b
     setAppts(fetchedAppts);
     setWaitlist(wl.data ?? []);
     setAllServices(allSvc.data ?? []);

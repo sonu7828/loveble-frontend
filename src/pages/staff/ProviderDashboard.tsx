@@ -197,15 +197,19 @@ export function ProviderDashboard() {
 
   // Provider-matching filter logic — strictly filter appointments to only those assigned to this provider
   const isMatchForProvider = (a: Appt) => {
-    if (filterScope === "all") return true;
+    if (filterScope === "all" && (isMedicalDirector || (user as any)?.role === "admin" || (user as any)?.role === "front_desk")) {
+      return true;
+    }
 
-    const apptStaffId = (a.staff_id || "").toLowerCase();
+    const apptStaffId = (a.staff_id || a.staff_profiles?.id || "").toLowerCase();
     const rawStaffName = (a.staff_name || a.staff_profiles?.full_name || "").toLowerCase();
     const userEmail = (user?.email || "").toLowerCase();
     const userStaffId = ((user as any)?.staff_id || user?.id || "").toLowerCase();
 
     // 1. Direct ID match (user ID or staff ID)
-    if (userStaffId && (apptStaffId === userStaffId || apptStaffId.includes(userStaffId))) return true;
+    if (userStaffId && apptStaffId && (apptStaffId === userStaffId || apptStaffId.includes(userStaffId))) {
+      return true;
+    }
 
     // 2. Direct name match against provider display name or user profile
     const myName = (providerName || (user as any)?.full_name || "").toLowerCase();
@@ -222,23 +226,32 @@ export function ProviderDashboard() {
         const approved: Array<{ id?: string; email?: string; full_name?: string }> =
           JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
         const match = approved.find(
-          (s) => (s.id && s.id.toLowerCase() === apptStaffId) || (s.email && s.email.toLowerCase() === userEmail)
+          (s) => (s.id && s.id.toLowerCase() === apptStaffId)
         );
         if (match && match.email?.toLowerCase() === userEmail) return true;
       } catch {}
     }
 
-    // 4. Always show unassigned / Nurse Practitioner / General Provider slots to Nurse Practitioner
-    if (
-      apptStaffId === "any-available" ||
-      !apptStaffId ||
-      rawStaffName.includes("nurse") ||
-      rawStaffName.includes("practitioner") ||
-      rawStaffName.includes("provider") ||
-      rawStaffName.includes("any available") ||
-      !rawStaffName
-    ) {
-      return true;
+    // 4. Role-based isolation check:
+    if (isRNInjector) {
+      // RN Injector ONLY sees appointments explicitly assigned to RN Injector
+      if (rawStaffName.includes("injector") || rawStaffName.includes("rn")) return true;
+      return false;
+    }
+
+    if (isNP) {
+      // Nurse Practitioner ONLY sees appointments assigned to Nurse Practitioner or unassigned (excluding RN Injector)
+      if (rawStaffName.includes("injector") || rawStaffName.includes("rn / injector")) return false;
+      if (
+        rawStaffName.includes("nurse") ||
+        rawStaffName.includes("practitioner") ||
+        rawStaffName.includes("np") ||
+        apptStaffId === "any-available" ||
+        !rawStaffName
+      ) {
+        return true;
+      }
+      return false;
     }
 
     return false;

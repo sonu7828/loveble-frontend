@@ -73,10 +73,13 @@ export default function StaffLogin() {
     setPassword("");
     setCode("");
 
+    const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+    const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
+
     staffService.getStaffProfiles(true).then((res: any) => {
       const list = Array.isArray(res) ? res : res?.data || res?.staff || [];
       const formatted = list
-        .filter((s: any) => s.is_active !== false)
+        .filter((s: any) => s.is_active !== false && (!s.email || !deletedSet.has(s.email.toLowerCase())))
         .map((s: any) => {
           const roles = s.user?.userRoles?.map((ur: any) => ur.role?.name) || [];
           const primaryRole = roles.find((r: string) => r !== "staff") || roles[0] || s.title?.toLowerCase() || "staff";
@@ -86,11 +89,9 @@ export default function StaffLogin() {
             role: primaryRole,
           };
         })
-        .filter((s: any) => s.email && s.email.toLowerCase() !== "admin@gmail.com" && s.email.toLowerCase() !== "phase1-admin@radiantilyk.com");
+        .filter((s: any) => s.email && s.email.toLowerCase() !== "admin@gmail.com" && s.email.toLowerCase() !== "phase1-admin@radiantilyk.com" && !deletedSet.has(s.email.toLowerCase()));
 
-      if (formatted.length > 0) {
-        setActiveStaffList(formatted);
-      }
+      setActiveStaffList(formatted);
     }).catch(() => {});
   }, []);
 
@@ -329,12 +330,20 @@ export default function StaffLogin() {
 
 
                 {activeRole === "staff" && (() => {
-                  const combined = activeStaffList.length > 0
+                  const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+                  const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
+
+                  const baseList = activeStaffList.length > 0
                     ? activeStaffList
                     : [
-                        { email: "injector@gmail.com", defaultName: "RN Injector", role: "rn_injector" },
-                        { email: "security@gmail.com", defaultName: "Security Officer", role: "privacy_officer" },
+                        { email: "frontdesk@gmail.com", defaultName: "FrontDesk-001", role: "front_desk" },
+                        { email: "medical@gmail.com", defaultName: "medical director", role: "medical_director" },
+                        { email: "nurse@gmail.com", defaultName: "NursePractioner", role: "nurse_practitioner" },
+                        { email: "injector@gmail.com", defaultName: "RN injector", role: "rn_injector" },
+                        { email: "security@gmail.com", defaultName: "security officer", role: "privacy_officer" },
                       ];
+
+                  const combined = baseList.filter((s) => !deletedSet.has(s.email.toLowerCase()));
 
                   const roleEmoji: Record<string, string> = {
                     admin: "👑", medical_director: "🩺", privacy_officer: "🛡️",

@@ -22,7 +22,7 @@ type ImportedClient = { first_name: string; last_name: string; email: string; ph
 
 export default function StaffClients() {
   const navigate = useNavigate();
-  const { canSeeAll, staffId, isAdmin, isPatientAccountManager } = useAuth();
+  const { canSeeAll, staffId, isAdmin, isPatientAccountManager, isNP, isRNInjector, user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [imported, setImported] = useState<ImportedClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -658,6 +658,24 @@ export default function StaffClients() {
       if (isGarbageTestClient({ email: a.client_email, first_name: a.client_first_name, last_name: a.client_last_name })) {
         continue;
       }
+
+      if (!canSeeAll) {
+        const sid = (a.staff_id || a.staffId || "").toLowerCase();
+        const sname = (a.staff_name || a.staffName || "").toLowerCase();
+        const userEmail = (user?.email || "").toLowerCase();
+
+        let isAssigned = false;
+        if (staffId && sid === staffId.toLowerCase()) isAssigned = true;
+        if (isRNInjector) {
+          if (sname.includes("injector") || sname.includes("rn")) isAssigned = true;
+        } else if (isNP) {
+          if (sname.includes("injector") || sname.includes("rn / injector")) isAssigned = false;
+          else if (sname.includes("nurse") || sname.includes("practitioner") || sname.includes("np") || sid === "any-available" || !sname) isAssigned = true;
+        }
+
+        if (!isAssigned) continue;
+      }
+
       const email = (a.client_email || "").trim().toLowerCase();
       const fn = (a.client_first_name || "").trim();
       const ln = (a.client_last_name || "").trim();

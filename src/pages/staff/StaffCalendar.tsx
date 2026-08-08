@@ -260,11 +260,40 @@ export default function StaffCalendar() {
     };
   }, []);
 
-  // If user is staff-only (not admin/scheduler), force filter to self
+  // Provider role filtering for Calendar view
+  const { isNP, isRNInjector, isAdmin, isMedicalDirector, user } = useAuth();
   const effectiveFilter = canSeeAll ? filterStaff : (staffId ?? "");
-  const visibleAppts = appts.filter((a) => {
+  const visibleAppts = appts.filter((a: any) => {
     if (isTestPatient(a)) return false;
-    if (effectiveFilter && a.staff_id !== effectiveFilter) return false;
+
+    const sid = (a.staff_id || a.staffId || "").toLowerCase();
+    const sname = (a.staff_name || (a as any).staff_profiles?.full_name || (a as any).staffName || "").toLowerCase().trim();
+    const srole = ((a as any).role || (a as any).staff_profiles?.role || "").toLowerCase().trim();
+
+    // 1. Dropdown filter override
+    if (filterStaff && filterStaff !== "all") {
+      if (sid !== filterStaff.toLowerCase()) return false;
+    }
+
+    // 2. Strict Provider Isolation between RN Injector & Nurse Practitioner
+    if (isRNInjector && !isNP && !isAdmin && !isMedicalDirector) {
+      // RN INJECTOR PORTAL: Only show RN Injector appointments
+      const isNursePractitioner = sname.includes("nurse") || sname.includes("practitioner") || sname.includes("nursepractioner") || srole.includes("nurse_practitioner");
+      if (isNursePractitioner && !sname.includes("injector")) {
+        return false;
+      }
+      const isInjectorAppt = sname.includes("injector") || srole.includes("injector") || srole === "rn_injector" || /\b(rn|injector)\b/i.test(sname);
+      if (!isInjectorAppt && sid !== staffId?.toLowerCase()) {
+        return false;
+      }
+    } else if (isNP && !isRNInjector && !isAdmin && !isMedicalDirector) {
+      // NURSE PRACTITIONER PORTAL: Only show Nurse Practitioner appointments (EXCLUDE RN Injector)
+      const isInjectorAppt = sname.includes("injector") || srole.includes("injector") || srole === "rn_injector";
+      if (isInjectorAppt) {
+        return false;
+      }
+    }
+
     if (filterLocation && a.location_id !== filterLocation) return false;
     if (filterService && a.service_id !== filterService) return false;
     if (filterStatus) {

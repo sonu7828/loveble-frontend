@@ -215,3 +215,59 @@ export async function fetchClinicalProviders(): Promise<UnifiedStaffMember[]> {
   const all = await fetchUnifiedStaffMembers();
   return all.filter(isClinicalProvider);
 }
+
+const DIRECT_BOOKING_PROVIDER_ROLES = new Set([
+  "nurse_practitioner",
+  "rn_injector",
+  "provider",
+]);
+
+export function isDirectBookingProvider(x: any): boolean {
+  if (!x) return false;
+  const r = (x.role || "").toLowerCase().trim();
+  const t = (x.title || "").toLowerCase().trim();
+  const n = (x.full_name || x.fullName || x.name || "").toLowerCase().trim();
+
+  // Explicit exclusion of non-booking staff (Admin, Medical Director, Front Desk, Security)
+  if (
+    r === "admin" ||
+    r === "system_admin" ||
+    r === "medical_director" ||
+    r === "scheduler" ||
+    r === "front_desk" ||
+    r === "privacy_officer" ||
+    r === "security_officer"
+  ) {
+    return false;
+  }
+  if (
+    t.includes("medical director") ||
+    t.includes("supervising physician") ||
+    t.includes("admin") ||
+    t.includes("scheduler") ||
+    t.includes("receptionist") ||
+    t.includes("privacy") ||
+    t.includes("security")
+  ) {
+    return false;
+  }
+  if (
+    n.includes("medical director") ||
+    n.includes("admin") ||
+    n.includes("system admin") ||
+    n.includes("scheduler") ||
+    n.includes("securityofficer")
+  ) {
+    return false;
+  }
+
+  if (DIRECT_BOOKING_PROVIDER_ROLES.has(r)) return true;
+  if (/\b(np|rn|injector|practitioner|nurse)\b/i.test(t)) return true;
+
+  return false;
+}
+
+export async function fetchBookingProviders(): Promise<UnifiedStaffMember[]> {
+  const all = await fetchUnifiedStaffMembers();
+  return all.filter(isDirectBookingProvider);
+}
