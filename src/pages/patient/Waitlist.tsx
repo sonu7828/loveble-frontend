@@ -12,31 +12,26 @@ import { Loader2, Bell, Check, ArrowLeft } from "lucide-react";
 import { formatPhone10 } from "@/lib/formatPhone";
 
 interface Service { id: string; name: string; }
-interface Location { id: string; name: string; city: string; }
 
 export default function Waitlist() {
   const [params] = useSearchParams();
   const [services, setServices] = useState<Service[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     serviceId: params.get("service") ?? "",
-    locationId: params.get("location") ?? "any",
     dateFrom: "", dateTo: "", notes: "",
   });
 
   useEffect(() => {
     (async () => {
-      const [{ data: s }, { data: l }, sess] = await Promise.all([
+      const [{ data: s }, sess] = await Promise.all([
         apiQuery("services").select("id, name").eq("is_active", true).order("display_order"),
-        apiQuery("locations").select("id, name, city").eq("is_active", true),
         authService.getSession(),
       ]);
       setServices(s ?? []);
-      setLocations(l ?? []);
 
       const userId = sess.data.session?.user?.id;
       const userEmail = sess.data.session?.user?.email;
@@ -65,34 +60,29 @@ export default function Waitlist() {
     }
     if (form.dateTo < form.dateFrom) { toast.error("End date must be after start date"); return; }
     setSaving(true);
-    const id = crypto.randomUUID();
-    const locationId = form.locationId === "any" ? null : form.locationId;
-    const { error } = await apiQuery("waitlist_requests").insert({
-      id,
-      client_first_name: form.firstName.trim(),
-      client_last_name: form.lastName.trim(),
-      client_email: form.email.trim().toLowerCase(),
-      client_phone: form.phone.trim(),
-      service_id: form.serviceId,
-      location_id: locationId,
-      desired_date_from: form.dateFrom,
-      desired_date_to: form.dateTo,
+    const { data, error } = await ApiClient.post("/appointments/waitlist", {
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.trim().toLowerCase(),
+      phone: form.phone.trim(),
+      serviceId: form.serviceId,
+      preferredDays: `${form.dateFrom} to ${form.dateTo}`,
       notes: form.notes.trim() || null,
     });
-    if (error) { setSaving(false); toast.error(error.message); return; }
+    if (error) { setSaving(false); toast.error(error); return; }
+
+    const waitlistId = (data as any)?.id || crypto.randomUUID();
 
     // Notify staff/admins (best effort)
     try {
       const svcName = services.find(s => s.id === form.serviceId)?.name;
-      const locName = locationId ? locations.find(l => l.id === locationId)?.name : "Either location";
       await ApiClient.post("notify-waitlist-join", {
         body: {
-          waitlistId: id,
+          waitlistId,
           clientName: `${form.firstName} ${form.lastName}`.trim(),
           clientEmail: form.email.trim().toLowerCase(),
           clientPhone: form.phone.trim(),
           serviceName: svcName,
-          locationName: locName,
           windowLabel: `${form.dateFrom} → ${form.dateTo}`,
           notes: form.notes.trim() || undefined,
         },
@@ -144,16 +134,6 @@ export default function Waitlist() {
                 <Select value={form.serviceId} onValueChange={(v) => setForm({ ...form, serviceId: v })}>
                   <SelectTrigger className="h-8 text-sm mt-0.5"><SelectValue placeholder="Select a service" /></SelectTrigger>
                   <SelectContent>{services.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Preferred location</Label>
-                <Select value={form.locationId} onValueChange={(v) => setForm({ ...form, locationId: v })}>
-                  <SelectTrigger className="h-8 text-sm mt-0.5"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Either location</SelectItem>
-                    {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name} — {l.city}</SelectItem>)}
-                  </SelectContent>
                 </Select>
               </div>
               <div>
