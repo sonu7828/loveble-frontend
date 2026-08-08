@@ -11,15 +11,11 @@
  */
 
 function getApiBaseUrl(): string {
-  const envUrl = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    // On localhost, route through relative /api to ensure Vite dev server proxies requests and preserves HttpOnly cookies
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return "/api";
-    }
+  const envUrl = (import.meta.env.VITE_API_BASE_URL as string)?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/$/, "");
   }
-  return envUrl || "/api";
+  return "/api";
 }
 
 export interface ApiResponse<T = any> {
