@@ -431,7 +431,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
 
   return (
     <section className="rounded-2xl border border-border bg-card p-6 mb-4">
-      {appt.client_email && (
+      {isNpPortal && appt.client_email && (
         <div className="mb-4">
           <ClientClinicalAlerts clientEmail={appt.client_email} />
         </div>

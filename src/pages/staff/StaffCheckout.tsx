@@ -1026,21 +1026,7 @@ export default function StaffCheckout() {
               claimedServiceCreditCents={claimedServiceCreditCents}
             />
 
-            <PointsPanel
-              clientEmail={sale?.client_email}
-              pointsBalance={pointsBalance}
-              pointValueCents={pointsSettings?.point_value_cents ?? 10}
-              maxRedemptionPct={pointsSettings?.max_redemption_pct ?? 50}
-              capBaseCents={Math.max(0, (totals.subtotal_cents ?? 0) - (totals.discount_cents ?? 0))}
-              pointsApply={pointsApply}
-              setPointsApply={setPointsApply}
-              disabledReason={
-                !pointsSettings?.is_enabled ? "Rewards program is currently disabled."
-                : (pointsSettings?.block_promo_combo && (promoCode || discountPct || discountAmount))
-                    ? "Remove the promo code or manual discount to use points."
-                : null
-              }
-            />
+
 
 
 
