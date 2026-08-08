@@ -71,23 +71,63 @@ export default function StaffClients() {
   const [addClientBusy, setAddClientBusy] = useState(false);
 
   const reloadAccounts = async () => {
-    const { data } = await apiQuery("client_profiles").select("email, is_lead, first_name, last_name, phone, dob, lead_captured_at, lead_source, created_at").limit(5000);
-    const cpList = data ?? [];
+    let cpList: any[] = [];
+    let userEmails: string[] = [];
+    let patEmails: string[] = [];
+
+    try {
+      const [cpRes, userRes, patRes] = await Promise.all([
+        apiQuery("client_profiles").select("email, is_lead, first_name, last_name, phone, dob, lead_captured_at, lead_source, created_at").limit(5000),
+        apiQuery("users" as any).select("email").limit(5000),
+        apiQuery("patient_profiles" as any).select("email").limit(5000),
+      ]);
+      if (cpRes.data) cpList = cpRes.data;
+      if (userRes.data) userEmails = userRes.data.map((u: any) => (u.email || "").toLowerCase()).filter(Boolean);
+      if (patRes.data) patEmails = patRes.data.map((p: any) => (p.email || "").toLowerCase()).filter(Boolean);
+    } catch {}
+
+    const cpEmails = cpList.map((r: any) => (r.email || "").toLowerCase()).filter(Boolean);
+
+    // Also collect local demo/registered users
+    const localRegistered: string[] = [];
+    try {
+      const demoUsers: any[] = JSON.parse(localStorage.getItem("rka_demo_users") || "[]");
+      demoUsers.forEach((u) => { if (u.email) localRegistered.push(u.email.toLowerCase()); });
+    } catch {}
+    try {
+      const sess = JSON.parse(localStorage.getItem("rka_session") || "{}");
+      if (sess?.user?.email) localRegistered.push(sess.user.email.toLowerCase());
+    } catch {}
+    try {
+      const patUser = JSON.parse(localStorage.getItem("rka_patient_user") || "{}");
+      if (patUser?.email) localRegistered.push(patUser.email.toLowerCase());
+    } catch {}
+    try {
+      const demoAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      demoAppts.forEach((a) => {
+        if (a.client_email && (a.has_account || a.user_id || a.signed_name || a.is_registered)) {
+          localRegistered.push(a.client_email.toLowerCase());
+        }
+      });
+    } catch {}
+
+    const allAccountSet = new Set([...cpEmails, ...userEmails, ...patEmails, ...localRegistered]);
 
     setClientProfiles(cpList);
+    setAccountEmails(allAccountSet);
 
-    setClientProfiles(cpList);
-    setAccountEmails(new Set(cpList.map((r: any) => (r.email || "").toLowerCase())));
     const leadRows = cpList.filter((r: any) => r.is_lead);
     setLeadEmails(new Set(leadRows.map((r: any) => (r.email || "").toLowerCase())));
-    setLeads(leadRows.map((r: any) => ({
-      email: (r.email || "").toLowerCase(),
-      first_name: r.first_name,
-      last_name: r.last_name,
-      phone: r.phone,
-      lead_captured_at: r.lead_captured_at,
-      lead_source: r.lead_source,
-    })));
+    setLeads(
+      leadRows.map((r: any) => ({
+        email: (r.email || "").toLowerCase(),
+        first_name: r.first_name,
+        last_name: r.last_name,
+        phone: r.phone,
+        lead_captured_at: r.lead_captured_at,
+        lead_source: r.lead_source,
+      }))
+    );
   };
 
   const reloadBlocked = async () => {
@@ -608,7 +648,27 @@ export default function StaffClients() {
   };
 
   const isGarbageTestClient = (c: { email?: string; first_name?: string; last_name?: string }) => {
-    return isTestPatient(c);
+    if (isTestPatient(c)) return true;
+    if (!c.email) return false;
+    const em = c.email.toLowerCase().trim();
+    const staffKeywords = [
+      "admin",
+      "nurse",
+      "frontdesk",
+      "medical",
+      "injector",
+      "practitioner",
+      "director",
+      "security",
+      "receptionist",
+      "provider",
+      "staff",
+      "thor",
+      "thomas",
+      "phase1-",
+    ];
+    if (em.endsWith("@radiantilyk.com") || staffKeywords.some((k) => em.includes(k))) return true;
+    return false;
   };
 
   const allClients = useMemo<UnifiedClient[]>(() => {
@@ -748,6 +808,35 @@ export default function StaffClients() {
         sort_at: lc.created_at ? new Date(lc.created_at).getTime() : Date.now(),
       });
     }
+
+    // Merge demo users (e.g. user@gmail.com)
+    try {
+      const demoUsers: any[] = JSON.parse(localStorage.getItem("rka_demo_users") || "[]");
+      for (const du of demoUsers) {
+        if (isGarbageTestClient({ email: du.email, first_name: du.first_name, last_name: du.last_name })) continue;
+        const email = (du.email || "").trim().toLowerCase();
+        if (!email) continue;
+        const fn = (du.first_name || du.firstName || "Demo").trim();
+        const ln = (du.last_name || du.lastName || "Patient").trim();
+        const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+        const key = nameKey.length > 1 ? nameKey : email;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            first_name: fn,
+            last_name: ln,
+            email: du.email,
+            phone: du.phone || null,
+            dob: du.dob || null,
+            appt_count: 0,
+            last_appt: null,
+            imported_id: null,
+            invited_at: null,
+            sort_at: Date.now(),
+          });
+        }
+      }
+    } catch {}
 
     return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || (a.last_name || "").localeCompare(b.last_name || ""));
   }, [items, imported, leads, clientProfiles, localClients]);

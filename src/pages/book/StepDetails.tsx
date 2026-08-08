@@ -49,6 +49,7 @@ export const StepDetails = ({
           <Input
             id="book-firstName"
             aria-invalid={!!fieldErrors.firstName}
+            placeholder="e.g. Jane"
             value={client.firstName}
             onChange={(e) => setField("firstName", e.target.value)}
             maxLength={60}
@@ -62,6 +63,7 @@ export const StepDetails = ({
           <Input
             id="book-lastName"
             aria-invalid={!!fieldErrors.lastName}
+            placeholder="e.g. Doe"
             value={client.lastName}
             onChange={(e) => setField("lastName", e.target.value)}
             maxLength={60}
@@ -102,6 +104,7 @@ export const StepDetails = ({
             autoComplete="email"
             autoCapitalize="off"
             autoCorrect="off"
+            placeholder="Enter email address..."
             value={client.email}
             onChange={(e) => setField("email", e.target.value)}
             maxLength={120}

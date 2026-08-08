@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiQuery } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { ShieldCheck, FileEdit, Send, CheckCircle2, Clock } from "lucide-react";
+import { ShieldCheck, FileEdit, Send, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
-interface AmendmentRequest {
+export interface AmendmentRequest {
   id: string;
   recordType: string;
+  currentText?: string;
   requestedText: string;
   reason: string;
   submittedAt: string;
@@ -18,46 +20,128 @@ interface AmendmentRequest {
 
 export function PatientAmendmentModal({ userEmail }: { userEmail: string }) {
   const STORAGE_KEY = `rka_patient_amendments_${userEmail?.toLowerCase()}`;
-  const [requests, setRequests] = useState<AmendmentRequest[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  });
-
+  const [requests, setRequests] = useState<AmendmentRequest[]>([]);
   const [recordType, setRecordType] = useState("Clinical Note / Chart Entry");
   const [currentText, setCurrentText] = useState("");
   const [requestedText, setRequestedText] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!userEmail) return;
+    try {
+      const local: AmendmentRequest[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      setRequests(local);
+    } catch {
+      setRequests([]);
+    }
+
+    // Try fetching from database if table exists
+    (async () => {
+      try {
+        const { data, error } = await apiQuery("chart_amendments" as any)
+          .select("*")
+          .ilike("patient_email", userEmail.toLowerCase())
+          .order("created_at", { ascending: false });
+
+        if (!error && data && Array.isArray(data) && data.length > 0) {
+          const mapped: AmendmentRequest[] = data.map((d: any) => ({
+            id: d.id,
+            recordType: d.record_type || d.category || "Clinical Note / Chart Entry",
+            currentText: d.current_text || "",
+            requestedText: d.requested_correction || d.requested_text || "",
+            reason: d.rationale || d.reason || "",
+            submittedAt: d.created_at || new Date().toISOString(),
+            status: d.status || "pending",
+          }));
+          setRequests(mapped);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        }
+      } catch {}
+    })();
+  }, [userEmail, STORAGE_KEY]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requestedText.trim() || !reason.trim()) {
-      toast.error("Please provide both the requested amendment and rationale.");
+    const reqText = requestedText.trim();
+    const rsnText = reason.trim();
+
+    if (!reqText || !rsnText) {
+      toast.error("Please describe both your requested amendment and rationale.");
       return;
     }
+
     setSubmitting(true);
+    const newId = `amd-${Date.now()}`;
+    const nowIso = new Date().toISOString();
 
     const newReq: AmendmentRequest = {
-      id: `amd-${Date.now()}`,
+      id: newId,
       recordType,
-      requestedText: requestedText.trim(),
-      reason: reason.trim(),
-      submittedAt: new Date().toISOString(),
+      currentText: currentText.trim() || undefined,
+      requestedText: reqText,
+      reason: rsnText,
+      submittedAt: nowIso,
       status: "pending",
     };
 
+    // 1. Update local state immediately for instant feedback
     const updated = [newReq, ...requests];
     setRequests(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
 
-    setSubmitting(false);
+    // 2. Try inserting into database backend table
+    try {
+      await apiQuery("chart_amendments" as any).insert({
+        id: newId,
+        patient_email: userEmail.toLowerCase(),
+        record_type: recordType,
+        current_text: currentText.trim() || null,
+        requested_correction: reqText,
+        rationale: rsnText,
+        status: "pending",
+        created_at: nowIso,
+      });
+    } catch {}
+
+    // 3. Reset form inputs
     setCurrentText("");
     setRequestedText("");
     setReason("");
-    toast.success("Amendment request submitted! Our Privacy Officer will review within 60 days per HIPAA §164.526.");
+    setSubmitting(false);
+
+    toast.success("Amendment request submitted successfully! Our Privacy Officer will review your request per HIPAA §164.526.");
+  };
+
+  const getStatusBadge = (status: AmendmentRequest["status"]) => {
+    switch (status) {
+      case "approved":
+        return (
+          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+            <CheckCircle2 className="h-3 w-3 mr-1" /> Approved &amp; Amended
+          </Badge>
+        );
+      case "denied":
+        return (
+          <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px]">
+            <XCircle className="h-3 w-3 mr-1" /> Denied
+          </Badge>
+        );
+      case "under_review":
+        return (
+          <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-[10px]">
+            <Clock className="h-3 w-3 mr-1" /> Under Privacy Officer Review
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">
+            <Clock className="h-3 w-3 mr-1" /> Pending Review
+          </Badge>
+        );
+    }
   };
 
   return (
@@ -71,7 +155,7 @@ export function PatientAmendmentModal({ userEmail }: { userEmail: string }) {
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            If you believe information in your medical record is incorrect or incomplete, you have the right to request an amendment.
+            If you believe information in your medical record is incorrect or incomplete, you have the right to request an official amendment.
           </p>
         </div>
         <FileEdit className="h-8 w-8 text-primary/40 shrink-0" />
@@ -80,7 +164,7 @@ export function PatientAmendmentModal({ userEmail }: { userEmail: string }) {
       <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="recordType" className="text-xs">Record Category</Label>
+            <Label htmlFor="recordType" className="text-xs">Record Category *</Label>
             <select
               id="recordType"
               value={recordType}
@@ -97,7 +181,7 @@ export function PatientAmendmentModal({ userEmail }: { userEmail: string }) {
             <Label htmlFor="currentText" className="text-xs">Current Entry (Optional)</Label>
             <Input
               id="currentText"
-              placeholder="e.g. Existing note date or statement..."
+              placeholder="e.g. Note date, statement, or field to correct..."
               value={currentText}
               onChange={(e) => setCurrentText(e.target.value)}
               className="mt-1.5 text-xs h-9"
@@ -106,7 +190,7 @@ export function PatientAmendmentModal({ userEmail }: { userEmail: string }) {
         </div>
 
         <div>
-          <Label htmlFor="requestedText" className="text-xs">Requested Correction / Amendment</Label>
+          <Label htmlFor="requestedText" className="text-xs">Requested Correction / Amendment *</Label>
           <Textarea
             id="requestedText"
             required
@@ -119,7 +203,7 @@ export function PatientAmendmentModal({ userEmail }: { userEmail: string }) {
         </div>
 
         <div>
-          <Label htmlFor="reason" className="text-xs">Rationale for Request</Label>
+          <Label htmlFor="reason" className="text-xs">Rationale for Request *</Label>
           <Textarea
             id="reason"
             required
@@ -140,20 +224,28 @@ export function PatientAmendmentModal({ userEmail }: { userEmail: string }) {
 
       {requests.length > 0 && (
         <div className="space-y-3 pt-2">
-          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Your Submitted Requests</h4>
+          <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Your Submitted Amendment Requests ({requests.length})</h4>
           <div className="space-y-2.5">
             {requests.map((r) => (
-              <div key={r.id} className="rounded-xl border border-border bg-background p-3.5 text-xs space-y-1.5">
-                <div className="flex items-center justify-between">
+              <div key={r.id} className="rounded-xl border border-border bg-background p-4 text-xs space-y-2">
+                <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-foreground">{r.recordType}</span>
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">
-                    <Clock className="h-3 w-3 mr-1" /> Pending Review
-                  </Badge>
+                  {getStatusBadge(r.status)}
                 </div>
-                <p className="text-muted-foreground"><strong className="text-foreground">Requested:</strong> {r.requestedText}</p>
-                <p className="text-muted-foreground"><strong className="text-foreground">Reason:</strong> {r.reason}</p>
-                <div className="text-[10px] text-muted-foreground pt-1 border-t border-border/50">
-                  Submitted: {new Date(r.submittedAt).toLocaleDateString()} · Privacy Officer SLA: 60 Days
+                {r.currentText && (
+                  <p className="text-muted-foreground text-[11px]">
+                    <strong className="text-foreground font-medium">Existing Record:</strong> {r.currentText}
+                  </p>
+                )}
+                <p className="text-muted-foreground">
+                  <strong className="text-foreground font-medium">Requested Amendment:</strong> {r.requestedText}
+                </p>
+                <p className="text-muted-foreground">
+                  <strong className="text-foreground font-medium">Rationale:</strong> {r.reason}
+                </p>
+                <div className="text-[10px] text-muted-foreground pt-1.5 border-t border-border/50 flex items-center justify-between">
+                  <span>Submitted: {new Date(r.submittedAt).toLocaleDateString()}</span>
+                  <span>HIPAA SLA: Review within 60 Days</span>
                 </div>
               </div>
             ))}

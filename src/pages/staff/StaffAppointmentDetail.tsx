@@ -168,6 +168,14 @@ export default function StaffAppointmentDetail() {
           gfeData = data;
         } catch (_err) {}
 
+        if (!gfeData) {
+          try {
+            const local = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || localStorage.getItem("rka_demo_gfe") || "[]");
+            const match = local.find((g: any) => (g.client_email || "").toLowerCase() === (a.client_email || "").toLowerCase() || g.appointment_id === a.id);
+            if (match) gfeData = match;
+          } catch {}
+        }
+
         setGfe(gfeData ?? null);
       }
 
@@ -551,6 +559,7 @@ export default function StaffAppointmentDetail() {
         appt={appt}
         consentSummary={consentSummary}
         gfe={gfe}
+        isNpPortal={isNpPortal}
         onReload={load}
         onSendPostOp={sendPostOp}
       />
@@ -609,7 +618,6 @@ export default function StaffAppointmentDetail() {
               size="sm"
               className="rounded-full"
               onClick={async () => {
-                // Block check-in if mandatory consents are still missing
                 if (consentSummary && consentSummary.pendingRequired > 0) {
                   toast.error(
                     `${consentSummary.pendingRequired} required consent${consentSummary.pendingRequired === 1 ? "" : "s"} still unsigned. Use "Sign in person" or "Resend consent forms" first.`,
@@ -635,7 +643,6 @@ export default function StaffAppointmentDetail() {
                 window.dispatchEvent(new Event("rka_demo_appointments_updated"));
                 window.dispatchEvent(new Event("rka_appointment_updated"));
                 window.dispatchEvent(new Event("rka_appointment_checkin"));
-                // Pre-create draft sale so checkout opens with services loaded
                 try {
                   await ApiClient.post("pos-create-or-get-sale", {
                     body: { appointmentId: appt.id },
@@ -659,7 +666,7 @@ export default function StaffAppointmentDetail() {
               <MailCheck className="h-3.5 w-3.5 mr-1.5" />Resend post-op
             </Button>
           )}
-          {!isNpPortal && ["approved", "pending", "arrived"].includes(appt.status) && (
+          {["approved", "pending", "arrived", "confirmed"].includes(appt.status) && (
             <Button
               size="sm"
               variant="outline"
@@ -690,10 +697,10 @@ export default function StaffAppointmentDetail() {
               <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Mark completed
             </Button>
           )}
-          {!["cancelled", "denied"].includes(appt.status) && (
+          {isNpPortal && !["cancelled", "denied"].includes(appt.status) && (
             <Button asChild size="sm" variant={gfe ? "outline" : "default"} className="rounded-full">
               {gfe ? (
-                <Link to={`/staff/clinical/gfe/${gfe.id}`}>
+                <Link to={`/staff/clinical/gfe/${gfe.id}?appointment=${appt.id}`}>
                   <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
                   GFE active · {differenceInDays(new Date(gfe.expires_at), new Date())}d left
                 </Link>
@@ -705,14 +712,14 @@ export default function StaffAppointmentDetail() {
               )}
             </Button>
           )}
-          {!["cancelled", "denied"].includes(appt.status) && (
+          {isNpPortal && !["cancelled", "denied"].includes(appt.status) && (
             <Button asChild size="sm" className="rounded-full">
               <Link to={`/staff/clinical/notes/new?appointment=${appt.id}`}>
                 <ClipboardPlus className="h-3.5 w-3.5 mr-1.5" />Start charting
               </Link>
             </Button>
           )}
-          {!isNpPortal && !["cancelled", "denied"].includes(appt.status) && (
+          {!["cancelled", "denied"].includes(appt.status) && (
             <Button asChild size="sm" className="rounded-full">
               <Link to={`/staff/checkout/${appt.id}`}>
                 <CreditCard className="h-3.5 w-3.5 mr-1.5" />Check out

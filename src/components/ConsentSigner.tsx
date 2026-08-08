@@ -131,29 +131,7 @@ export const ConsentSigner = ({ form, defaultName, value, onChange }: Props) => 
     onChange(merged);
   };
 
-  // iOS scroll lock while drawing — prevents page from scrolling under finger
-  const scrollYRef = useRef(0);
-  const lockScroll = () => {
-    scrollYRef.current = window.scrollY;
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollYRef.current}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
-    document.body.style.width = "100%";
-  };
-  const unlockScroll = () => {
-    document.body.style.position = "";
-    document.body.style.top = "";
-    document.body.style.left = "";
-    document.body.style.right = "";
-    document.body.style.width = "";
-    window.scrollTo(0, scrollYRef.current);
-  };
-  // Always unlock on unmount in case the user navigates away mid-stroke
-  useEffect(() => () => { unlockScroll(); }, []);
-
   const handleEnd = () => {
-    unlockScroll();
     if (!sigRef.current || sigRef.current.isEmpty()) return;
     const png = sigRef.current.getCanvas().toDataURL("image/png");
     commit({ signaturePng: png, decision: "consent", signedFullName: name, attestationFlags: flags, clientAttestedReview: true });
@@ -311,7 +289,6 @@ export const ConsentSigner = ({ form, defaultName, value, onChange }: Props) => 
                     penColor="#0f172a"
                     minWidth={1.5}
                     maxWidth={3.5}
-                    onBegin={lockScroll}
                     onEnd={handleEnd}
                     canvasProps={{
                       className: "w-full h-40 cursor-crosshair block",

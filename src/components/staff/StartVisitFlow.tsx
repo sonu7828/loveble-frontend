@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, ApiClient } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
@@ -16,13 +17,15 @@ type Props = {
   appt: any;
   consentSummary: { total: number; signed: number; pendingRequired: number; pendingOptional: number } | null;
   gfe: { id: string; expires_at: string; signed_at: string } | null;
+  isNpPortal?: boolean;
   onReload: () => void;
   onSendPostOp: (opts?: { openPrintWindow?: boolean; resend?: boolean }) => Promise<void>;
 };
 
 type StepState = "done" | "current" | "pending" | "skipped";
 
-export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPostOp }: Props) {
+export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload, onSendPostOp }: Props) {
+  const { user } = useAuth();
   const [note, setNote] = useState<{ id: string; status: string; photo_pre_paths: string[] | null; photo_post_paths: string[] | null } | null>(null);
   const [sale, setSale] = useState<{ id: string; status: string } | null>(null);
   const [intake, setIntake] = useState<any | null>(null);
@@ -37,7 +40,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
   const loadProgress = useCallback(async () => {
     setLoading(true);
     const email = (appt.client_email ?? "").toLowerCase();
-    const [{ data: n }, { data: s }, { data: i }, { data: lf }] = await Promise.all([
+    const [{ data: nRes }, { data: s }, { data: i }, { data: lf }] = await Promise.all([
       apiQuery
         .from("clinical_notes")
         .select("id, status, photo_pre_paths, photo_post_paths")
@@ -70,7 +73,17 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
         .limit(1)
         .maybeSingle(),
     ]);
-    setNote(n ?? null);
+
+    let finalNote = nRes ?? null;
+    if (!finalNote) {
+      try {
+        const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || localStorage.getItem("rka_demo_chart_notes") || "[]");
+        const match = localList.find((cn: any) => cn.appointment_id === appt.id || cn.appointmentId === appt.id || (cn.client_email || "").toLowerCase() === email);
+        if (match) finalNote = match;
+      } catch {}
+    }
+
+    setNote(finalNote);
     setSale(s ?? null);
     setIntake(i ?? null);
     setLastFull(lf ?? null);
@@ -82,11 +95,23 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     setIntakeSentAt(appt.intake_last_sent_at ?? appt.intake_sent_at ?? null);
   }, [appt.intake_last_sent_at, appt.intake_sent_at]);
 
+  useEffect(() => {
+    window.addEventListener("rka_gfe_updated", loadProgress);
+    window.addEventListener("rka_chart_note_updated", loadProgress);
+    window.addEventListener("rka_appointment_updated", loadProgress);
+    window.addEventListener("rka_demo_appointments_updated", loadProgress);
+    return () => {
+      window.removeEventListener("rka_gfe_updated", loadProgress);
+      window.removeEventListener("rka_chart_note_updated", loadProgress);
+      window.removeEventListener("rka_appointment_updated", loadProgress);
+      window.removeEventListener("rka_demo_appointments_updated", loadProgress);
+    };
+  }, [loadProgress]);
+
   const activeStepRef = useRef<HTMLLIElement | null>(null);
   const prevActiveStep = useRef<string | null>(null);
   useEffect(() => {
     if (loading) return;
-    // Only auto-scroll when the active step actually advances, not on initial mount
     if (prevActiveStep.current) {
       activeStepRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -100,6 +125,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
   const gfeDone = !!gfe;
   const chartSigned = note && ["signed", "cosigned", "locked"].includes(note.status);
   const chartDraft = note && note.status === "draft";
+  const chartDone = !!note;
   const photoCount = ((note?.photo_pre_paths?.length) ?? 0) + ((note?.photo_post_paths?.length) ?? 0);
   const photosDone = photoCount > 0;
   const paid = sale?.status === "paid";
@@ -118,11 +144,10 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     assessment: intakeDone,
     consents: consentsDone,
     gfe: gfeDone,
-    chart: !!chartSigned,
+    chart: chartDone,
     photos: photosDone,
     checkout: paid,
   };
-  // Consents/chart/checkout are blocking; assessment/gfe/photos are recommended
   const blocking: Record<typeof order[number], boolean> = {
     checkin: true, assessment: true, consents: true, gfe: false, chart: true, photos: false, checkout: true,
   };
@@ -175,10 +200,10 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
   const chartHref = chartDraft
     ? `/staff/clinical/notes/new?appointment=${appt.id}&draft=${note.id}`
     : note
-      ? `/staff/clinical/notes/${note.id}`
+      ? `/staff/clinical/notes/${note.id}?appointment=${appt.id}`
       : `/staff/clinical/notes/new?appointment=${appt.id}`;
   const gfeHref = gfe
-    ? `/staff/clinical/gfe/${gfe.id}`
+    ? `/staff/clinical/gfe/${gfe.id}?appointment=${appt.id}`
     : `/staff/clinical/gfe/new?email=${encodeURIComponent(appt.client_email ?? "")}&first=${encodeURIComponent(appt.client_first_name ?? "")}&last=${encodeURIComponent(appt.client_last_name ?? "")}&appointment=${appt.id}`;
 
   const handleSendIntake = async () => {
@@ -188,7 +213,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
         body: { appointmentId: appt.id },
       });
 
-      if (error) { toast.error(error.message ?? "Failed to send"); return; }
+      if (error) { toast.error((error as any)?.message ?? (typeof error === "string" ? error : "Failed to send")); return; }
       toast.success("Assessment link sent");
       setIntakeSentAt(new Date().toISOString());
     } finally {
@@ -196,9 +221,6 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     }
   };
 
-  // Staff override: when a patient completes their health history verbally in-clinic,
-  // record an attestation row so the assessment step unblocks. The signer is the staff
-  // member (verified in person), not the patient — preserves provenance for HIPAA.
   const handleMarkIntakeInPerson = async () => {
     const { confirmDialog } = await import("@/components/ui/confirm");
     const ok = await confirmDialog({
@@ -209,10 +231,9 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     if (!ok) return;
     setMarkingIntakeInPerson(true);
     try {
-      const { data: u } = await authService.getSession();
-      let staffName = u.user?.email ?? "Staff";
-      if (u.user?.id) {
-        const { data: sp } = await apiQuery("staff_profiles").select("full_name").eq("user_id", u.user.id).maybeSingle();
+      let staffName = user?.email ?? "Staff";
+      if (user?.id) {
+        const { data: sp } = await apiQuery("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
         if (sp?.full_name) staffName = sp.full_name;
       }
       const nowIso = new Date().toISOString();
@@ -239,9 +260,6 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     }
   };
 
-  // Annual rule: a "full" client assessment is valid for 365 days. Anything in
-  // between is the short pre-visit check-in. Surface BOTH so staff can tell at
-  // a glance whether the patient is current on the annual.
   const annualLabel = lastFull?.submitted_at
     ? `Annual assessment ${annualOverdue ? "EXPIRED" : "on file"} (${format(new Date(lastFull.submitted_at), "MMM d, yyyy")})`
     : "No annual client assessment on file";
@@ -258,7 +276,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
       label: "Check in",
       sublabel: checkedIn ? "Patient arrived" : "Mark patient as arrived",
       icon: UserCheck,
-      action: !checkedIn ? (
+      action: !checkedIn && !isNpPortal ? (
         <Button size="sm" className="rounded-full" disabled={checkingIn} onClick={handleCheckin}>
           {checkingIn ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
           Check in
@@ -335,13 +353,15 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
       label: "GFE (NP)",
       sublabel: gfe ? `Active · ${differenceInDays(new Date(gfe.expires_at), new Date())}d left` : "Not on file (optional for non-Rx)",
       icon: gfe ? ShieldCheck : ShieldAlert,
-      action: (
+      action: isNpPortal ? (
         <Button asChild size="sm" variant={gfe ? "outline" : "default"} className="rounded-full">
           <Link to={gfeHref}>
             {gfe ? "View GFE" : "Conduct GFE"}
             <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
           </Link>
         </Button>
+      ) : (
+        <span className="text-[11px] text-muted-foreground italic font-normal">Read-only for Front Desk</span>
       ),
     },
     {
@@ -349,13 +369,15 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
       label: "Chart note",
       sublabel: chartSigned ? "Signed" : chartDraft ? "Draft in progress" : "Not started",
       icon: ClipboardPlus,
-      action: !chartSigned ? (
+      action: isNpPortal && !chartSigned ? (
         <Button asChild size="sm" className="rounded-full">
           <Link to={chartHref}>
             {chartDraft ? "Continue charting" : "Start charting"}
             <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
           </Link>
         </Button>
+      ) : !isNpPortal ? (
+        <span className="text-[11px] text-muted-foreground italic font-normal">Read-only for Front Desk</span>
       ) : null,
     },
     {
@@ -363,10 +385,12 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
       label: "Photos",
       sublabel: photosDone ? `${photoCount} attached` : "Recommended for injectables & laser",
       icon: Camera,
-      action: note && !photosDone ? (
+      action: isNpPortal && note && !photosDone ? (
         <Button asChild size="sm" variant="outline" className="rounded-full">
           <Link to={chartHref}>Add photos<ArrowRight className="h-3.5 w-3.5 ml-1.5" /></Link>
         </Button>
+      ) : !isNpPortal ? (
+        <span className="text-[11px] text-muted-foreground italic font-normal">Read-only for Front Desk</span>
       ) : null,
     },
     {
