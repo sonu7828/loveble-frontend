@@ -616,15 +616,25 @@ export default function StaffAppointmentDetail() {
                   );
                   return;
                 }
+                const nowIso = new Date().toISOString();
                 const { error } = await apiQuery
                   .from("appointments")
-                  .update({ status: "arrived", checked_in_at: new Date().toISOString() })
+                  .update({ status: "arrived", checked_in_at: nowIso })
                   .eq("id", appt.id);
                 if (error) { toast.error(error.message); return; }
                 await apiQuery("appointment_audit_log").insert({
                   appointment_id: appt.id, action: "checked_in",
                   from_status: appt.status, to_status: "arrived" as any,
                 });
+                setAppt((prev: any) => (prev ? { ...prev, status: "arrived", checked_in_at: nowIso } : prev));
+                try {
+                  const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                  const updated = local.map((item: any) => (item.id === appt.id ? { ...item, status: "arrived", checked_in_at: nowIso } : item));
+                  localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+                } catch {}
+                window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+                window.dispatchEvent(new Event("rka_appointment_updated"));
+                window.dispatchEvent(new Event("rka_appointment_checkin"));
                 // Pre-create draft sale so checkout opens with services loaded
                 try {
                   await ApiClient.post("pos-create-or-get-sale", {
@@ -664,6 +674,15 @@ export default function StaffAppointmentDetail() {
                 const { data, error } = await ApiClient.post("mark-appointment-complete", { body: { appointmentId: appt.id } });
                 toast.dismiss(t);
                 if (error || data?.error) { toast.error(data?.error || (error as any)?.message || "Could not complete"); return; }
+                setAppt((prev: any) => (prev ? { ...prev, status: "completed" } : prev));
+                try {
+                  const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                  const updated = local.map((item: any) => (item.id === appt.id ? { ...item, status: "completed" } : item));
+                  localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+                } catch {}
+                window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+                window.dispatchEvent(new Event("rka_appointment_updated"));
+                window.dispatchEvent(new Event("rka_appointment_completed"));
                 toast.success(data?.reviewSent ? "Completed — review email sent" : "Completed (no review URL set for this location)");
                 load();
               }}

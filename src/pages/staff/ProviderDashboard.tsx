@@ -272,6 +272,9 @@ export function ProviderDashboard() {
       const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
       const updated = local.map((a: any) => (a.id === apptId ? { ...a, status: "arrived", checked_in_at: nowIso } : a));
       localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+      window.dispatchEvent(new Event("rka_appointment_updated"));
+      window.dispatchEvent(new Event("rka_appointment_checkin"));
       toast.success("Patient marked as checked-in!");
       loadData();
     } catch {
@@ -286,6 +289,9 @@ export function ProviderDashboard() {
       const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
       const updated = local.map((a: any) => (a.id === apptId ? { ...a, status: "completed", checked_out_at: nowIso } : a));
       localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+      window.dispatchEvent(new Event("rka_appointment_updated"));
+      window.dispatchEvent(new Event("rka_appointment_completed"));
       toast.success("Patient checked-out & payment completed! Saved to Patient History.");
       loadData();
     } catch {

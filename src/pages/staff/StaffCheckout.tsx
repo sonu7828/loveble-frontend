@@ -705,6 +705,14 @@ export default function StaffCheckout() {
 
       if (appointmentId) {
         await apiQuery("appointments").update({ status: "completed" }).eq("id", appointmentId);
+        try {
+          const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+          const updated = local.map((a: any) => (a.id === appointmentId ? { ...a, status: "completed" } : a));
+          localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+        } catch {}
+        window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+        window.dispatchEvent(new Event("rka_appointment_updated"));
+        window.dispatchEvent(new Event("rka_appointment_completed"));
       }
 
       const email = sale?.client_email;

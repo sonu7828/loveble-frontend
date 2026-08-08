@@ -245,12 +245,16 @@ export default function StaffCalendar() {
     window.addEventListener("rka_demo_appointments_updated", handleUpdate);
     window.addEventListener("rka_appointment_updated", handleUpdate);
     window.addEventListener("rka_appointment_confirmed", handleUpdate);
+    window.addEventListener("rka_appointment_checkin", handleUpdate);
+    window.addEventListener("rka_appointment_completed", handleUpdate);
     window.addEventListener("rka_chart_note_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
     return () => {
       window.removeEventListener("rka_demo_appointments_updated", handleUpdate);
       window.removeEventListener("rka_appointment_updated", handleUpdate);
       window.removeEventListener("rka_appointment_confirmed", handleUpdate);
+      window.removeEventListener("rka_appointment_checkin", handleUpdate);
+      window.removeEventListener("rka_appointment_completed", handleUpdate);
       window.removeEventListener("rka_chart_note_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };

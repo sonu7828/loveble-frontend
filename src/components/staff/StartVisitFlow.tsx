@@ -138,15 +138,24 @@ export function StartVisitFlow({ appt, consentSummary, gfe, onReload, onSendPost
     }
     setCheckingIn(true);
     try {
+      const nowIso = new Date().toISOString();
       const { error } = await apiQuery
         .from("appointments")
-        .update({ status: "arrived", checked_in_at: new Date().toISOString() })
+        .update({ status: "arrived", checked_in_at: nowIso })
         .eq("id", appt.id);
       if (error) { toast.error(error.message); return; }
       await apiQuery("appointment_audit_log").insert({
         appointment_id: appt.id, action: "checked_in",
         from_status: appt.status, to_status: "arrived" as any,
       });
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const updated = local.map((a: any) => (a.id === appt.id ? { ...a, status: "arrived", checked_in_at: nowIso } : a));
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      } catch {}
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+      window.dispatchEvent(new Event("rka_appointment_updated"));
+      window.dispatchEvent(new Event("rka_appointment_checkin"));
       try {
         await ApiClient.post("pos-create-or-get-sale", { body: { appointmentId: appt.id } });
       } catch (e) { console.error("pos draft create failed", e); }

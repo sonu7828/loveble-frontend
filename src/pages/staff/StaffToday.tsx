@@ -703,13 +703,22 @@ function StandardStaffToday() {
 
   const checkInAppt = async (apptId: string) => {
     try {
+      const nowIso = new Date().toISOString();
       const { error } = await apiQuery("appointments")
-        .update({ status: "arrived", checked_in_at: new Date().toISOString() })
+        .update({ status: "arrived", checked_in_at: nowIso })
         .eq("id", apptId);
       if (error) throw error;
       setAppts((prev) =>
-        prev.map((a) => (a.id === apptId ? { ...a, status: "arrived", checked_in_at: new Date().toISOString() } : a))
+        prev.map((a) => (a.id === apptId ? { ...a, status: "arrived", checked_in_at: nowIso } : a))
       );
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const updated = local.map((item: any) => (item.id === apptId ? { ...item, status: "arrived", checked_in_at: nowIso } : item));
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      } catch {}
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+      window.dispatchEvent(new Event("rka_appointment_updated"));
+      window.dispatchEvent(new Event("rka_appointment_checkin"));
       toast.success("Patient checked in!");
     } catch (e: any) {
       toast.error(e.message ?? "Failed to check in");
