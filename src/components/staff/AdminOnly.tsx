@@ -1,1 +1,1 @@
-export { AdminOnly, AdminOrDirectorOnly, AdminOrPrivacyOnly } from "../auth/RouteGuards";
+export { AdminOnly, AdminOrDirectorOnly, AdminOrPrivacyOnly, MedicalDirectorOnly } from "../auth/RouteGuards";

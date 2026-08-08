@@ -1,16 +1,20 @@
 // Clinical inbox — simplified. Everything lives in the patient's chart.
-// This page is just: find a patient, plus urgent alerts (cosign queue, expiring GFEs).
+// This page is just: find a patient, plus urgent alerts (cosign queue, expiring GFEs, HIPAA amendment requests).
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery, ApiClient } from "@/services/api";
 import { clinicalService } from "@/services/api/clinicalService";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, ShieldAlert, FileText, ShieldCheck, Search, Calendar as CalIcon, AlertTriangle, ClipboardPlus, ChevronRight } from "lucide-react";
+import { Loader2, ShieldAlert, FileText, ShieldCheck, Search, Calendar as CalIcon, AlertTriangle, FileEdit, CheckCircle2, XCircle, Clock, Send } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { fetchIncompleteCharts, type IncompleteChart } from "@/lib/incompleteCharts";
 import { isTestPatient } from "@/lib/testPatientFilter";
+import { toast } from "sonner";
 
 export default function StaffClinical() {
   const { user, isClinicalStaff, isNP, isMedicalDirector, isAdmin, canSeeAll, staffId, loading: authLoading } = useAuth();
@@ -23,6 +27,97 @@ export default function StaffClinical() {
   const [incompleteError, setIncompleteError] = useState<string | null>(null);
   const [recentNotes, setRecentNotes] = useState<any[]>([]);
 
+  // HIPAA Amendment Requests State
+  const [amendments, setAmendments] = useState<any[]>([]);
+  const [selectedAmendment, setSelectedAmendment] = useState<any | null>(null);
+  const [actionNotes, setActionNotes] = useState("");
+  const [processingAmendment, setProcessingAmendment] = useState(false);
+
+  const loadAmendments = async () => {
+    let dbAmendments: any[] = [];
+    try {
+      const { data } = await apiQuery("chart_amendments" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data) dbAmendments = data;
+    } catch {}
+
+    let localAmendments: any[] = [];
+    try {
+      const keys = Object.keys(localStorage).filter((k) => k.startsWith("rka_patient_amendments_"));
+      keys.forEach((k) => {
+        const email = k.replace("rka_patient_amendments_", "");
+        const arr = JSON.parse(localStorage.getItem(k) || "[]");
+        arr.forEach((item: any) => {
+          localAmendments.push({ ...item, patient_email: email });
+        });
+      });
+    } catch {}
+
+    const map = new Map<string, any>();
+    dbAmendments.forEach((a) => map.set(a.id, a));
+    localAmendments.forEach((a) =>
+      map.set(a.id, {
+        id: a.id,
+        patient_email: a.patient_email || a.email || "patient@example.com",
+        record_type: a.recordType || a.record_type || "Clinical Note / Chart Entry",
+        current_text: a.currentText || a.current_text || "",
+        requested_correction: a.requestedText || a.requested_correction || "",
+        rationale: a.reason || a.rationale || "",
+        status: a.status || "pending",
+        created_at: a.submittedAt || a.created_at || new Date().toISOString(),
+      })
+    );
+
+    setAmendments(Array.from(map.values()));
+  };
+
+  const handleUpdateAmendmentStatus = async (newStatus: "approved" | "denied") => {
+    if (!selectedAmendment) return;
+    setProcessingAmendment(true);
+    const id = selectedAmendment.id;
+    const nowIso = new Date().toISOString();
+
+    try {
+      // 1. Try DB update
+      try {
+        await apiQuery("chart_amendments" as any)
+          .update({
+            status: newStatus,
+            reviewed_at: nowIso,
+            reviewer_email: user?.email || "staff@radiantilyk.com",
+            review_notes: actionNotes.trim() || null,
+          })
+          .eq("id", id);
+      } catch {}
+
+      // 2. Update local storage for affected patient
+      if (selectedAmendment.patient_email) {
+        const storageKey = `rka_patient_amendments_${selectedAmendment.patient_email.toLowerCase()}`;
+        try {
+          const local: any[] = JSON.parse(localStorage.getItem(storageKey) || "[]");
+          const updated = local.map((r) =>
+            r.id === id ? { ...r, status: newStatus, reviewNotes: actionNotes.trim() || undefined } : r
+          );
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch {}
+      }
+
+      setAmendments((prev) => prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a)));
+      toast.success(
+        `Amendment request for ${selectedAmendment.patient_email} marked as ${
+          newStatus === "approved" ? "Approved & Amended" : "Denied"
+        }.`
+      );
+      setSelectedAmendment(null);
+      setActionNotes("");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update amendment status");
+    } finally {
+      setProcessingAmendment(false);
+    }
+  };
+
   const loadRecentNotes = async () => {
     let dbNotes: any[] = [];
     try {
@@ -31,7 +126,7 @@ export default function StaffClinical() {
         .order("created_at", { ascending: false })
         .limit(50);
       if (data) dbNotes = data;
-    } catch { }
+    } catch {}
 
     let dbGfes: any[] = [];
     try {
@@ -40,20 +135,20 @@ export default function StaffClinical() {
         .order("signed_at", { ascending: false })
         .limit(50);
       if (data) dbGfes = data;
-    } catch { }
+    } catch {}
 
     let localNotes: any[] = [];
     try {
       localNotes = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
-    } catch { }
+    } catch {}
 
     let localGfes: any[] = [];
     try {
       localGfes = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
-    } catch { }
+    } catch {}
 
     const map = new Map<string, any>();
-    
+
     // Add DB & Local SOAP Clinical Notes
     dbNotes.forEach((n) => map.set(n.id, n));
     localNotes.forEach((n) => map.set(n.id, n));
@@ -73,8 +168,12 @@ export default function StaffClinical() {
       isGfe: true,
     });
 
-    dbGfes.forEach((g) => { if (g.id) map.set(`gfe-${g.id}`, formatGfe(g)); });
-    localGfes.forEach((g) => { if (g.id) map.set(`gfe-${g.id}`, formatGfe(g)); });
+    dbGfes.forEach((g) => {
+      if (g.id) map.set(`gfe-${g.id}`, formatGfe(g));
+    });
+    localGfes.forEach((g) => {
+      if (g.id) map.set(`gfe-${g.id}`, formatGfe(g));
+    });
 
     const merged = Array.from(map.values());
 
@@ -99,7 +198,12 @@ export default function StaffClinical() {
         const in30 = new Date(now.getTime() + 30 * 86400000).toISOString();
         const [cosQueue, gexRes, incompleteRows] = await Promise.all([
           clinicalService.getCosignQueue().catch(() => []),
-          apiQuery("gfe_records").select("id, client_email, client_first_name, client_last_name, np_name, expires_at").gte("expires_at", now.toISOString()).lt("expires_at", in30).order("expires_at").limit(20),
+          apiQuery("gfe_records")
+            .select("id, client_email, client_first_name, client_last_name, np_name, expires_at")
+            .gte("expires_at", now.toISOString())
+            .lt("expires_at", in30)
+            .order("expires_at")
+            .limit(20),
           fetchIncompleteCharts({ canSeeAll, staffId }),
         ]);
         if (gexRes.error) console.error("[StaffClinical] gfe query error:", gexRes.error);
@@ -119,6 +223,7 @@ export default function StaffClinical() {
         setExpiringGfes((gexRes.data ?? []).filter((g: any) => !isTestPatient(g)));
         setIncomplete(incompleteRows.filter((r) => !isTestPatient(r.appointment)));
         await loadRecentNotes();
+        await loadAmendments();
       } catch (e) {
         console.error("[StaffClinical] load failed:", e);
         setIncompleteError(e instanceof Error ? e.message : "Incomplete charts could not be loaded.");
@@ -127,177 +232,146 @@ export default function StaffClinical() {
       }
     })();
 
-    const handleUpdate = () => loadRecentNotes();
-    window.addEventListener("rka_chart_note_updated", handleUpdate);
-    window.addEventListener("rka_gfe_updated", handleUpdate);
-    return () => {
-      window.removeEventListener("rka_chart_note_updated", handleUpdate);
-      window.removeEventListener("rka_gfe_updated", handleUpdate);
+    const handleUpdate = () => {
+      loadRecentNotes();
+      loadAmendments();
     };
+    window.addEventListener("rka_clinical_note_saved", handleUpdate);
+    return () => window.removeEventListener("rka_clinical_note_saved", handleUpdate);
   }, [user, authLoading, canSeeAll, staffId]);
 
-  if (authLoading) return <div className="p-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>;
-  if (!isClinicalStaff && !canSeeAll) {
-    return (
-      <div className="max-w-md mx-auto p-10 text-center space-y-3">
-        <ShieldAlert className="h-10 w-10 mx-auto text-warning" />
-        <p className="text-sm text-muted-foreground">Clinical staff role required.</p>
-      </div>
-    );
-  }
+  const handleOpenChart = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lookup.trim()) return;
+    const term = lookup.trim();
+    if (term.includes("@")) {
+      navigate(`/staff/clinical/clients/${encodeURIComponent(term.toLowerCase())}`);
+    } else {
+      navigate(`/staff/clients?q=${encodeURIComponent(term)}`);
+    }
+  };
+
+  const pendingAmendmentsCount = amendments.filter((a) => a.status === "pending" || !a.status).length;
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-8">
-      <div>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground">Clinical Documentation</div>
-        <h1 className="text-2xl font-serif">Charts</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Every patient has one chart. GFE, chart notes, photos, and consents all live there.
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+      <div className="border-b border-border pb-5">
+        <h1 className="font-serif text-2xl md:text-3xl font-medium tracking-tight">Clinical Dashboard &amp; Charts</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+          Find patient charts, manage incomplete visit notes, review GFEs, and process HIPAA record amendments.
         </p>
       </div>
 
-      {/* Incomplete charts — first thing staff need to see */}
-      {loading ? (
-        <div className="rounded-lg border border-warning/30 bg-warning-soft/40 p-5 flex items-center gap-3">
-          <Loader2 className="h-4 w-4 animate-spin text-warning-soft-foreground" />
-          <p className="text-sm text-muted-foreground">Loading incomplete charts…</p>
+      {/* Patient Search Bar */}
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-xs space-y-3">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+          Find or open a patient chart
         </div>
-      ) : incomplete.length > 0 ? (
-        <Section title={`Incomplete charts (${incomplete.length})`} accent>
-          <p className="text-[11px] text-muted-foreground -mt-1">
-            All past appointments with missing chart notes or unsigned consents.
-          </p>
-
-          {incomplete.map((row) => {
-            const a = row.appointment;
-            const reasons: string[] = [];
-            if (row.missingNote) reasons.push("Chart note");
-            if (row.unsignedConsents > 0) reasons.push(`${row.unsignedConsents} unsigned consent${row.unsignedConsents > 1 ? "s" : ""}`);
-            return (
-              <div
-                key={a.id}
-                className="rounded-md border border-warning/30 bg-warning-soft/40 p-3 transition"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <AlertTriangle className="h-4 w-4 text-warning-soft-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {a.client_first_name} {a.client_last_name}{" "}
-                        <span className="text-muted-foreground">— {reasons.join(" • ")}</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {a.client_email}{a.staff_name ? ` • ${a.staff_name}` : ""} • {format(new Date(a.end_at), "PP")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 shrink-0">
-                    {row.missingNote && (
-                      <Button asChild size="sm" className="rounded-full">
-                        <Link to={`/staff/clinical/notes/new?appointment=${a.id}`}>
-                          <ClipboardPlus className="h-3.5 w-3.5 mr-1.5" />Complete chart
-                        </Link>
-                      </Button>
-                    )}
-                    <Button asChild size="sm" variant="outline" className="rounded-full">
-                      <Link to={`/staff/appointments/${a.id}`}>
-                        Open appointment<ChevronRight className="h-3.5 w-3.5 ml-1" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </Section>
-      ) : incompleteError ? (
-        <Section title="Incomplete charts" accent>
-          <p className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-            Could not load incomplete charts: {incompleteError}
-          </p>
-        </Section>
-      ) : (
-        <Section title="Incomplete charts">
-          <p className="rounded-md border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-            No incomplete charts. 🎉
-          </p>
-        </Section>
-      )}
-
-      {/* Open a patient's chart */}
-      <div className="rounded-lg border border-border bg-secondary/30 p-5 space-y-3">
-        <div className="text-xs uppercase tracking-widest text-muted-foreground">Open a patient chart</div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const query = lookup.trim().toLowerCase();
-            if (!query) return;
-
-            let matchedEmail = "";
-            try {
-              const gfes: any[] = JSON.parse(localStorage.getItem("rka_demo_gfe_records") || "[]");
-              const gfeMatch = gfes.find(g =>
-                (g.client_email || "").toLowerCase() === query ||
-                (`${g.client_first_name || ""} ${g.client_last_name || ""}`).toLowerCase().includes(query)
-              );
-              if (gfeMatch?.client_email) matchedEmail = gfeMatch.client_email;
-            } catch { }
-
-            if (!matchedEmail) {
-              try {
-                const notes: any[] = JSON.parse(localStorage.getItem("rka_demo_clinical_notes") || "[]");
-                const noteMatch = notes.find(n =>
-                  (n.client_email || "").toLowerCase() === query ||
-                  (`${n.client_first_name || ""} ${n.client_last_name || ""}`).toLowerCase().includes(query)
-                );
-                if (noteMatch?.client_email) matchedEmail = noteMatch.client_email;
-              } catch { }
-            }
-
-            if (!matchedEmail) {
-              try {
-                const appts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-                const apptMatch = appts.find(a =>
-                  (a.client_email || a.clientEmail || "").toLowerCase() === query ||
-                  (`${a.client_first_name || a.first_name || ""} ${a.client_last_name || a.last_name || ""}`).toLowerCase().includes(query)
-                );
-                if (apptMatch?.client_email || apptMatch?.clientEmail) matchedEmail = apptMatch.client_email || apptMatch.clientEmail;
-              } catch { }
-            }
-
-            const target = matchedEmail || query;
-            navigate(`/staff/clinical/clients/${encodeURIComponent(target)}`);
-          }}
-          className="flex gap-2"
-        >
+        <form onSubmit={handleOpenChart} className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               value={lookup}
               onChange={(e) => setLookup(e.target.value)}
-              placeholder="Search patient by Name, Phone, or Email…"
-              type="text"
+              placeholder="Enter patient email or name..."
               className="pl-8"
             />
           </div>
-          <Button type="submit" size="sm">Open chart</Button>
+          <Button type="submit" size="sm">
+            Open chart
+          </Button>
         </form>
         <div className="flex flex-wrap gap-2 pt-1">
           <Button asChild size="sm" variant="outline">
-            <Link to="/staff/today"><CalIcon className="h-4 w-4 mr-2" />Today's schedule</Link>
+            <Link to="/staff/today">
+              <CalIcon className="h-4 w-4 mr-2" />
+              Today's schedule
+            </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link to="/staff/clients"><Search className="h-4 w-4 mr-2" />Browse all patients</Link>
+            <Link to="/staff/clients">
+              <Search className="h-4 w-4 mr-2" />
+              Browse all patients
+            </Link>
           </Button>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Tip: every patient chart contains <span className="font-medium">Good Faith Examinations (GFEs)</span>, <span className="font-medium">SOAP chart notes</span>, <span className="font-medium">Pre/Post photos</span>, and <span className="font-medium">consents</span>.
-          {isNP && <> NPs can sign a GFE anytime — it stays valid for 12 months.</>}
-        </p>
       </div>
+
+      {loading && (
+        <div className="flex items-center justify-center p-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
 
       {!loading && (
         <>
+          {/* Patient Record Amendment Requests (HIPAA §164.526) */}
+          <Section title={`Patient Record Amendment Requests (${amendments.length})`} accent={pendingAmendmentsCount > 0}>
+            <div className="flex items-center justify-between gap-2 -mt-1 mb-2">
+              <p className="text-[11px] text-muted-foreground">
+                Patient requests to amend or correct their clinical chart entries under HIPAA §164.526.
+              </p>
+              {pendingAmendmentsCount > 0 && (
+                <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] font-semibold">
+                  {pendingAmendmentsCount} Pending SLA Review
+                </Badge>
+              )}
+            </div>
+
+            {amendments.length === 0 ? (
+              <div className="rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground text-center">
+                No patient record amendment requests submitted.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {amendments.map((a) => (
+                  <div key={a.id} className="rounded-xl border border-border bg-card p-4 text-xs space-y-2 hover:border-primary/40 transition">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <FileEdit className="h-4 w-4 text-primary shrink-0" />
+                        <span className="font-semibold text-foreground">{a.patient_email}</span>
+                        <span className="text-muted-foreground">• {a.record_type}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {a.status === "approved" ? (
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Approved
+                          </Badge>
+                        ) : a.status === "denied" ? (
+                          <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px]">
+                            <XCircle className="h-3 w-3 mr-1" /> Denied
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">
+                            <Clock className="h-3 w-3 mr-1" /> Pending SLA Review
+                          </Badge>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedAmendment(a);
+                            setActionNotes("");
+                          }}
+                          className="h-7 text-xs rounded-full px-3"
+                        >
+                          Review Request
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground">
+                      <strong className="text-foreground font-medium">Requested Amendment:</strong> {a.requested_correction}
+                    </p>
+                    <p className="text-muted-foreground">
+                      <strong className="text-foreground font-medium">Rationale:</strong> {a.rationale}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {/* Recent Chart Notes */}
           <Section title={`Recent Chart Notes (${recentNotes.length})`}>
             <div className="flex items-center justify-between gap-2 -mt-1 mb-1">
               <p className="text-[11px] text-muted-foreground">Recently created and signed chart notes across all patients</p>
@@ -311,29 +385,36 @@ export default function StaffClinical() {
                 No recent chart notes found. Create a new chart note from any patient appointment or profile.
               </p>
             ) : (
-              recentNotes.slice(0, 10).map((n) => (
-                <NoteRow key={n.id} n={n} />
-              ))
+              recentNotes.slice(0, 10).map((n) => <NoteRow key={n.id} n={n} />)
             )}
           </Section>
 
           {(isNP || isMedicalDirector || isAdmin) && needsCosign.length > 0 && (
             <Section title={`Awaiting co-signature (${needsCosign.length})`} accent>
-              {needsCosign.map(n => <NoteRow key={n.id} n={n} />)}
+              {needsCosign.map((n) => (
+                <NoteRow key={n.id} n={n} />
+              ))}
             </Section>
           )}
 
-
           {expiringGfes.length > 0 && (
             <Section title="GFEs expiring soon">
-              {expiringGfes.map(g => (
-                <Link key={g.id} to={`/staff/clinical/clients/${encodeURIComponent(g.client_email)}`} className="block rounded-md border border-border p-3 hover:border-primary/40 transition">
+              {expiringGfes.map((g) => (
+                <Link
+                  key={g.id}
+                  to={`/staff/clinical/clients/${encodeURIComponent(g.client_email)}`}
+                  className="block rounded-md border border-border p-3 hover:border-primary/40 transition"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <ShieldCheck className="h-4 w-4 text-muted-foreground" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{g.client_first_name} {g.client_last_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{g.client_email} • by {g.np_name}</p>
+                        <p className="text-sm font-medium truncate">
+                          {g.client_first_name} {g.client_last_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {g.client_email} • by {g.np_name}
+                        </p>
                       </div>
                     </div>
                     <span className="text-xs text-muted-foreground">Expires {formatDateSafe(g.expires_at, "PP")}</span>
@@ -344,6 +425,91 @@ export default function StaffClinical() {
           )}
         </>
       )}
+
+      {/* Review & Respond Amendment Dialog */}
+      <Dialog open={!!selectedAmendment} onOpenChange={(open) => !open && setSelectedAmendment(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-serif">
+              <ShieldCheck className="h-5 w-5 text-primary" /> Review HIPAA §164.526 Amendment Request
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedAmendment && (
+            <div className="space-y-4 text-xs">
+              <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-1.5">
+                <div>
+                  <span className="font-semibold text-foreground">Patient Email:</span> {selectedAmendment.patient_email}
+                </div>
+                <div>
+                  <span className="font-semibold text-foreground">Record Category:</span> {selectedAmendment.record_type}
+                </div>
+                <div>
+                  <span className="font-semibold text-foreground">Submitted Date:</span>{" "}
+                  {new Date(selectedAmendment.created_at).toLocaleString()}
+                </div>
+              </div>
+
+              {selectedAmendment.current_text && (
+                <div>
+                  <span className="font-semibold text-foreground">Existing Record Entry:</span>
+                  <p className="p-2.5 rounded-lg border border-border bg-background mt-1 text-muted-foreground">
+                    {selectedAmendment.current_text}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <span className="font-semibold text-foreground">Requested Correction / Amendment:</span>
+                <p className="p-2.5 rounded-lg border border-border bg-background mt-1 font-medium text-foreground">
+                  {selectedAmendment.requested_correction}
+                </p>
+              </div>
+
+              <div>
+                <span className="font-semibold text-foreground">Patient Rationale:</span>
+                <p className="p-2.5 rounded-lg border border-border bg-background mt-1 text-muted-foreground">
+                  {selectedAmendment.rationale}
+                </p>
+              </div>
+
+              <div>
+                <span className="font-semibold text-foreground">Staff Review Notes / Addendum Statement (Optional):</span>
+                <Textarea
+                  rows={2}
+                  value={actionNotes}
+                  onChange={(e) => setActionNotes(e.target.value)}
+                  placeholder="Enter staff review explanation or addendum details..."
+                  className="mt-1 text-xs"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-border">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedAmendment(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={processingAmendment}
+              onClick={() => handleUpdateAmendmentStatus("denied")}
+              className="text-rose-600 border-rose-500/30 hover:bg-rose-500/10"
+            >
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Deny Request
+            </Button>
+            <Button
+              size="sm"
+              disabled={processingAmendment}
+              onClick={() => handleUpdateAmendmentStatus("approved")}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve &amp; Amend Chart
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -362,7 +528,9 @@ function formatDateSafe(val: any, fmt = "PPP p") {
 function Section({ title, accent, children }: { title: string; accent?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <div className={`text-xs uppercase tracking-widest ${accent ? "text-warning-soft-foreground" : "text-muted-foreground"}`}>{title}</div>
+      <div className={`text-xs uppercase tracking-widest ${accent ? "text-amber-600 font-semibold" : "text-muted-foreground"}`}>
+        {title}
+      </div>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -370,23 +538,34 @@ function Section({ title, accent, children }: { title: string; accent?: boolean;
 
 function NoteRow({ n }: { n: any }) {
   const cls =
-    n.status === "cosigned" || n.status === "locked" ? "bg-success-soft text-success-soft-foreground" :
-    n.status === "signed" || n.isGfe ? "bg-emerald-600 text-white font-semibold" :
-    "bg-secondary text-muted-foreground";
+    n.status === "cosigned" || n.status === "locked"
+      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+      : n.status === "signed" || n.isGfe
+      ? "bg-emerald-600 text-white font-semibold"
+      : "bg-secondary text-muted-foreground";
   const name = `${n.client_first_name ?? ""} ${n.client_last_name ?? ""}`.trim() || n.client_email || "Client";
   const linkTo = n.isGfe ? `/staff/clinical/gfe/${n.id.replace(/^gfe-/, "")}` : `/staff/clinical/notes/${n.id}`;
 
   return (
-    <Link to={linkTo} className="block rounded-md border border-border p-3 hover:border-primary/40 hover:bg-secondary/40 transition">
+    <Link
+      to={linkTo}
+      className="block rounded-md border border-border p-3 hover:border-primary/40 hover:bg-secondary/40 transition"
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
           <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{name} <span className="text-muted-foreground">— {n.service_name ?? n.category}</span></p>
-            <p className="text-xs text-muted-foreground truncate">{n.provider_name || "Provider"} • {formatDateSafe(n.signed_at || n.created_at)}</p>
+            <p className="text-sm font-medium truncate">
+              {name} <span className="text-muted-foreground">— {n.service_name ?? n.category}</span>
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {n.provider_name || "Provider"} • {formatDateSafe(n.signed_at || n.created_at)}
+            </p>
           </div>
         </div>
-        <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded shrink-0 ${cls}`}>{n.isGfe ? "Signed GFE" : n.status || "signed"}</span>
+        <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded shrink-0 ${cls}`}>
+          {n.isGfe ? "Signed GFE" : n.status || "signed"}
+        </span>
       </div>
     </Link>
   );

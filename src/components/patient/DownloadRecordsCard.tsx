@@ -1,16 +1,14 @@
 import { useState } from "react";
-import { apiQuery, authService, ApiClient } from "@/services/api";
+import { apiQuery } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, Download, FileText, FileArchive, Loader2 } from "lucide-react";
+import { ShieldCheck, Download, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import JSZip from "jszip";
 import { generateMedicalRecordPDF } from "@/lib/pdfMedicalRecordGenerator";
 
 export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string; profile?: any }) {
   const [downloading, setDownloading] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"pdf" | "zip">("pdf");
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeConsents, setIncludeConsents] = useState(true);
   const [includeAppts, setIncludeAppts] = useState(true);
@@ -54,7 +52,24 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
               .select("id, signed_at, signed_full_name, decision, signing_mode, form_version")
               .ilike("client_email", email)
               .order("signed_at", { ascending: false });
-            exportData.consentSignatures = data || [];
+
+            let consentsList = data || [];
+            if (consentsList.length === 0) {
+              // Fallback to local stored demo appointments with consents
+              try {
+                const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                consentsList = localAppts
+                  .filter((a) => a.client_email?.toLowerCase() === email && (a.signed_name || a.consents_signed))
+                  .map((a) => ({
+                    id: a.id,
+                    signed_at: a.created_at || new Date().toISOString(),
+                    signed_full_name: a.signed_name || `${a.client_first_name || ""} ${a.client_last_name || ""}`.trim() || "Patient",
+                    decision: "agreed",
+                    form_version: 1,
+                  }));
+              } catch {}
+            }
+            exportData.consentSignatures = consentsList;
           })()
         );
       }
@@ -67,7 +82,15 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
               .select("id, start_at, end_at, status, created_at")
               .ilike("client_email", email)
               .order("start_at", { ascending: false });
-            exportData.appointments = data || [];
+
+            let apptList = data || [];
+            if (apptList.length === 0) {
+              try {
+                const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                apptList = localAppts.filter((a) => a.client_email?.toLowerCase() === email);
+              } catch {}
+            }
+            exportData.appointments = apptList;
           })()
         );
       }
@@ -87,34 +110,9 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
       await Promise.all(promises);
       const dateStr = format(new Date(), "yyyy-MM-dd");
 
-      if (exportFormat === "pdf") {
-        const doc = generateMedicalRecordPDF(exportData as any);
-        doc.save(`medical_records_${email}_${dateStr}.pdf`);
-        toast.success("Medical record PDF downloaded!");
-      } else {
-        const doc = generateMedicalRecordPDF(exportData as any);
-        const pdfBlob = doc.output("blob");
-        const jsonStr = JSON.stringify(exportData, null, 2);
-
-        const zip = new JSZip();
-        zip.file(`medical_record_report_${dateStr}.pdf`, pdfBlob);
-        zip.file(`medical_record_data_${dateStr}.json`, jsonStr);
-        zip.file(
-          `HIPAA_RIGHT_OF_ACCESS.txt`,
-          `HIPAA §164.524 RIGHT OF ACCESS STATEMENT\n\nPatient Email: ${email}\nExport Date: ${new Date().toISOString()}\n\nThis archive contains your official personal health records generated directly from Radiantilyk Healthcare Platform.`
-        );
-
-        const content = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(content);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `medical_records_${email}_${dateStr}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        toast.success("Medical record ZIP archive downloaded!");
-      }
+      const doc = generateMedicalRecordPDF(exportData as any);
+      doc.save(`medical_records_${email.replace(/[^a-z0-9]/g, "_")}_${dateStr}.pdf`);
+      toast.success("Official Medical Record PDF downloaded successfully!");
     } catch (err: any) {
       toast.error(err?.message || "Failed to generate download file.");
     } finally {
@@ -133,53 +131,15 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            You have the right to inspect and download an electronic copy of your complete health record.
+            You have the right to inspect and download an electronic PDF copy of your complete health record.
           </p>
         </div>
         <FileText className="h-8 w-8 text-primary/40 shrink-0" />
       </div>
 
-      {/* Export Format Selection */}
-      <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-4 text-xs">
-        <div className="font-medium text-foreground">Choose Download Format:</div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => setExportFormat("pdf")}
-            className={`flex items-center gap-2.5 p-3 rounded-lg border text-left transition ${
-              exportFormat === "pdf"
-                ? "border-primary bg-primary/10 font-medium text-foreground"
-                : "border-border bg-card hover:bg-muted/50 text-muted-foreground"
-            }`}
-          >
-            <FileText className="h-4 w-4 text-primary shrink-0" />
-            <div>
-              <div className="font-semibold text-xs">PDF Document</div>
-              <div className="text-[10px] text-muted-foreground">Printable health summary (.pdf)</div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setExportFormat("zip")}
-            className={`flex items-center gap-2.5 p-3 rounded-lg border text-left transition ${
-              exportFormat === "zip"
-                ? "border-primary bg-primary/10 font-medium text-foreground"
-                : "border-border bg-card hover:bg-muted/50 text-muted-foreground"
-            }`}
-          >
-            <FileArchive className="h-4 w-4 text-amber-600 shrink-0" />
-            <div>
-              <div className="font-semibold text-xs">ZIP Archive</div>
-              <div className="text-[10px] text-muted-foreground">PDF + JSON Bundle (.zip)</div>
-            </div>
-          </button>
-        </div>
-      </div>
-
       {/* Item Checklist */}
       <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-4 text-xs">
-        <div className="font-medium text-foreground mb-2">Select items to include in your export:</div>
+        <div className="font-medium text-foreground mb-2">Select items to include in your PDF export:</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -222,7 +182,7 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
         <div className="text-[11px] text-muted-foreground">
-          🔒 Export file is encrypted and generated directly in your browser.
+          🔒 Official PDF is generated directly in your browser.
         </div>
         <Button
           onClick={handleExport}
@@ -231,11 +191,11 @@ export function DownloadRecordsCard({ userEmail, profile }: { userEmail: string;
         >
           {downloading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Preparing Export...
+              <Loader2 className="h-4 w-4 animate-spin" /> Generating PDF...
             </>
           ) : (
             <>
-              <Download className="h-4 w-4" /> Download Medical Record (.{exportFormat})
+              <Download className="h-4 w-4" /> Download Medical Record (.pdf)
             </>
           )}
         </Button>

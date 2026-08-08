@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiQuery, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
@@ -29,7 +29,12 @@ interface Appt {
 export default function StaffInbox() {
   const navigate = useNavigate();
   const { canSeeAll, staffId } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "waitlist" ? "waitlist" : "bookings";
+
   const [appts, setAppts] = useState<Appt[]>([]);
+  const [waitlist, setWaitlist] = useState<any[]>([]);
+  const [allServices, setAllServices] = useState<any[]>([]);
   const [meta, setMeta] = useState<Record<string, { service: string; staff: string; location: string }>>({});
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [locationFilter, setLocationFilter] = useState<string>("all");
@@ -46,9 +51,21 @@ export default function StaffInbox() {
     let aq = apiQuery("appointments").select("*").eq("status", "pending").order("created_at", { ascending: true });
     if (!canSeeAll && staffId) aq = aq.eq("staff_id", staffId);
 
+<<<<<<< HEAD
     const a = await aq;
     const fetchedAppts = ((a.data ?? []) as Appt[]).filter((x) => !isTestPatient(x));
+=======
+    const [a, wl, allSvc] = await Promise.all([
+      aq,
+      apiQuery("waitlist_entries").select("*"),
+      apiQuery("services").select("id, name"),
+    ]);
+
+    const fetchedAppts = (a.data ?? []) as Appt[];
+>>>>>>> a7057e0d8fd3b6bb1446b655e3a92e49851e6a7b
     setAppts(fetchedAppts);
+    setWaitlist(wl.data ?? []);
+    setAllServices(allSvc.data ?? []);
 
     const sids = [...new Set(fetchedAppts.map((x: any) => x.service_id).filter(Boolean))];
     const stids = [...new Set(fetchedAppts.map((x: any) => x.staff_id).filter(Boolean))];
@@ -107,9 +124,22 @@ export default function StaffInbox() {
     load();
   }, [load]);
 
+  const removeWaitlistEntry = useCallback(async (id: string) => {
+    setBusyId(id);
+    const { error } = await apiQuery("waitlist_entries").delete().eq("id", id);
+    setBusyId(null);
+    if (error) {
+      toast.error(error.message || "Could not remove waitlist entry");
+      return;
+    }
+    toast.success("Waitlist entry removed successfully");
+    load();
+  }, [load]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (activeTab === "waitlist") return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (appts.length === 0) return;
       if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); setFocusIdx((i) => Math.min(i + 1, appts.length - 1)); }
@@ -124,7 +154,7 @@ export default function StaffInbox() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [appts, focusIdx, act, navigate]);
+  }, [appts, focusIdx, act, navigate, activeTab]);
 
   const filteredAppts = locationFilter === "all" ? appts : appts.filter(a => a.location_id === locationFilter);
 
@@ -132,19 +162,48 @@ export default function StaffInbox() {
     <div className="p-4 sm:p-8 max-w-5xl mx-auto">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="font-serif text-3xl">Booking Requests</h1>
-          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
-            <Keyboard className="h-3 w-3" />
-            <span><kbd className="px-1 rounded bg-secondary text-[10px]">j</kbd>/<kbd className="px-1 rounded bg-secondary text-[10px]">k</kbd> navigate · <kbd className="px-1 rounded bg-secondary text-[10px]">a</kbd> approve · <kbd className="px-1 rounded bg-secondary text-[10px]">d</kbd> deny · <kbd className="px-1 rounded bg-secondary text-[10px]">Enter</kbd> open</span>
-          </p>
+          <h1 className="font-serif text-3xl">{activeTab === "bookings" ? "Booking Requests" : "Waitlist Requests"}</h1>
+          {activeTab === "bookings" && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+              <Keyboard className="h-3 w-3" />
+              <span><kbd className="px-1 rounded bg-secondary text-[10px]">j</kbd>/<kbd className="px-1 rounded bg-secondary text-[10px]">k</kbd> navigate · <kbd className="px-1 rounded bg-secondary text-[10px]">a</kbd> approve · <kbd className="px-1 rounded bg-secondary text-[10px]">d</kbd> deny · <kbd className="px-1 rounded bg-secondary text-[10px]">Enter</kbd> open</span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary rounded-full px-3.5 py-1.5 text-xs font-semibold">
           <InboxIcon className="h-4 w-4" />
-          <span>{appts.length} Pending Booking{appts.length === 1 ? "" : "s"}</span>
+          <span>
+            {activeTab === "bookings"
+              ? `${appts.length} Pending Booking${appts.length === 1 ? "" : "s"}`
+              : `${waitlist.length} Waitlist Request${waitlist.length === 1 ? "" : "s"}`}
+          </span>
         </div>
       </header>
 
-      {locations.length > 1 && (
+      <div className="flex gap-4 border-b border-border pb-px mb-6">
+        <button
+          onClick={() => setSearchParams({ tab: "bookings" })}
+          className={`pb-2 text-sm font-medium border-b-2 transition ${
+            activeTab === "bookings"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Booking Requests ({appts.length})
+        </button>
+        <button
+          onClick={() => setSearchParams({ tab: "waitlist" })}
+          className={`pb-2 text-sm font-medium border-b-2 transition ${
+            activeTab === "waitlist"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Waitlist ({waitlist.length})
+        </button>
+      </div>
+
+      {activeTab === "bookings" && locations.length > 1 && (
         <div className="flex flex-wrap gap-1.5 mb-4">
           <FilterPill active={locationFilter === "all"} onClick={() => setLocationFilter("all")}>All locations</FilterPill>
           {locations.map(l => (
@@ -158,26 +217,35 @@ export default function StaffInbox() {
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-5 w-5 animate-spin" /></div>
-      ) : filteredAppts.length === 0 ? (
-        <Empty text={locationFilter === "all" ? "No pending booking requests. Inbox zero ✨" : "No pending booking requests for this location."} />
+      ) : activeTab === "bookings" ? (
+        filteredAppts.length === 0 ? (
+          <Empty text={locationFilter === "all" ? "No pending booking requests. Inbox zero ✨" : "No pending booking requests for this location."} />
+        ) : (
+          <ol className="space-y-3">
+            {filteredAppts.map((a, i) => (
+              <ApptRow
+                key={a.id} a={a} m={meta[a.id]}
+                focused={i === focusIdx}
+                busy={busyId === a.id}
+                denying={denyFor === a.id}
+                denyReason={denyReason} setDenyReason={setDenyReason} denyRef={denyRef}
+                onApprove={() => act(a.id, "approve")}
+                onDenyClick={() => { setDenyFor(a.id); setTimeout(() => denyRef.current?.focus(), 30); }}
+                onDenyConfirm={() => act(a.id, "deny", denyReason)}
+                onDenyCancel={() => { setDenyFor(null); setDenyReason(""); }}
+                onOpen={() => navigate(`/staff/appointments/${a.id}`)}
+                onFocus={() => setFocusIdx(i)}
+              />
+            ))}
+          </ol>
+        )
       ) : (
-        <ol className="space-y-3">
-          {filteredAppts.map((a, i) => (
-            <ApptRow
-              key={a.id} a={a} m={meta[a.id]}
-              focused={i === focusIdx}
-              busy={busyId === a.id}
-              denying={denyFor === a.id}
-              denyReason={denyReason} setDenyReason={setDenyReason} denyRef={denyRef}
-              onApprove={() => act(a.id, "approve")}
-              onDenyClick={() => { setDenyFor(a.id); setTimeout(() => denyRef.current?.focus(), 30); }}
-              onDenyConfirm={() => act(a.id, "deny", denyReason)}
-              onDenyCancel={() => { setDenyFor(null); setDenyReason(""); }}
-              onOpen={() => navigate(`/staff/appointments/${a.id}`)}
-              onFocus={() => setFocusIdx(i)}
-            />
-          ))}
-        </ol>
+        <WaitlistTab
+          entries={waitlist}
+          services={allServices}
+          onRemove={removeWaitlistEntry}
+          busyId={busyId}
+        />
       )}
     </div>
   );
@@ -268,5 +336,68 @@ function ApptRow(props: {
         </div>
       </div>
     </li>
+  );
+}
+
+function WaitlistTab(props: {
+  entries: any[];
+  services: any[];
+  onRemove: (id: string) => void;
+  busyId: string | null;
+}) {
+  const { entries, services, onRemove, busyId } = props;
+
+  if (entries.length === 0) {
+    return <div className="rounded-2xl border border-dashed border-border p-16 text-center text-sm text-muted-foreground">Waitlist is currently empty.</div>;
+  }
+
+  return (
+    <ol className="space-y-3">
+      {entries.map((w) => {
+        const svcName = services.find(s => s.id === w.service_id)?.name ?? "Any service";
+        return (
+          <li key={w.id}>
+            <div className="rounded-2xl border border-border bg-card p-5 transition hover:border-primary/30">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 font-serif text-lg">
+                    {svcName}
+                    <span className="text-[10px] text-primary border border-primary/40 rounded-full px-1.5 py-0.5 uppercase">{w.status}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Preferred: {w.preferred_days || "Any time"}</span>
+                    {w.created_at && (
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Submitted: {format(new Date(w.created_at), "MMM d, yyyy h:mm a")}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3 text-sm border-t border-border pt-4 mt-4">
+                <div>
+                  <div className="font-medium">{w.client_first_name} {w.client_last_name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"><Mail className="h-3 w-3" /><a href={`mailto:${w.client_email}`} className="hover:text-foreground">{w.client_email}</a></div>
+                  <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"><Phone className="h-3 w-3" /><a href={`tel:${w.client_phone}`} className="hover:text-foreground">{w.client_phone}</a></div>
+                </div>
+                {w.notes && <div className="text-xs text-muted-foreground bg-secondary/40 rounded-lg p-3">{w.notes}</div>}
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-border flex gap-2">
+                <Button
+                  onClick={() => onRemove(w.id)}
+                  disabled={busyId === w.id}
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full border-destructive/30 hover:border-destructive hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                >
+                  {busyId === w.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Remove from Waitlist
+                </Button>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

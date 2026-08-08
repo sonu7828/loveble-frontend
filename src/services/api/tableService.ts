@@ -98,6 +98,16 @@ function normalizeRow(tableName: string, row: any): any {
     };
   }
 
+  if (lowerTable === "locations" || lowerTable === "location") {
+    return {
+      ...row,
+      id: row.id,
+      name: row.name,
+      is_active: row.isActive !== false,
+      isActive: row.isActive !== false,
+    };
+  }
+
   return row;
 }
 
