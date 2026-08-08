@@ -11,14 +11,14 @@
  */
 
 function getApiBaseUrl(): string {
-  const envUrl = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
-    // On localhost, route through relative /api to ensure Vite dev server proxies requests and preserves HttpOnly cookies
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
+    // On localhost or netlify.app, route through relative /api to ensure proxy rewrites preserve HttpOnly cookies
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".netlify.app")) {
       return "/api";
     }
   }
+  const envUrl = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
   return envUrl || "/api";
 }
 
