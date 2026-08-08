@@ -262,6 +262,7 @@ export default function StaffCalendar() {
 
   // Provider role filtering for Calendar view
   const { isNP, isRNInjector, isAdmin, isMedicalDirector, user } = useAuth();
+  const showProviderDropdown = canSeeAll && !isNP && !isRNInjector;
   const effectiveFilter = canSeeAll ? filterStaff : (staffId ?? "");
   const visibleAppts = appts.filter((a: any) => {
     if (isTestPatient(a)) return false;
@@ -270,8 +271,8 @@ export default function StaffCalendar() {
     const sname = (a.staff_name || (a as any).staff_profiles?.full_name || (a as any).staffName || "").toLowerCase().trim();
     const srole = ((a as any).role || (a as any).staff_profiles?.role || "").toLowerCase().trim();
 
-    // 1. Dropdown filter override
-    if (filterStaff && filterStaff !== "all") {
+    // 1. Dropdown filter override (only if provider dropdown is active)
+    if (showProviderDropdown && filterStaff && filterStaff !== "all") {
       if (sid !== filterStaff.toLowerCase()) return false;
     }
 
@@ -379,7 +380,7 @@ export default function StaffCalendar() {
           </Button>
         </div>
 
-        {canSeeAll && (
+        {showProviderDropdown && (
           <div className="grid grid-cols-2 gap-2 mb-3">
             <Select value={filterStaff || "all"} onValueChange={(v) => setFilterStaff(v === "all" ? "" : v)}>
               <SelectTrigger aria-label="Filter by provider" className="h-9 text-xs"><SelectValue placeholder="All providers" /></SelectTrigger>
@@ -485,7 +486,7 @@ export default function StaffCalendar() {
             <button onClick={() => setView("week")} aria-pressed={view === "week"} className={`px-3 py-1.5 ${view === "week" ? "bg-foreground text-background font-medium" : "bg-background"}`}>Week</button>
             <button onClick={() => setView("month")} aria-pressed={view === "month"} className={`px-3 py-1.5 ${view === "month" ? "bg-foreground text-background font-medium" : "bg-background"}`}>Month</button>
           </div>
-          {canSeeAll && (
+          {showProviderDropdown && (
             <Select value={filterStaff || "all"} onValueChange={(value) => setFilterStaff(value === "all" ? "" : value)}>
               <SelectTrigger aria-label="Filter by provider" className="h-9 w-[160px] rounded-full text-xs">
                 <SelectValue placeholder="All providers" />
