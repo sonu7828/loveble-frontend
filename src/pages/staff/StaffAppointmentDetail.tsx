@@ -26,7 +26,8 @@ import { fetchUnifiedStaffMembers } from "@/lib/unifiedStaff";
 export default function StaffAppointmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isNP, isAdmin } = useAuth();
+  const isNpPortal = (isNP && !isAdmin) || (user?.roles?.includes("nurse_practitioner") && !user?.roles?.includes("admin"));
   const [appt, setAppt] = useState<any>(null);
   const [meta, setMeta] = useState<any>({});
   const [consentSummary, setConsentSummary] = useState<{ total: number; signed: number; pendingRequired: number; pendingOptional: number } | null>(null);
@@ -558,17 +559,17 @@ export default function StaffAppointmentDetail() {
       <section className="rounded-2xl border border-border bg-card p-6 mb-4">
         <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-4">Actions</h2>
         <div className="flex flex-wrap gap-2">
-          {!["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
             <Button onClick={() => setEditServicesOpen(true)} size="sm" variant="outline" className="rounded-full">
               <Pencil className="h-3.5 w-3.5 mr-1.5" />Edit services
             </Button>
           )}
-          {!["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
             <Button onClick={() => setRescheduleOpen(true)} size="sm" variant="outline" className="rounded-full">
               <CalendarClock className="h-3.5 w-3.5 mr-1.5" />Reschedule
             </Button>
           )}
-          {!["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
             <Button onClick={cancelAppt} size="sm" variant="outline" className="rounded-full text-destructive hover:text-destructive">
               <XCircle className="h-3.5 w-3.5 mr-1.5" />Cancel appointment
             </Button>
@@ -594,7 +595,7 @@ export default function StaffAppointmentDetail() {
               <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Confirm appointment
             </Button>
           )}
-          {["approved", "pending", "confirmed"].includes(appt.status) && (
+          {!isNpPortal && ["approved", "pending", "confirmed"].includes(appt.status) && (
             <Button
               size="sm"
               className="rounded-full"
@@ -639,7 +640,7 @@ export default function StaffAppointmentDetail() {
               <MailCheck className="h-3.5 w-3.5 mr-1.5" />Resend post-op
             </Button>
           )}
-          {["approved", "pending", "arrived"].includes(appt.status) && (
+          {!isNpPortal && ["approved", "pending", "arrived"].includes(appt.status) && (
             <Button
               size="sm"
               variant="outline"
@@ -683,7 +684,7 @@ export default function StaffAppointmentDetail() {
               </Link>
             </Button>
           )}
-          {!["cancelled", "denied"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied"].includes(appt.status) && (
             <Button asChild size="sm" className="rounded-full">
               <Link to={`/staff/checkout/${appt.id}`}>
                 <CreditCard className="h-3.5 w-3.5 mr-1.5" />Check out
