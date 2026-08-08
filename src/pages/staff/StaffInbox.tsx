@@ -1,12 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { apiQuery, ApiClient } from "@/services/api";
+import { apiQuery } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
 import { isTestPatient, purgeLocalTestPatients } from "@/lib/testPatientFilter";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Check, X, Loader2, MapPin, Clock, User as UserIcon, Mail, Phone, ChevronRight, Inbox as InboxIcon, Keyboard } from "lucide-react";
+import {
+  Check, X, Loader2, MapPin, Clock, User as UserIcon, Mail, Phone,
+  ChevronRight, Inbox as InboxIcon, Keyboard, CalendarCheck, Ban,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface Appt {
@@ -32,7 +35,7 @@ export default function StaffInbox() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") === "waitlist" ? "waitlist" : "bookings";
 
-  // Enforce role permissions: Privacy Officer cannot manage.
+  // Role permission: Privacy Officer cannot manage
   const canManage = (isAdmin || isFrontDesk || isScheduler || isNP || isRNInjector || isMedicalDirector) && !isPrivacyOfficer;
 
   const [appts, setAppts] = useState<Appt[]>([]);
@@ -56,13 +59,15 @@ export default function StaffInbox() {
 
     const [a, wl, allSvc] = await Promise.all([
       aq,
-      apiQuery("waitlist_entries").select("*"),
+      apiQuery("waitlist_entries").select("*").order("created_at", { ascending: false }),
       apiQuery("services").select("id, name"),
     ]);
 
-    const fetchedAppts = ((a.data ?? []) as Appt[]).filter((item: any) => !isTestPatient(item));
+    const fetchedAppts = ((a.data ?? []) as Appt[]).filter((x) => !isTestPatient(x));
     setAppts(fetchedAppts);
-    setWaitlist(((wl.data ?? []) as any[]).filter((item: any) => !isTestPatient(item)));
+
+    const rawWaitlist = ((wl.data ?? []) as any[]).filter((x) => !isTestPatient(x));
+    setWaitlist(rawWaitlist);
     setAllServices(allSvc.data ?? []);
 
     const sids = [...new Set(fetchedAppts.map((x: any) => x.service_id).filter(Boolean))];
@@ -76,6 +81,7 @@ export default function StaffInbox() {
       lids.length ? apiQuery("locations").select("id, name").in("id", lids) : Promise.resolve({ data: [] as any[] }),
       fetchApptServiceNames(apptIds),
     ]);
+
     const m: typeof meta = {};
     fetchedAppts.forEach((x: any) => {
       const fallback = s.data?.find((y: any) => y.id === x.service_id)?.name ?? "—";
@@ -96,14 +102,10 @@ export default function StaffInbox() {
     setBusyId(id);
     const targetStatus = action === "approve" ? "approved" : "denied";
     const updatePayload: any = { status: targetStatus };
-    if (reason && action === "deny") {
-      updatePayload.cancellation_reason = reason;
-    }
+    if (reason && action === "deny") updatePayload.cancellation_reason = reason;
 
-    // 1. Optimistically remove from pending list in state
     setAppts((prev) => prev.filter((x) => x.id !== id));
 
-    // 2. Update localStorage demo appointments if present
     try {
       const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
       const updated = local.map((item: any) =>
@@ -114,7 +116,6 @@ export default function StaffInbox() {
       console.warn("Failed to update rka_demo_appointments", e);
     }
 
-    // 3. Update Supabase / API DB
     try {
       await apiQuery("appointments").update(updatePayload).eq("id", id);
     } catch (err) {
@@ -127,38 +128,35 @@ export default function StaffInbox() {
 
     toast.success(action === "approve" ? "Booking Request Approved!" : "Booking Request Declined!");
 
-    // 4. Dispatch synchronization events across all app components
     window.dispatchEvent(new Event("rka_demo_appointments_updated"));
     window.dispatchEvent(new Event("rka_appointment_updated"));
     if (action === "approve") {
       window.dispatchEvent(new Event("rka_appointment_confirmed"));
     }
-  }, []);
+    load();
+  }, [load]);
 
+  // Soft-remove waitlist entry (sets status to "removed", no hard DB delete)
   const removeWaitlistEntry = useCallback(async (id: string) => {
     setBusyId(id);
-    const { error } = await apiQuery("waitlist_entries").delete().eq("id", id);
+    const { error } = await apiQuery("waitlist_entries").update({ status: "removed" }).eq("id", id);
     setBusyId(null);
-    if (error) {
-      toast.error(error.message || "Could not remove waitlist entry");
-      return;
-    }
-    toast.success("Waitlist entry removed successfully");
+    if (error) { toast.error(error.message || "Could not update waitlist entry"); return; }
+    toast.success("Waitlist entry marked as removed");
     load();
   }, [load]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (activeTab === "waitlist") return;
+      if (activeTab !== "bookings") return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (appts.length === 0) return;
-      if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); setFocusIdx((i) => Math.min(i + 1, appts.length - 1)); }
-      else if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); setFocusIdx((i) => Math.max(i - 1, 0)); }
+      if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); setFocusIdx(i => Math.min(i + 1, appts.length - 1)); }
+      else if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); setFocusIdx(i => Math.max(i - 1, 0)); }
       else if (e.key === "Enter") { const it: any = appts[focusIdx]; if (it) navigate(`/staff/appointments/${it.id}`); }
       else {
-        const it = appts[focusIdx];
-        if (!it) return;
+        const it = appts[focusIdx]; if (!it) return;
         if (e.key === "a") { e.preventDefault(); act(it.id, "approve"); }
         else if (e.key === "d") { e.preventDefault(); setDenyFor(it.id); setTimeout(() => denyRef.current?.focus(), 30); }
       }
@@ -173,18 +171,25 @@ export default function StaffInbox() {
     <div className="p-4 sm:p-8 max-w-5xl mx-auto">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="font-serif text-3xl">{activeTab === "bookings" ? "Booking Requests" : "Waitlist Requests"}</h1>
+          <h1 className="font-serif text-3xl">{activeTab === "bookings" ? "Booking Requests" : "Waitlist"}</h1>
+          {activeTab === "bookings" && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+              <Keyboard className="h-3 w-3" />
+              <span><kbd className="px-1 rounded bg-secondary text-[10px]">j</kbd>/<kbd className="px-1 rounded bg-secondary text-[10px]">k</kbd> navigate · <kbd className="px-1 rounded bg-secondary text-[10px]">a</kbd> approve · <kbd className="px-1 rounded bg-secondary text-[10px]">d</kbd> deny · <kbd className="px-1 rounded bg-secondary text-[10px]">Enter</kbd> open</span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary rounded-full px-3.5 py-1.5 text-xs font-semibold">
           <InboxIcon className="h-4 w-4" />
           <span>
             {activeTab === "bookings"
               ? `${appts.length} Pending Booking${appts.length === 1 ? "" : "s"}`
-              : `${waitlist.length} Waitlist Request${waitlist.length === 1 ? "" : "s"}`}
+              : `${waitlist.length} Waitlist Record${waitlist.length === 1 ? "" : "s"}`}
           </span>
         </div>
       </header>
 
+      {/* Tab Navigation — 2 Tabs Only */}
       <div className="flex gap-4 border-b border-border pb-px mb-6">
         <button
           onClick={() => setSearchParams({ tab: "bookings" })}
@@ -309,28 +314,11 @@ function ApptRow(props: {
         <div className="mt-4 pt-4 border-t border-border">
           {!denying ? (
             <div className="flex gap-2">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.onApprove();
-                }}
-                disabled={busy}
-                size="sm"
-                className="rounded-full cursor-pointer px-4"
-              >
-                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Check className="h-3.5 w-3.5 mr-1" />Approve</>}
+              <Button onClick={props.onApprove} disabled={busy} size="sm" className="rounded-full">
+                {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Check className="h-3.5 w-3.5 mr-1" />Approve <span className="opacity-50 text-[10px] ml-1">a</span></>}
               </Button>
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.onDenyClick();
-                }}
-                disabled={busy}
-                size="sm"
-                variant="outline"
-                className="rounded-full cursor-pointer px-4"
-              >
-                <X className="h-3.5 w-3.5 mr-1" />Deny
+              <Button onClick={props.onDenyClick} disabled={busy} size="sm" variant="outline" className="rounded-full">
+                <X className="h-3.5 w-3.5 mr-1" />Deny <span className="opacity-50 text-[10px] ml-1">d</span>
               </Button>
             </div>
           ) : (
@@ -338,12 +326,8 @@ function ApptRow(props: {
               <div className="text-xs font-medium text-muted-foreground">Select or type a reason for declining:</div>
               <div className="flex flex-wrap gap-1.5">
                 {["Provider unavailable", "Service prerequisite not met", "Schedule conflict", "Patient requested cancellation"].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => props.setDenyReason(preset)}
-                    className="text-[11px] px-2.5 py-1 rounded-md border border-border bg-muted/30 hover:bg-primary/10 hover:border-primary/30 transition"
-                  >
+                  <button key={preset} type="button" onClick={() => props.setDenyReason(preset)}
+                    className="text-[11px] px-2.5 py-1 rounded-md border border-border bg-muted/30 hover:bg-primary/10 hover:border-primary/30 transition">
                     {preset}
                   </button>
                 ))}
@@ -362,6 +346,27 @@ function ApptRow(props: {
   );
 }
 
+function WaitlistStatusBadge({ status }: { status: string }) {
+  const s = status?.toLowerCase();
+  if (s === "booked")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/40 bg-emerald-500/10 rounded-full px-2 py-0.5 uppercase">
+        <CalendarCheck className="h-3 w-3" /> Booked
+      </span>
+    );
+  if (s === "removed")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground border border-border bg-secondary/40 rounded-full px-2 py-0.5 uppercase">
+        <Ban className="h-3 w-3" /> Removed
+      </span>
+    );
+  return (
+    <span className="text-[10px] text-primary border border-primary/40 rounded-full px-2 py-0.5 uppercase">
+      {status || "WAITING"}
+    </span>
+  );
+}
+
 function WaitlistTab(props: {
   entries: any[];
   services: any[];
@@ -372,21 +377,25 @@ function WaitlistTab(props: {
   const { entries, services, onRemove, busyId, canManage } = props;
 
   if (entries.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-border p-16 text-center text-sm text-muted-foreground">Waitlist is currently empty.</div>;
+    return <Empty text="Waitlist is currently empty." />;
   }
 
   return (
     <ol className="space-y-3">
       {entries.map((w) => {
-        const svcName = services.find(s => s.id === w.service_id)?.name ?? "Any service";
+        const svcName = services.find((s) => s.id === w.service_id)?.name ?? "Any service";
+        const isWaiting = !w.status || w.status.toLowerCase() === "waiting";
+        const isBooked = w.status?.toLowerCase() === "booked";
+        const isRemoved = w.status?.toLowerCase() === "removed";
+
         return (
           <li key={w.id}>
-            <div className="rounded-2xl border border-border bg-card p-5 transition hover:border-primary/30">
+            <div className={`rounded-2xl border bg-card p-5 transition ${isWaiting ? "border-border hover:border-primary/30" : "border-border/60 opacity-90"}`}>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 font-serif text-lg">
                     {svcName}
-                    <span className="text-[10px] text-primary border border-primary/40 rounded-full px-1.5 py-0.5 uppercase">{w.status}</span>
+                    <WaitlistStatusBadge status={w.status} />
                   </div>
                   <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-4 gap-y-1">
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Preferred: {w.preferred_days || "Any time"}</span>
@@ -406,29 +415,40 @@ function WaitlistTab(props: {
                 {w.notes && <div className="text-xs text-muted-foreground bg-secondary/40 rounded-lg p-3">{w.notes}</div>}
               </div>
 
-              <div className="mt-4 pt-4 border-t border-border flex gap-2">
-                {canManage && (
-                  <Button
-                    asChild
-                    size="sm"
-                    className="rounded-full shadow-xs"
-                  >
+              {/* Action buttons — ONLY shown for active WAITING entries */}
+              {isWaiting && canManage && (
+                <div className="mt-4 pt-4 border-t border-border flex gap-2">
+                  <Button asChild size="sm" className="rounded-full shadow-xs">
                     <Link to={`/staff/appointments/new?firstName=${encodeURIComponent(w.client_first_name || "")}&lastName=${encodeURIComponent(w.client_last_name || "")}&email=${encodeURIComponent(w.client_email || "")}&phone=${encodeURIComponent(w.client_phone || "")}&serviceId=${w.service_id || ""}&notes=${encodeURIComponent(w.notes || "")}&waitlistId=${w.id}`}>
                       Book Appointment
                     </Link>
                   </Button>
-                )}
-                <Button
-                  onClick={() => onRemove(w.id)}
-                  disabled={busyId === w.id || !canManage}
-                  size="sm"
-                  variant="outline"
-                  className="rounded-full border-destructive/30 hover:border-destructive hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
-                >
-                  {busyId === w.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                  Remove from Waitlist
-                </Button>
-              </div>
+                  <Button
+                    onClick={() => onRemove(w.id)}
+                    disabled={busyId === w.id}
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full border-destructive/30 hover:border-destructive hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                  >
+                    {busyId === w.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    Remove from Waitlist
+                  </Button>
+                </div>
+              )}
+
+              {/* Read-only status note for BOOKED or REMOVED entries */}
+              {isBooked && (
+                <div className="mt-3 pt-3 border-t border-border/50 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CalendarCheck className="h-3.5 w-3.5" />
+                  Converted to appointment (read-only)
+                </div>
+              )}
+              {isRemoved && (
+                <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Ban className="h-3.5 w-3.5" />
+                  Removed by staff (read-only)
+                </div>
+              )}
             </div>
           </li>
         );
