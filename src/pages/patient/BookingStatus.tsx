@@ -50,8 +50,36 @@ const BookingStatus = () => {
         );
       } catch { }
 
+      // Query API/DB if not found in localStorage or to fetch latest appointment status
+      try {
+        const dbRes: any = await apiQuery("appointments")
+          .select("*, locations(*), staff_profiles(*), services(*)")
+          .or(`id.eq.${tokenParam},booking_token.eq.${tokenParam}`);
+        
+        if (dbRes && dbRes.data) {
+          const dbItem = Array.isArray(dbRes.data) ? dbRes.data[0] : dbRes.data;
+          if (dbItem) {
+            appt = appt ? { ...appt, ...dbItem } : dbItem;
+          }
+        }
+      } catch { }
+
+      // Fallback to searching all DB appointments
       if (!appt) {
-        // Token not found in system
+        try {
+          const allRes: any = await apiQuery("appointments").select("*");
+          if (allRes && allRes.data && Array.isArray(allRes.data)) {
+            appt = allRes.data.find((item: any) =>
+              item.bookingToken === tokenParam ||
+              item.booking_token === tokenParam ||
+              item.token === tokenParam ||
+              item.id === tokenParam
+            );
+          }
+        } catch { }
+      }
+
+      if (!appt) {
         setLoading(false);
         setLoadError("Booking token not found.");
         return;

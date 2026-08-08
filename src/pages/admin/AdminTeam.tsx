@@ -118,8 +118,8 @@ export default function AdminTeam() {
     setLoading(true);
 
     try {
-      // Clear legacy deleted emails cache so real DB members are never hidden
-      try { localStorage.removeItem("rka_deleted_staff_emails"); } catch {}
+      const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
+      const deletedSet = new Set(deletedEmails.map((e) => e.toLowerCase()));
 
       const rawData = await staffService.getStaffProfiles(false);
       const dataList: any[] = Array.isArray(rawData) ? rawData : (rawData as any)?.data || (rawData as any)?.staff || [];
@@ -142,20 +142,25 @@ export default function AdminTeam() {
         };
       });
 
+      const activeFetched = fetchedMembers.filter(
+        (m) => (!m.email || !deletedSet.has(m.email.toLowerCase())) && !deletedSet.has(m.id)
+      );
+
       // Merge default staff members if not present AND not deleted
       DEFAULT_STAFF_MEMBERS.forEach((d) => {
         if (
           d.email &&
-          !fetchedMembers.some((m) => m.email?.toLowerCase() === d.email.toLowerCase())
+          !deletedSet.has(d.email.toLowerCase()) &&
+          !activeFetched.some((m) => m.email?.toLowerCase() === d.email.toLowerCase())
         ) {
-          fetchedMembers.push({
+          activeFetched.push({
             ...d,
             full_name: getDynamicProfileName(d.email, d.full_name)
           });
         }
       });
 
-      setMembers(fetchedMembers);
+      setMembers(activeFetched);
 
       // Synchronize: REPLACE approved accounts with current staff list (removes stale entries)
       const oldApproved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
@@ -433,7 +438,6 @@ export default function AdminTeam() {
     }
     setBusy(m.id);
     try {
-      await staffService.deleteStaff(m.id).catch(() => {});
       if (m.email) {
         const cleanEmail = m.email.toLowerCase();
         const deletedEmails: string[] = JSON.parse(localStorage.getItem("rka_deleted_staff_emails") || "[]");
@@ -444,8 +448,15 @@ export default function AdminTeam() {
         const approved: any[] = JSON.parse(localStorage.getItem("rka_approved_staff_accounts") || "[]");
         const filtered = approved.filter((a) => a.email?.toLowerCase() !== cleanEmail);
         localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(filtered));
-        window.dispatchEvent(new Event("rka_staff_updated"));
       }
+
+      await staffService.deleteStaff(m.id).catch(() => {});
+      if (m.email) {
+        await staffService.deleteStaff(m.email).catch(() => {});
+      }
+
+      setMembers((prev) => prev.filter((x) => x.id !== m.id && (m.email ? x.email?.toLowerCase() !== m.email.toLowerCase() : true)));
+      window.dispatchEvent(new Event("rka_staff_updated"));
       toast.success(`${m.full_name} deleted`);
     } catch (e: any) {
       toast.error(e?.message || `Failed to delete ${m.full_name}`);

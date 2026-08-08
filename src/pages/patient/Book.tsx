@@ -16,7 +16,7 @@ import {
 import { z } from "zod";
 import { type CardOnFileHandle } from "@/components/CardOnFile";
 import { usePageMeta } from "@/hooks/usePageMeta";
-import { isClinicalProvider, formatStaffDisplayName } from "@/lib/unifiedStaff";
+import { isClinicalProvider, formatStaffDisplayName, fetchBookingProviders } from "@/lib/unifiedStaff";
 
 import type { Step, Category, Service, Location, Staff, ProviderRow, ConsentForm } from "../book/types";
 import type { CompactValue } from "@/components/CompactConsentCard";
@@ -127,11 +127,11 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
 
   useEffect(() => {
     (async () => {
-      const [c, s, l, sp, p, sess] = await Promise.all([
+      const [c, s, l, unifiedStaff, p, sess] = await Promise.all([
         apiQuery("service_categories").select("*").eq("is_active", true).order("display_order"),
         apiQuery("services").select("*").eq("is_active", true).order("display_order"),
         apiQuery("locations").select("*").eq("is_active", true),
-        apiQuery("staff_directory" as any).select("id, full_name, title, color"),
+        fetchBookingProviders(),
         apiQuery("service_providers").select("service_id, staff_id, location_id"),
         authService.getSession(),
       ]);
@@ -142,21 +142,21 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
         setLocations(l.data as any);
         setLocationId(prev => prev || l.data[0].id);
       }
-      if (sp.data && Array.isArray(sp.data)) {
-        const rawStaff = (sp.data as any[]).map(x => ({
-          ...x,
-          full_name: formatStaffDisplayName(x.full_name || x.fullName || x.name || "Staff Member"),
-          title: x.title || "Licensed Specialist",
-          color: x.color || "#8B6B5D",
-          role: (x.role || x.pending_role || "").toLowerCase(),
-        }));
 
-        const filtered = rawStaff.filter(isClinicalProvider);
-        setStaff(filtered);
-        if (filtered.length > 0) {
-          setStaffId(prev => prev || filtered[0].id);
+      if (Array.isArray(unifiedStaff) && unifiedStaff.length > 0) {
+        const formatted = unifiedStaff.map(x => ({
+          ...x,
+          full_name: formatStaffDisplayName(x.full_name || (x as any).fullName || "Staff Member"),
+          title: x.title || "Licensed Specialist",
+          color: (x as any).color || "#8B6B5D",
+          role: (x.role || "").toLowerCase(),
+        }));
+        setStaff(formatted as any[]);
+        if (formatted.length > 0) {
+          setStaffId(prev => prev || formatted[0].id);
         }
       }
+
       if (p.data) setProviders(p.data as any);
 
       const currentUser = (sess?.user || sess?.session?.user) as any;
@@ -191,7 +191,9 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
   const availableStaff = useMemo(() => {
     if (!locationId || serviceIds.length === 0) return staff;
     const validStaff = staff.filter(st => {
-      return serviceIds.every(sId => providers.some(p => p.service_id === sId && p.location_id === locationId && p.staff_id === st.id));
+      const mapped = providers.filter(p => p.staff_id === st.id);
+      if (mapped.length === 0) return true;
+      return serviceIds.every(sId => mapped.some(p => p.service_id === sId && p.location_id === locationId));
     });
     return validStaff.length > 0 ? validStaff : staff;
   }, [locationId, serviceIds, staff, providers]);
@@ -360,9 +362,39 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       }
 
       if (apiResult) {
+        const createdToken = apiResult.bookingToken || apiResult.booking_token || apiResult.appointmentId || `bk_${Date.now()}`;
+        const fullApptRecord = {
+          id: apiResult.appointmentId || `apt-${Date.now()}`,
+          booking_token: createdToken,
+          bookingToken: createdToken,
+          token: createdToken,
+          ...newAppointmentPayload,
+          client_first_name: client.firstName,
+          client_last_name: client.lastName,
+          first_name: client.firstName,
+          last_name: client.lastName,
+          service_name: selectedSvcNames,
+          services_list: selectedServices,
+          total_amount_cents: totalAmountCents,
+          status: apiResult.status || "pending",
+        };
+
+        try {
+          const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+          const existingIdx = localList.findIndex((item: any) => item.id === fullApptRecord.id || item.booking_token === createdToken);
+          if (existingIdx >= 0) {
+            localList[existingIdx] = fullApptRecord;
+          } else {
+            localList.unshift(fullApptRecord);
+          }
+          localStorage.setItem("rka_demo_appointments", JSON.stringify(localList));
+          window.dispatchEvent(new Event("rka_appointment_created"));
+        } catch { }
+
         setSubmitting(false);
         setBookingResult({
           ...apiResult,
+          bookingToken: createdToken,
           temporaryPassword: apiResult.temporaryPassword || (apiResult.existingAccount ? undefined : generatedTempPassword),
         });
         return;

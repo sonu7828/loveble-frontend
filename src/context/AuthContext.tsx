@@ -225,8 +225,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Core Role Flags
   const isAdmin = roles.includes("admin");
-  const isFrontDesk = roles.includes("front_desk") || isAdmin;
-  const isNP = roles.includes("nurse_practitioner") || isAdmin;
+  const isFrontDesk = roles.includes("front_desk");
+  const isNP = roles.includes("nurse_practitioner");
   const isMedicalDirector = roles.includes("medical_director");
   const isPrivacyOfficer = roles.includes("privacy_officer");
   const isRNInjector = roles.includes("rn_injector");
@@ -237,7 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isClinicalStaff = isAdmin || isNP || isMedicalDirector || isRNInjector;
   const isPrivileged = isAdmin || isNP || isMedicalDirector || isPrivacyOfficer || isRNInjector || isFrontDesk;
 
-  const canOverride = isAdmin || isFrontDesk || isNP || isMedicalDirector;
+  const canOverride = isAdmin || isFrontDesk || isMedicalDirector;
   const canSeeAll = canOverride;
 
   const isScheduler = isFrontDesk;

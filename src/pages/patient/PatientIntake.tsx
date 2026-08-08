@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,9 @@ type LastFull = {
 
 
 export default function PatientIntake() {
-  const { token } = useParams();
+  const { token: urlToken } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = urlToken || searchParams.get("token") || searchParams.get("appointmentId");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [appt, setAppt] = useState<Appt | null>(null);
