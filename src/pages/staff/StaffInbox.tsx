@@ -66,9 +66,7 @@ export default function StaffInbox() {
     const fetchedAppts = ((a.data ?? []) as Appt[]).filter((x) => !isTestPatient(x));
     setAppts(fetchedAppts);
 
-    const rawWaitlist = ((wl.data ?? []) as any[]).filter(
-      (x) => !isTestPatient(x) && x.status?.toLowerCase() !== "removed"
-    );
+    const rawWaitlist = ((wl.data ?? []) as any[]).filter((x) => !isTestPatient(x));
     setWaitlist(rawWaitlist);
     setAllServices(allSvc.data ?? []);
 
@@ -141,20 +139,11 @@ export default function StaffInbox() {
   // Soft-remove waitlist entry (sets status to "removed", no hard DB delete)
   const removeWaitlistEntry = useCallback(async (id: string) => {
     setBusyId(id);
-    // Immediately remove from UI list state
-    setWaitlist((prev) => prev.filter((w) => w.id !== id));
-
     const { error } = await apiQuery("waitlist_entries").update({ status: "removed" }).eq("id", id);
     setBusyId(null);
-
-    if (error) {
-      toast.error(error.message || "Could not update waitlist entry");
-      load(); // Revert on error
-      return;
-    }
-
-    toast.success("Waitlist entry removed");
-    await load();
+    if (error) { toast.error(error.message || "Could not update waitlist entry"); return; }
+    toast.success("Waitlist entry marked as removed");
+    load();
   }, [load]);
 
   // Keyboard shortcuts
@@ -447,11 +436,17 @@ function WaitlistTab(props: {
                 </div>
               )}
 
-              {/* Read-only status note for BOOKED entries */}
+              {/* Read-only status note for BOOKED or REMOVED entries */}
               {isBooked && (
                 <div className="mt-3 pt-3 border-t border-border/50 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                   <CalendarCheck className="h-3.5 w-3.5" />
-                  Converted to appointment
+                  Converted to appointment (read-only)
+                </div>
+              )}
+              {isRemoved && (
+                <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Ban className="h-3.5 w-3.5" />
+                  Removed by staff (read-only)
                 </div>
               )}
             </div>

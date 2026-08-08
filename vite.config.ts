@@ -16,16 +16,6 @@ export default defineConfig(({ mode }) => ({
         target: process.env.VITE_BACKEND_URL || "https://sonulovablebackend-production.up.railway.app",
         changeOrigin: true,
         secure: false,
-        timeout: 30000,
-        proxyTimeout: 30000,
-        configure: (proxy) => {
-          proxy.on("error", (err, _req, res) => {
-            if (res && !res.headersSent && 'writeHead' in res) {
-              res.writeHead(502, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ success: false, error: `Proxy connection error: ${err.message}` }));
-            }
-          });
-        },
       },
     },
   },
