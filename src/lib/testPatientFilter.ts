@@ -33,7 +33,7 @@ export function isTestPatient(c: {
   if (email.includes("phase2a") || fullName.includes("phase2a")) return true;
   if (fullName.includes("testpatient") || fullName.includes("test patient") || fullName.includes("walk-in") || fullName.includes("walkin")) return true;
   if (fullName.includes("admin test") || fullName.includes("demo test") || fullName.includes("patient 001") || fullName.includes("patient001")) return true;
-  if (fullName.includes("user4") || fullName.includes("user4 resu") || fullName.includes("resu") || email === "user@gmail.com" || email.includes("user@gmail.com")) return true;
+  if (fullName.includes("user4") || fullName.includes("user4 resu") || fullName.includes("resu")) return true;
   if (fullName.includes("omm kapoor") || fullName.includes("om kapoor") || fullName.includes("jully romareo") || fullName.includes("jully")) return true;
   if (fullName.includes("tony stark") || fullName.includes("stark") || fullName.includes("rajnandani") || fullName.includes("sinnghaniya")) return true;
   if (fullName.includes("drake farma") || fullName.includes("faaaaaa") || fullName.includes("jimmy jam") || fullName.includes("jimmy has") || fullName.includes("saaf saaf")) return true;

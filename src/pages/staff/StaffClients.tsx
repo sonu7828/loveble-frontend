@@ -809,6 +809,35 @@ export default function StaffClients() {
       });
     }
 
+    // Merge demo users (e.g. user@gmail.com)
+    try {
+      const demoUsers: any[] = JSON.parse(localStorage.getItem("rka_demo_users") || "[]");
+      for (const du of demoUsers) {
+        if (isGarbageTestClient({ email: du.email, first_name: du.first_name, last_name: du.last_name })) continue;
+        const email = (du.email || "").trim().toLowerCase();
+        if (!email) continue;
+        const fn = (du.first_name || du.firstName || "Demo").trim();
+        const ln = (du.last_name || du.lastName || "Patient").trim();
+        const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+        const key = nameKey.length > 1 ? nameKey : email;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            first_name: fn,
+            last_name: ln,
+            email: du.email,
+            phone: du.phone || null,
+            dob: du.dob || null,
+            appt_count: 0,
+            last_appt: null,
+            imported_id: null,
+            invited_at: null,
+            sort_at: Date.now(),
+          });
+        }
+      }
+    } catch {}
+
     return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || (a.last_name || "").localeCompare(b.last_name || ""));
   }, [items, imported, leads, clientProfiles, localClients]);
 
