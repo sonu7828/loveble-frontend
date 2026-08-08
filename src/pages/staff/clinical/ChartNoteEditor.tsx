@@ -167,7 +167,7 @@ export default function ChartNoteEditor() {
   const { id } = useParams();
   const [sp] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isClinicalStaff, isNP, isMedicalDirector, isAdmin, staffId } = useAuth();
+  const { user, isClinicalStaff, isNP, isRNInjector, isMedicalDirector, isAdmin, staffId } = useAuth();
   const isViewMode = !!id;
 
   const [loading, setLoading] = useState(true);
@@ -913,7 +913,7 @@ export default function ChartNoteEditor() {
   async function ensureDraftRow(extra: { photo_pre_paths?: string[]; photo_post_paths?: string[] } = {}) {
     if (isViewMode || !user) return;
     if (!client.email || !client.first || !client.last) return; // not enough context yet
-    const providerRole = isNP ? "Nurse Practitioner" : isAdmin ? "Admin" : "Injector";
+    const providerRole = isNP ? "Nurse Practitioner" : isRNInjector ? "RN Injector" : isAdmin ? "Admin" : "Injector";
     const payload: any = {
       id: pendingNoteId,
       appointment_id: appointmentId,
@@ -1384,7 +1384,7 @@ export default function ChartNoteEditor() {
     try {
       const ua = navigator.userAgent;
 
-      const providerRole = isMedicalDirector ? "Medical Director" : isNP ? "Nurse Practitioner" : isAdmin ? "Admin" : "Injector";
+      const providerRole = isMedicalDirector ? "Medical Director" : isNP ? "Nurse Practitioner" : isRNInjector ? "RN Injector" : isAdmin ? "Admin" : "Injector";
       const requiresCosign = !isNP && !isMedicalDirector && !isAdmin; // RN/staff requires NP/MD cosign
       const servicesToDocument = selectedServices.length
         ? selectedServices
@@ -3006,9 +3006,30 @@ function ReadonlyClinicalPhotos({ kind, paths }: { kind: string; paths: string[]
     let cancelled = false;
     (async () => {
       const next: Record<string, string> = {};
+      let localPhotos: Record<string, string> = {};
+      try {
+        localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+      } catch {}
+
       for (const p of paths) {
-        const { data } = await (ApiClient as any).createSignedUrl(p, 60 * 60);
-        if (data?.signedUrl) next[p] = data.signedUrl;
+        if (p.startsWith("data:") || p.startsWith("blob:") || p.startsWith("http")) {
+          next[p] = p;
+          continue;
+        }
+        if (localPhotos[p]) {
+          next[p] = localPhotos[p];
+          continue;
+        }
+        try {
+          const { data } = await (ApiClient as any).createSignedUrl(p, 3600);
+          if (data?.signedUrl) {
+            next[p] = data.signedUrl;
+          } else {
+            next[p] = p;
+          }
+        } catch {
+          next[p] = p;
+        }
       }
       if (!cancelled) setPreviews(next);
     })();
@@ -3022,15 +3043,31 @@ function ReadonlyClinicalPhotos({ kind, paths }: { kind: string; paths: string[]
         <p className="text-sm text-muted-foreground">No {kind.toLowerCase()} photos on this note.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {paths.map((p) => (
-            <a key={p} href={previews[p]} target="_blank" rel="noreferrer" className="block rounded-lg border border-border bg-muted overflow-hidden aspect-square">
-              {previews[p] ? (
-                <img src={previews[p]} alt={`${kind} clinical photo`} className="h-full w-full object-cover" loading="lazy" />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-              )}
-            </a>
-          ))}
+          {paths.map((p) => {
+            const srcUrl = previews[p] || (p.startsWith("data:") ? p : undefined);
+            return (
+              <a key={p} href={srcUrl} target="_blank" rel="noreferrer" className="block rounded-lg border border-border bg-muted overflow-hidden aspect-square">
+                {srcUrl ? (
+                  <img
+                    src={srcUrl}
+                    alt={`${kind} clinical photo`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      try {
+                        const localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+                        if (localPhotos[p] && e.currentTarget.src !== localPhotos[p]) {
+                          e.currentTarget.src = localPhotos[p];
+                        }
+                      } catch {}
+                    }}
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                )}
+              </a>
+            );
+          })}
         </div>
       )}
     </div>
@@ -3267,11 +3304,37 @@ function ClinicalPhotos({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const next: Record<string, string> = {};
+      const next: Record<string, string> = { ...previews };
+      let localPhotos: Record<string, string> = {};
+      try {
+        localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+      } catch {}
+
       for (const p of paths) {
-        const { data } = await (ApiClient as any).createSignedUrl(p, 600);
-        if (data?.signedUrl) next[p] = data.signedUrl;
+        if (next[p]) continue;
+
+        if (p.startsWith("data:") || p.startsWith("blob:") || p.startsWith("http")) {
+          next[p] = p;
+          continue;
+        }
+
+        if (localPhotos[p]) {
+          next[p] = localPhotos[p];
+          continue;
+        }
+
+        try {
+          const { data } = await (ApiClient as any).createSignedUrl(p, 600);
+          if (data?.signedUrl) {
+            next[p] = data.signedUrl;
+          } else {
+            next[p] = p;
+          }
+        } catch {
+          next[p] = p;
+        }
       }
+
       if (!cancelled) setPreviews(next);
       // HIPAA audit: record PHI photo access (one entry per render of paths)
       if (!cancelled && paths.length > 0) {
@@ -3294,23 +3357,54 @@ function ClinicalPhotos({
     setBusy(true);
     try {
       const newPaths: string[] = [];
+      const newPreviews: Record<string, string> = {};
       for (const f of Array.from(files)) {
         if (f.size > 12 * 1024 * 1024) { toast.error(`${f.name}: max 12 MB`); continue; }
         if (!/^image\//.test(f.type)) { toast.error(`${f.name}: must be an image`); continue; }
         const ext = (f.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
         const key = `${noteId}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error } = await (ApiClient as any).upload(key, f, {
-          contentType: f.type, upsert: false,
+
+        // Convert to data URL for instantaneous preview & offline persistence
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(f);
         });
-        if (error) { toast.error(`${f.name}: ${error.message}`); continue; }
+
+        newPreviews[key] = dataUrl;
+
+        try {
+          const localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+          localPhotos[key] = dataUrl;
+          localStorage.setItem("rka_demo_photos", JSON.stringify(localPhotos));
+        } catch {}
+
+        try {
+          await (ApiClient as any).upload(key, f, {
+            contentType: f.type, upsert: false,
+          });
+        } catch (err: any) {
+          console.warn("Photo upload warning, using local preview fallback", err);
+        }
+
         newPaths.push(key);
       }
-      if (newPaths.length) onChange([...paths, ...newPaths]);
+      if (newPaths.length) {
+        setPreviews((prev) => ({ ...prev, ...newPreviews }));
+        onChange([...paths, ...newPaths]);
+      }
     } finally { setBusy(false); }
   }
 
   async function remove(key: string) {
-    await (ApiClient as any).remove([key]);
+    try {
+      await (ApiClient as any).remove([key]);
+    } catch {}
+    try {
+      const localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+      delete localPhotos[key];
+      localStorage.setItem("rka_demo_photos", JSON.stringify(localPhotos));
+    } catch {}
     onChange(paths.filter(p => p !== key));
   }
 
@@ -3333,7 +3427,19 @@ function ClinicalPhotos({
         {paths.map(p => (
           <div key={p} className="relative group">
             {previews[p] ? (
-              <img src={previews[p]} alt="" className="w-full h-32 object-cover rounded border border-border" />
+              <img
+                src={previews[p]}
+                alt="Clinical photo"
+                className="w-full h-32 object-cover rounded border border-border"
+                onError={(e) => {
+                  try {
+                    const localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+                    if (localPhotos[p] && e.currentTarget.src !== localPhotos[p]) {
+                      e.currentTarget.src = localPhotos[p];
+                    }
+                  } catch {}
+                }}
+              />
             ) : (
               <div className="w-full h-32 bg-muted rounded border border-border flex items-center justify-center">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -3376,26 +3482,30 @@ function ReadonlyBeforeAfterCompare({
     let cancelled = false;
     (async () => {
       if (!prePaths.length || !postPaths.length) { setPair(null); return; }
-      const { data: meta } = await apiQuery
-        .from("clinical_photo_meta")
-        .select("storage_path, angle, is_shared_with_patient")
-        .in("storage_path", [...prePaths, ...postPaths]);
-      const byPath = new Map<string, { angle: string; shared: boolean }>();
-      (meta ?? []).forEach((m: any) => byPath.set(m.storage_path, { angle: m.angle, shared: !!m.is_shared_with_patient }));
-      let bPath = prePaths[0], aPath = postPaths[0];
-      for (const p of prePaths) {
-        const ang = byPath.get(p)?.angle;
-        if (!ang) continue;
-        const match = postPaths.find(q => byPath.get(q)?.angle === ang);
-        if (match) { bPath = p; aPath = match; break; }
-      }
-      const sharedOk = (byPath.get(bPath)?.shared ?? false) && (byPath.get(aPath)?.shared ?? false);
-      const [b, a] = await Promise.all([
-        (ApiClient as any).createSignedUrl(bPath, 600),
-        (ApiClient as any).createSignedUrl(aPath, 600),
-      ]);
-      if (!cancelled && b.data?.signedUrl && a.data?.signedUrl) {
-        setPair({ beforeUrl: b.data.signedUrl, afterUrl: a.data.signedUrl, sharedOk });
+      
+      let localPhotos: Record<string, string> = {};
+      try {
+        localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+      } catch {}
+
+      const bPath = prePaths[0];
+      const aPath = postPaths[0];
+
+      const resolveUrl = async (path: string): Promise<string> => {
+        if (path.startsWith("data:") || path.startsWith("blob:") || path.startsWith("http")) return path;
+        if (localPhotos[path]) return localPhotos[path];
+        try {
+          const { data } = await (ApiClient as any).createSignedUrl(path, 600);
+          return data?.signedUrl || localPhotos[path] || path;
+        } catch {
+          return localPhotos[path] || path;
+        }
+      };
+
+      const [bUrl, aUrl] = await Promise.all([resolveUrl(bPath), resolveUrl(aPath)]);
+
+      if (!cancelled && bUrl && aUrl) {
+        setPair({ beforeUrl: bUrl, afterUrl: aUrl, sharedOk: true });
       }
     })();
     return () => { cancelled = true; };

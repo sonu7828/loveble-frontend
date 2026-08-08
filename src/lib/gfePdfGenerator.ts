@@ -301,24 +301,34 @@ export function generateGfePDF(record: GfeRecordPdfData): jsPDF {
   y += 20;
 
   const sigImg = record.signature_png || record.provider_signature_png;
-  if (sigImg) {
+  if (sigImg && typeof sigImg === "string" && sigImg.trim().length > 20) {
     try {
-      doc.addImage(sigImg, "PNG", margin, y, 160, 45);
+      const format = sigImg.includes("image/jpeg") || sigImg.includes("image/jpg") ? "JPEG" : "PNG";
+      doc.addImage(sigImg, format, margin, y, 160, 45);
     } catch {
-      doc.setFont("helvetica", "bold");
-      doc.text("[ Signed Electronically ]", margin, y + 25);
+      try {
+        doc.addImage(sigImg, margin, y, 160, 45);
+      } catch {
+        doc.setFont("helvetica", "bold");
+        doc.text("[ Signed Electronically ]", margin, y + 25);
+      }
     }
   } else {
     doc.setFont("helvetica", "italic");
     doc.text("[ Provider Signed Electronically ]", margin, y + 25);
   }
 
-  if (record.patient_signature_png) {
+  if (record.patient_signature_png && typeof record.patient_signature_png === "string" && record.patient_signature_png.trim().length > 20) {
     try {
-      doc.addImage(record.patient_signature_png, "PNG", margin + 260, y, 160, 45);
+      const format = record.patient_signature_png.includes("image/jpeg") || record.patient_signature_png.includes("image/jpg") ? "JPEG" : "PNG";
+      doc.addImage(record.patient_signature_png, format, margin + 260, y, 160, 45);
     } catch {
-      doc.setFont("helvetica", "bold");
-      doc.text("[ Patient Signed ]", margin + 260, y + 25);
+      try {
+        doc.addImage(record.patient_signature_png, margin + 260, y, 160, 45);
+      } catch {
+        doc.setFont("helvetica", "bold");
+        doc.text("[ Patient Signed ]", margin + 260, y + 25);
+      }
     }
   }
 

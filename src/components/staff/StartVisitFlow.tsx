@@ -26,7 +26,8 @@ type Props = {
 type StepState = "done" | "current" | "pending" | "skipped";
 
 export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload, onSendPostOp }: Props) {
-  const { user } = useAuth();
+  const { user, isNP, isRNInjector, isMedicalDirector } = useAuth();
+  const canConductClinical = isNpPortal || isNP || isRNInjector || isMedicalDirector || (user?.roles?.some((r: string) => ["nurse_practitioner", "rn_injector", "medical_director"].includes(r)));
   const [note, setNote] = useState<{ id: string; status: string; photo_pre_paths: string[] | null; photo_post_paths: string[] | null } | null>(null);
   const [sale, setSale] = useState<{ id: string; status: string } | null>(null);
   const [intake, setIntake] = useState<any | null>(null);
@@ -370,7 +371,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
       label: "GFE (NP)",
       sublabel: gfe ? `Active · ${differenceInDays(new Date(gfe.expires_at), new Date())}d left` : "Not on file (optional for non-Rx)",
       icon: gfe ? ShieldCheck : ShieldAlert,
-      action: isNpPortal ? (
+      action: canConductClinical ? (
         <Button asChild size="sm" variant={gfe ? "outline" : "default"} className="rounded-full">
           <Link to={gfeHref}>
             {gfe ? "View GFE" : "Conduct GFE"}
@@ -386,14 +387,14 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
       label: "Chart note",
       sublabel: chartSigned ? "Signed" : chartDraft ? "Draft in progress" : "Not started",
       icon: ClipboardPlus,
-      action: isNpPortal && !chartSigned ? (
+      action: canConductClinical && !chartSigned ? (
         <Button asChild size="sm" className="rounded-full">
           <Link to={chartHref}>
             {chartDraft ? "Continue charting" : "Start charting"}
             <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
           </Link>
         </Button>
-      ) : !isNpPortal ? (
+      ) : !canConductClinical ? (
         <span className="text-[11px] text-muted-foreground italic font-normal">Read-only for Front Desk</span>
       ) : null,
     },
@@ -402,11 +403,11 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
       label: "Photos",
       sublabel: photosDone ? `${photoCount} attached` : "Recommended for injectables & laser",
       icon: Camera,
-      action: isNpPortal && note && !photosDone ? (
+      action: canConductClinical && note && !photosDone ? (
         <Button asChild size="sm" variant="outline" className="rounded-full">
           <Link to={chartHref}>Add photos<ArrowRight className="h-3.5 w-3.5 ml-1.5" /></Link>
         </Button>
-      ) : !isNpPortal ? (
+      ) : !canConductClinical ? (
         <span className="text-[11px] text-muted-foreground italic font-normal">Read-only for Front Desk</span>
       ) : null,
     },

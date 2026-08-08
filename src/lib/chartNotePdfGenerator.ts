@@ -24,6 +24,8 @@ export interface ChartNotePdfData {
     followup_weeks?: number | string | null;
     post_op_reviewed?: boolean | null;
     post_assessment?: string[] | null;
+    photo_pre_paths?: string[] | null;
+    photo_post_paths?: string[] | null;
   };
   detail?: Record<string, any> | null;
   sigs?: Array<{
@@ -194,7 +196,75 @@ export function generateChartNotePDF(data: ChartNotePdfData): jsPDF {
     y += splitNotes.length * 12 + 15;
   }
 
-  // Section 5: Signatures
+  // Section 5: Clinical Pre & Post Treatment Photos
+  const prePhotos = note.photo_pre_paths || [];
+  const postPhotos = note.photo_post_paths || [];
+  const totalPhotos = prePhotos.length + postPhotos.length;
+
+  if (totalPhotos > 0) {
+    let localPhotos: Record<string, string> = {};
+    try {
+      localPhotos = JSON.parse(localStorage.getItem("rka_demo_photos") || "{}");
+    } catch {}
+
+    renderSectionHeader(`Clinical Treatment Photos (${totalPhotos})`);
+
+    const renderPhotoGrid = (title: string, paths: string[]) => {
+      if (!paths || !paths.length) return;
+      checkAddPage(140);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(60, 40, 30);
+      doc.text(`${title} (${paths.length}):`, margin + 10, y);
+      y += 14;
+
+      const photoWidth = 150;
+      const photoHeight = 112;
+      let xOffset = margin + 10;
+
+      for (let i = 0; i < paths.length; i++) {
+        const p = paths[i];
+        const imgData = localPhotos[p] || (p.startsWith("data:") || p.startsWith("http") ? p : null);
+
+        if (xOffset + photoWidth > margin + contentWidth) {
+          xOffset = margin + 10;
+          y += photoHeight + 14;
+          checkAddPage(photoHeight + 18);
+        }
+
+        if (imgData && typeof imgData === "string" && imgData.trim().length > 20) {
+          try {
+            const fmt = imgData.includes("image/jpeg") || imgData.includes("image/jpg") ? "JPEG" : "PNG";
+            doc.addImage(imgData, fmt, xOffset, y, photoWidth, photoHeight);
+          } catch {
+            try {
+              doc.addImage(imgData, xOffset, y, photoWidth, photoHeight);
+            } catch {
+              doc.setFillColor(235, 230, 225);
+              doc.rect(xOffset, y, photoWidth, photoHeight, "F");
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(8);
+              doc.text("[ Clinical Photo Attached ]", xOffset + 15, y + photoHeight / 2);
+            }
+          }
+        } else {
+          doc.setFillColor(235, 230, 225);
+          doc.rect(xOffset, y, photoWidth, photoHeight, "F");
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8);
+          doc.text("[ Clinical Photo Attached ]", xOffset + 15, y + photoHeight / 2);
+        }
+
+        xOffset += photoWidth + 15;
+      }
+      y += photoHeight + 20;
+    };
+
+    if (prePhotos.length > 0) renderPhotoGrid("Pre-Procedure Photos", prePhotos);
+    if (postPhotos.length > 0) renderPhotoGrid("Post-Procedure Photos", postPhotos);
+  }
+
+  // Section 6: Signatures
   checkAddPage(100);
   renderSectionHeader("Signatures & Verification");
   doc.setFontSize(8.5);
@@ -205,14 +275,20 @@ export function generateChartNotePDF(data: ChartNotePdfData): jsPDF {
   if (sigs.length > 0) {
     for (const s of sigs) {
       checkAddPage(60);
-      if (s.signature_png) {
+      if (s.signature_png && typeof s.signature_png === "string" && s.signature_png.trim().length > 20) {
         try {
-          doc.addImage(s.signature_png, "PNG", margin + 10, y, 150, 40);
+          const format = s.signature_png.includes("image/jpeg") || s.signature_png.includes("image/jpg") ? "JPEG" : "PNG";
+          doc.addImage(s.signature_png, format, margin + 10, y, 150, 40);
           y += 44;
         } catch {
-          doc.setFont("helvetica", "bold");
-          doc.text(`[ ${s.signer_name} - Signed Electronically ]`, margin + 10, y + 15);
-          y += 25;
+          try {
+            doc.addImage(s.signature_png, margin + 10, y, 150, 40);
+            y += 44;
+          } catch {
+            doc.setFont("helvetica", "bold");
+            doc.text(`[ ${s.signer_name} - Signed Electronically ]`, margin + 10, y + 15);
+            y += 25;
+          }
         }
       }
       doc.setFont("helvetica", "bold");
