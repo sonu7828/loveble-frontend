@@ -648,7 +648,24 @@ export default function StaffClients() {
   };
 
   const isGarbageTestClient = (c: { email?: string; first_name?: string; last_name?: string }) => {
-    return isTestPatient(c);
+    if (isTestPatient(c)) return true;
+    if (!c.email) return false;
+    const em = c.email.toLowerCase().trim();
+    const knownStaff = [
+      "admin@gmail.com",
+      "frontdesk@gmail.com",
+      "nurse@gmail.com",
+      "medical@gmail.com",
+      "injector@gmail.com",
+      "nursepractitioner@gmail.com",
+      "medicaldirector@gmail.com",
+      "security@gmail.com",
+      "thor@gmail.com",
+      "thomas@gmail.com",
+    ];
+    if (knownStaff.includes(em)) return true;
+    if (em.endsWith("@radiantilyk.com") || em.startsWith("phase1-")) return true;
+    return false;
   };
 
   const allClients = useMemo<UnifiedClient[]>(() => {
