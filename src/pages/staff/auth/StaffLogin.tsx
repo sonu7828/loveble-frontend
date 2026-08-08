@@ -415,9 +415,6 @@ export default function StaffLogin() {
                   <Link to="/staff/forgot-password" className="text-primary hover:underline font-medium inline-block">
                     Forgot your password?
                   </Link>
-                  <p className="text-[11px] text-muted-foreground">
-                    No account? Check your email for an activation link.
-                  </p>
                 </div>
               </form>
             </>
