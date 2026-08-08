@@ -468,27 +468,76 @@ export default function StaffCheckout() {
     // eslint-disable-next-line
   }, [saleId, loading]);
 
-  const addService = (id: string) => {
-    const s = services.find((x) => x.id === id); if (!s) return;
-    const existing = items.findIndex((it) => it.kind === "service" && it.reference_id === id);
-    if (existing !== -1) { toast.info(`${s.name} is already on the checkout. Edit the quantity or remove it first.`); return; }
-    const next: LineItem[] = [...items, { kind: "service" as const, reference_id: id, label: s.name, quantity: 1, unit_price_cents: s.price_cents ?? 0, line_total_cents: s.price_cents ?? 0, tippable: s.tippable, metadata: {} }];
-    setItems(next); recompute({ items: next });
+  const addService = (id: string, nameFallback?: string, priceCentsFallback?: number) => {
+    const DEFAULT_CLINIC_SERVICES = [
+      { id: "svc-glp1", name: "GLP-1 Wellness Management — Televisit", price_cents: 15000 },
+      { id: "svc-hrt", name: "Hormone Replacement Therapy", price_cents: 15000 },
+      { id: "svc-botox", name: "Neurotoxin / Botox", price_cents: 14000 },
+      { id: "svc-facial", name: "Custom Medical Facial", price_cents: 12000 },
+      { id: "svc-laser", name: "CO2 Laser Resurfacing", price_cents: 35000 },
+      { id: "svc-microneedle", name: "RF Microneedling", price_cents: 25000 },
+    ];
+    const s = services.find((x) => x.id === id) || DEFAULT_CLINIC_SERVICES.find((x) => x.id === id);
+    const label = s?.name || nameFallback || "Clinic Service";
+    const priceCents = s?.price_cents ?? priceCentsFallback ?? 15000;
+
+    const existingIdx = items.findIndex((it) => (it.kind === "service" || it.kind === "unit_service") && (it.reference_id === id || it.label === label));
+    if (existingIdx !== -1) {
+      const existing = items[existingIdx];
+      const newQty = existing.quantity + 1;
+      const updated = items.map((it, i) => i === existingIdx ? { ...it, quantity: newQty, line_total_cents: it.unit_price_cents * newQty } : it);
+      setItems(updated);
+      recompute({ items: updated });
+      toast.success(`Increased ${label} quantity to ${newQty}`);
+      return;
+    }
+
+    const next: LineItem[] = [...items, { kind: "service" as const, reference_id: id, label, quantity: 1, unit_price_cents: priceCents, line_total_cents: priceCents, tippable: true, metadata: {} }];
+    setItems(next);
+    recompute({ items: next });
+    toast.success(`Added ${label} to checkout`);
   };
+
   const addUnit = (svcId: string) => {
-    const us = unitServices.find((x) => x.service_id === svcId); if (!us) return;
-    const existing = items.findIndex((it) => it.kind === "unit_service" && it.reference_id === svcId);
-    if (existing !== -1) { toast.info(`${us.services?.name ?? "Service"} is already on the checkout. Enter the units in the quantity box.`); return; }
-    const next: LineItem[] = [...items, { kind: "unit_service" as const, reference_id: svcId, label: `${us.services?.name} (1 ${us.unit_label})`, quantity: 1, unit_price_cents: us.price_per_unit_cents, line_total_cents: us.price_per_unit_cents, metadata: { unit_label: us.unit_label, units: 1 } }];
-    setItems(next); recompute({ items: next });
+    const us = unitServices.find((x) => x.service_id === svcId);
+    const label = us?.services?.name ? `${us.services.name} (1 ${us.unit_label || "unit"})` : "Unit Service";
+    const unitPrice = us?.price_per_unit_cents ?? 1200;
+
+    const existingIdx = items.findIndex((it) => it.kind === "unit_service" && (it.reference_id === svcId || it.label === label));
+    if (existingIdx !== -1) {
+      const existing = items[existingIdx];
+      const newQty = existing.quantity + 1;
+      const updated = items.map((it, i) => i === existingIdx ? { ...it, quantity: newQty, line_total_cents: it.unit_price_cents * newQty, metadata: { ...(it.metadata ?? {}), units: newQty } } : it);
+      setItems(updated);
+      recompute({ items: updated });
+      toast.success(`Increased ${label} quantity to ${newQty}`);
+      return;
+    }
+
+    const next: LineItem[] = [...items, { kind: "unit_service" as const, reference_id: svcId, label, quantity: 1, unit_price_cents: unitPrice, line_total_cents: unitPrice, metadata: { unit_label: us?.unit_label || "unit", units: 1 } }];
+    setItems(next);
+    recompute({ items: next });
+    toast.success(`Added ${label} to checkout`);
   };
+
   const addProduct = (id: string) => {
     const p = products.find((x) => x.id === id); if (!p) return;
     const kind = (p.kind === "package" ? "package" : p.kind === "service_addon" ? "service_addon" : "product") as LineItem["kind"];
-    const existing = items.findIndex((it) => it.kind === kind && it.reference_id === id);
-    if (existing !== -1) { toast.info(`${p.name} is already on the checkout. Edit the quantity or remove it first.`); return; }
+    const existingIdx = items.findIndex((it) => it.kind === kind && (it.reference_id === id || it.label === p.name));
+    if (existingIdx !== -1) {
+      const existing = items[existingIdx];
+      const newQty = existing.quantity + 1;
+      const updated = items.map((it, i) => i === existingIdx ? { ...it, quantity: newQty, line_total_cents: it.unit_price_cents * newQty } : it);
+      setItems(updated);
+      recompute({ items: updated });
+      toast.success(`Increased ${p.name} quantity to ${newQty}`);
+      return;
+    }
+
     const next: LineItem[] = [...items, { kind, reference_id: id, label: p.name, quantity: 1, unit_price_cents: p.price_cents, line_total_cents: p.price_cents, tippable: p.tippable, taxable: p.taxable, metadata: {} }];
-    setItems(next); recompute({ items: next });
+    setItems(next);
+    recompute({ items: next });
+    toast.success(`Added ${p.name} to checkout`);
   };
   const addCustom = (label: string, priceDollars: string) => {
     const cents = Math.round(parseFloat(priceDollars) * 100);
