@@ -276,20 +276,73 @@ export default function StaffCheckout() {
     if (!walkInLocationId) { toast.error("Pick a location"); return; }
     if (!walkInFirstName.trim() || !walkInLastName.trim()) { toast.error("Enter client name"); return; }
     setWalkInStarting(true);
-    const body: any = {
-      locationId: walkInLocationId,
-      clientFirstName: walkInFirstName.trim(),
-      clientLastName: walkInLastName.trim(),
-    };
-    if (walkInEmail.trim()) body.clientEmail = walkInEmail.trim();
-    if (walkInPhone.trim()) body.clientPhone = walkInPhone.trim();
-    const { data, error } = await ApiClient.post("pos-create-or-get-sale", body);
-    setWalkInStarting(false);
-    if (error || data?.error) { toast.error(data?.error || await functionErrorMessage(error, "Could not start walk-in checkout")); return; }
-    setSaleId(data.saleId);
-    setLoading(true);
-    await loadSaleData(data.saleId);
-  }, [walkInLocationId, walkInFirstName, walkInLastName, walkInEmail, walkInPhone, loadSaleData]);
+    try {
+      // 1. Fetch today's appointments to search for a matching patient appointment
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { data: todayAppts } = await apiQuery("appointments")
+        .select("id, status, client_first_name, client_last_name, client_email, client_phone")
+        .gte("start_at", `${todayStr}T00:00:00.000Z`)
+        .lte("start_at", `${todayStr}T23:59:59.999Z`);
+
+      const matchedAppt = (todayAppts ?? []).find(a => {
+        const sameEmail = walkInEmail.trim() && a.client_email && a.client_email.toLowerCase() === walkInEmail.trim().toLowerCase();
+        const samePhone = walkInPhone.trim() && a.client_phone && a.client_phone.replace(/\D/g, '') === walkInPhone.replace(/\D/g, '');
+        const sameName = a.client_first_name?.toLowerCase() === walkInFirstName.trim().toLowerCase() && 
+                          a.client_last_name?.toLowerCase() === walkInLastName.trim().toLowerCase();
+        return (sameEmail || samePhone || sameName) && a.status !== "completed" && a.status !== "cancelled";
+      });
+
+      if (matchedAppt) {
+        // Automatically check the patient in (update status to "arrived")
+        await apiQuery("appointments")
+          .update({ status: "arrived", checked_in_at: new Date().toISOString() })
+          .eq("id", matchedAppt.id);
+
+        toast.success("Matching appointment found and checked in!");
+
+        // Clear the walk-in form input fields
+        setWalkInFirstName("");
+        setWalkInLastName("");
+        setWalkInEmail("");
+        setWalkInPhone("");
+        setClientSearch("");
+
+        // Navigate to the appointment checkout URL
+        navigate(`/staff/checkout/${matchedAppt.id}`);
+        return;
+      }
+
+      // 2. Normal walk-in sale flow if no matching appointment found
+      const body: any = {
+        locationId: walkInLocationId,
+        clientFirstName: walkInFirstName.trim(),
+        clientLastName: walkInLastName.trim(),
+      };
+      if (walkInEmail.trim()) body.clientEmail = walkInEmail.trim();
+      if (walkInPhone.trim()) body.clientPhone = walkInPhone.trim();
+
+      const { data, error } = await ApiClient.post("pos-create-or-get-sale", body);
+      if (error || data?.error) { 
+        toast.error(data?.error || await functionErrorMessage(error, "Could not start walk-in checkout")); 
+        return; 
+      }
+
+      // Clear the walk-in form input fields
+      setWalkInFirstName("");
+      setWalkInLastName("");
+      setWalkInEmail("");
+      setWalkInPhone("");
+      setClientSearch("");
+
+      setSaleId(data.saleId);
+      setLoading(true);
+      await loadSaleData(data.saleId);
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred starting checkout");
+    } finally {
+      setWalkInStarting(false);
+    }
+  }, [walkInLocationId, walkInFirstName, walkInLastName, walkInEmail, walkInPhone, loadSaleData, navigate, setClientSearch]);
 
   useEffect(() => {
     if (appointmentId) {
@@ -308,7 +361,7 @@ export default function StaffCheckout() {
       apiQuery("locations").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
         setWalkInLocations(data ?? []);
         if (qLoc && data?.some((l: any) => l.id === qLoc)) setWalkInLocationId(qLoc);
-        else if (data && data.length === 1) setWalkInLocationId(data[0].id);
+        else if (data && data.length > 0) setWalkInLocationId(data[0].id);
       });
     }
   }, [appointmentId, startAppointmentSale, searchParams]);
@@ -737,9 +790,6 @@ export default function StaffCheckout() {
         clientSearching={clientSearching}
         clientResults={clientResults}
         pickClient={pickClient}
-        walkInLocations={walkInLocations}
-        walkInLocationId={walkInLocationId}
-        setWalkInLocationId={setWalkInLocationId}
         walkInFirstName={walkInFirstName}
         setWalkInFirstName={setWalkInFirstName}
         walkInLastName={walkInLastName}

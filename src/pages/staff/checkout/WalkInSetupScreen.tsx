@@ -3,7 +3,6 @@ import { ArrowLeft, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Props = {
   clientSearch: string;
@@ -11,9 +10,6 @@ type Props = {
   clientSearching: boolean;
   clientResults: any[];
   pickClient: (c: any) => void;
-  walkInLocations: any[];
-  walkInLocationId: string;
-  setWalkInLocationId: (v: string) => void;
   walkInFirstName: string;
   setWalkInFirstName: (v: string) => void;
   walkInLastName: string;
@@ -53,15 +49,6 @@ export function WalkInSetupScreen(p: Props) {
               ))}
             </div>
           )}
-        </div>
-        <div>
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Location</Label>
-          <Select value={p.walkInLocationId} onValueChange={p.setWalkInLocationId}>
-            <SelectTrigger className="mt-1"><SelectValue placeholder="Select location" /></SelectTrigger>
-            <SelectContent>
-              {p.walkInLocations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

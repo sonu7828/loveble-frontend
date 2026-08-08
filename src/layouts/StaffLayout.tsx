@@ -89,9 +89,13 @@ export default function StaffLayout() {
   const pendingCount = usePendingBookings(!!user && (isAdmin || isFrontDesk));
   const [unreadSms] = useState(0);
 
+  const isProviderForNavigation = useMemo(() => {
+    return !isAdmin && (isMedicalDirector || isNP || isRNInjector);
+  }, [isAdmin, isMedicalDirector, isNP, isRNInjector]);
+
   // Medical Director, Security Officer, and Staff navigation groups
   const staffGroups: Group[] = useMemo(() => {
-    if (isMedicalDirector) {
+    if (isMedicalDirector && !isAdmin) {
       return [
         {
           key: "dashboard",
@@ -151,7 +155,7 @@ export default function StaffLayout() {
       ];
     }
 
-    if (isPrivacyOfficer) {
+    if (isPrivacyOfficer && !isAdmin) {
       return [
         {
           key: "sec_dashboard",
@@ -177,7 +181,7 @@ export default function StaffLayout() {
       ];
     }
 
-    if (isProvider) {
+    if (isProviderForNavigation) {
       return [
         {
           key: "prov_dashboard",

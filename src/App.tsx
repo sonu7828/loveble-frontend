@@ -65,7 +65,7 @@ import Reviews from "./pages/public/Reviews.tsx";
 import AdminReports from "./pages/admin/AdminReports.tsx";
 import AdminProductivity from "./pages/admin/AdminProductivity.tsx";
 import AdminTreatmentPlans from "./pages/admin/AdminTreatmentPlans.tsx";
-import { AdminOnly, AdminOrDirectorOnly, AdminOrPrivacyOnly } from "./components/staff/AdminOnly.tsx";
+import { AdminOnly, AdminOrDirectorOnly, AdminOrPrivacyOnly, MedicalDirectorOnly } from "./components/staff/AdminOnly.tsx";
 import { OwnerOnly } from "./components/staff/OwnerOnly.tsx";
 import AdminFinances from "./pages/admin/AdminFinances.tsx";
 import AdminAudit from "./pages/admin/AdminAudit.tsx";
@@ -245,8 +245,8 @@ const App = () => (
                   <Route path="compliance/admin" element={<AdminOrPrivacyOnly><ComplianceAdmin /></AdminOrPrivacyOnly>} />
                   <Route path="breach-report" element={<AdminOrPrivacyOnly><AdminBreachReport /></AdminOrPrivacyOnly>} />
                   <Route path="vendors" element={<AdminOrPrivacyOnly><AdminVendors /></AdminOrPrivacyOnly>} />
-                  <Route path="clinical-reviews" element={<StaffClinicalReviews />} />
-                  <Route path="orders" element={<StaffOrders />} />
+                  <Route path="clinical-reviews" element={<MedicalDirectorOnly><StaffClinicalReviews /></MedicalDirectorOnly>} />
+                  <Route path="orders" element={<MedicalDirectorOnly><StaffOrders /></MedicalDirectorOnly>} />
                   <Route path="reports" element={<AdminOrDirectorOnly><AdminReports /></AdminOrDirectorOnly>} />
                   <Route path="clinical-templates" element={<AdminOrDirectorOnly><AdminClinicalTemplates /></AdminOrDirectorOnly>} />
                   <Route path="inbox" element={<StaffInbox />} />

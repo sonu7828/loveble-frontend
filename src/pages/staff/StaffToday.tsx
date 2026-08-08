@@ -1169,17 +1169,17 @@ function SecurityOfficerDashboard() {
 
 /* ── Staff Today Main Dispatcher Component ─────────────────────────────────── */
 export default function StaffToday() {
-  const { isMedicalDirector, isProvider, isPrivacyOfficer } = useAuth();
+  const { isAdmin, isMedicalDirector, isProvider, isPrivacyOfficer } = useAuth();
 
-  if (isPrivacyOfficer) {
+  if (isPrivacyOfficer && !isAdmin) {
     return <SecurityOfficerDashboard />;
   }
 
-  if (isMedicalDirector) {
+  if (isMedicalDirector && !isAdmin) {
     return <MedicalDirectorDashboard />;
   }
 
-  if (isProvider) {
+  if (isProvider && !isAdmin) {
     return <ProviderDashboard />;
   }
 

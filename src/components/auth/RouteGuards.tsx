@@ -23,3 +23,10 @@ export function AdminOrPrivacyOnly({ children }: { children: React.ReactNode }) 
   if (!isAdmin && !isPrivacyOfficer) return <Navigate to={resolveLandingRoute(roles)} replace />;
   return <>{children}</>;
 }
+
+export function MedicalDirectorOnly({ children }: { children: React.ReactNode }) {
+  const { loading, roles } = useAuth();
+  if (loading) return <div className="min-h-[40vh] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+  if (!roles.includes("medical_director")) return <Navigate to={resolveLandingRoute(roles)} replace />;
+  return <>{children}</>;
+}
