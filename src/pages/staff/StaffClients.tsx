@@ -98,6 +98,18 @@ export default function StaffClients() {
       const sess = JSON.parse(localStorage.getItem("rka_session") || "{}");
       if (sess?.user?.email) localRegistered.push(sess.user.email.toLowerCase());
     } catch {}
+    try {
+      const patUser = JSON.parse(localStorage.getItem("rka_patient_user") || "{}");
+      if (patUser?.email) localRegistered.push(patUser.email.toLowerCase());
+    } catch {}
+    try {
+      const demoAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      demoAppts.forEach((a) => {
+        if (a.client_email && (a.has_account || a.user_id || a.signed_name || a.is_registered)) {
+          localRegistered.push(a.client_email.toLowerCase());
+        }
+      });
+    } catch {}
 
     const allAccountSet = new Set([...cpEmails, ...userEmails, ...patEmails, ...localRegistered]);
 
