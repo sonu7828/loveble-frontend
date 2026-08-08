@@ -47,7 +47,6 @@ const AUTH_ENDPOINTS = [
   '/auth/refresh',
   '/auth/refresh-token',
   '/auth/logout',
-  '/auth/me',
   '/auth/mfa/login-verify',
   '/auth/mfa/setup',
   '/auth/mfa/verify',
