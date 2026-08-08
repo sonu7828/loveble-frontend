@@ -86,7 +86,7 @@ export default function StaffLayout() {
     });
   }, [user]);
 
-  const pendingCount = usePendingBookings(!!user && (isAdmin || isFrontDesk));
+  const pendingCount = usePendingBookings(!!user);
   const [unreadSms] = useState(0);
 
   const isProviderForNavigation = useMemo(() => {

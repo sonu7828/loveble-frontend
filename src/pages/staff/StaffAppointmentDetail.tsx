@@ -26,7 +26,8 @@ import { fetchUnifiedStaffMembers } from "@/lib/unifiedStaff";
 export default function StaffAppointmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isNP, isAdmin } = useAuth();
+  const isNpPortal = (isNP && !isAdmin) || (user?.roles?.includes("nurse_practitioner") && !user?.roles?.includes("admin"));
   const [appt, setAppt] = useState<any>(null);
   const [meta, setMeta] = useState<any>({});
   const [consentSummary, setConsentSummary] = useState<{ total: number; signed: number; pendingRequired: number; pendingOptional: number } | null>(null);
@@ -558,17 +559,17 @@ export default function StaffAppointmentDetail() {
       <section className="rounded-2xl border border-border bg-card p-6 mb-4">
         <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-4">Actions</h2>
         <div className="flex flex-wrap gap-2">
-          {!["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
             <Button onClick={() => setEditServicesOpen(true)} size="sm" variant="outline" className="rounded-full">
               <Pencil className="h-3.5 w-3.5 mr-1.5" />Edit services
             </Button>
           )}
-          {!["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
             <Button onClick={() => setRescheduleOpen(true)} size="sm" variant="outline" className="rounded-full">
               <CalendarClock className="h-3.5 w-3.5 mr-1.5" />Reschedule
             </Button>
           )}
-          {!["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied", "no_show", "completed"].includes(appt.status) && (
             <Button onClick={cancelAppt} size="sm" variant="outline" className="rounded-full text-destructive hover:text-destructive">
               <XCircle className="h-3.5 w-3.5 mr-1.5" />Cancel appointment
             </Button>
@@ -587,6 +588,15 @@ export default function StaffAppointmentDetail() {
                   appointment_id: appt.id, action: "confirmed_by_staff",
                   from_status: "pending", to_status: "confirmed" as any,
                 });
+                setAppt((prev: any) => (prev ? { ...prev, status: "confirmed" } : prev));
+                try {
+                  const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                  const updated = local.map((item: any) => (item.id === appt.id ? { ...item, status: "confirmed" } : item));
+                  localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+                } catch {}
+                window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+                window.dispatchEvent(new Event("rka_appointment_updated"));
+                window.dispatchEvent(new Event("rka_appointment_confirmed"));
                 toast.success("Appointment confirmed!");
                 load();
               }}
@@ -594,7 +604,7 @@ export default function StaffAppointmentDetail() {
               <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Confirm appointment
             </Button>
           )}
-          {["approved", "pending", "confirmed"].includes(appt.status) && (
+          {!isNpPortal && ["approved", "pending", "confirmed"].includes(appt.status) && (
             <Button
               size="sm"
               className="rounded-full"
@@ -606,15 +616,25 @@ export default function StaffAppointmentDetail() {
                   );
                   return;
                 }
+                const nowIso = new Date().toISOString();
                 const { error } = await apiQuery
                   .from("appointments")
-                  .update({ status: "arrived", checked_in_at: new Date().toISOString() })
+                  .update({ status: "arrived", checked_in_at: nowIso })
                   .eq("id", appt.id);
                 if (error) { toast.error(error.message); return; }
                 await apiQuery("appointment_audit_log").insert({
                   appointment_id: appt.id, action: "checked_in",
                   from_status: appt.status, to_status: "arrived" as any,
                 });
+                setAppt((prev: any) => (prev ? { ...prev, status: "arrived", checked_in_at: nowIso } : prev));
+                try {
+                  const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                  const updated = local.map((item: any) => (item.id === appt.id ? { ...item, status: "arrived", checked_in_at: nowIso } : item));
+                  localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+                } catch {}
+                window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+                window.dispatchEvent(new Event("rka_appointment_updated"));
+                window.dispatchEvent(new Event("rka_appointment_checkin"));
                 // Pre-create draft sale so checkout opens with services loaded
                 try {
                   await ApiClient.post("pos-create-or-get-sale", {
@@ -639,7 +659,7 @@ export default function StaffAppointmentDetail() {
               <MailCheck className="h-3.5 w-3.5 mr-1.5" />Resend post-op
             </Button>
           )}
-          {["approved", "pending", "arrived"].includes(appt.status) && (
+          {!isNpPortal && ["approved", "pending", "arrived"].includes(appt.status) && (
             <Button
               size="sm"
               variant="outline"
@@ -654,6 +674,15 @@ export default function StaffAppointmentDetail() {
                 const { data, error } = await ApiClient.post("mark-appointment-complete", { body: { appointmentId: appt.id } });
                 toast.dismiss(t);
                 if (error || data?.error) { toast.error(data?.error || (error as any)?.message || "Could not complete"); return; }
+                setAppt((prev: any) => (prev ? { ...prev, status: "completed" } : prev));
+                try {
+                  const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                  const updated = local.map((item: any) => (item.id === appt.id ? { ...item, status: "completed" } : item));
+                  localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+                } catch {}
+                window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+                window.dispatchEvent(new Event("rka_appointment_updated"));
+                window.dispatchEvent(new Event("rka_appointment_completed"));
                 toast.success(data?.reviewSent ? "Completed — review email sent" : "Completed (no review URL set for this location)");
                 load();
               }}
@@ -683,7 +712,7 @@ export default function StaffAppointmentDetail() {
               </Link>
             </Button>
           )}
-          {!["cancelled", "denied"].includes(appt.status) && (
+          {!isNpPortal && !["cancelled", "denied"].includes(appt.status) && (
             <Button asChild size="sm" className="rounded-full">
               <Link to={`/staff/checkout/${appt.id}`}>
                 <CreditCard className="h-3.5 w-3.5 mr-1.5" />Check out

@@ -36,8 +36,8 @@ function getStatusBadgeStyle(status: string) {
   }
   if (s === "confirmed" || s === "approved") {
     return {
-      bg: "#e0f2fe", // Soft Sky Blue
-      badgeClass: "bg-sky-500/20 text-sky-900 border border-sky-500/30",
+      bg: "#dbeafe", // Distinct Sky Blue
+      badgeClass: "bg-sky-600 text-white font-bold border border-sky-700 shadow-xs",
       label: "Confirmed",
     };
   }
@@ -189,7 +189,13 @@ export default function StaffCalendar() {
           const startTime = new Date(start).getTime();
           const endTime = new Date(end).getTime();
           if (apptTime >= startTime && apptTime <= endTime) {
-            map.set(x.id, x);
+            if (map.has(x.id)) {
+              // DB appointment takes precedence for updated status (e.g. confirmed)
+              const dbItem = map.get(x.id);
+              map.set(x.id, { ...x, ...dbItem });
+            } else {
+              map.set(x.id, x);
+            }
           }
         }
       });
@@ -237,10 +243,18 @@ export default function StaffCalendar() {
   useEffect(() => {
     const handleUpdate = () => setRefreshTrigger((n) => n + 1);
     window.addEventListener("rka_demo_appointments_updated", handleUpdate);
+    window.addEventListener("rka_appointment_updated", handleUpdate);
+    window.addEventListener("rka_appointment_confirmed", handleUpdate);
+    window.addEventListener("rka_appointment_checkin", handleUpdate);
+    window.addEventListener("rka_appointment_completed", handleUpdate);
     window.addEventListener("rka_chart_note_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
     return () => {
       window.removeEventListener("rka_demo_appointments_updated", handleUpdate);
+      window.removeEventListener("rka_appointment_updated", handleUpdate);
+      window.removeEventListener("rka_appointment_confirmed", handleUpdate);
+      window.removeEventListener("rka_appointment_checkin", handleUpdate);
+      window.removeEventListener("rka_appointment_completed", handleUpdate);
       window.removeEventListener("rka_chart_note_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };

@@ -177,13 +177,28 @@ export default function AdminTeam() {
       localStorage.setItem("rka_approved_staff_accounts", JSON.stringify(newApproved));
 
       const map: Record<string, Role[]> = {};
+      const managerList: string[] = JSON.parse(localStorage.getItem("rka_patient_account_managers") || "[]");
+
       dataList.forEach((x: any) => {
         const uid = x.userId || x.user_id || x.user?.id;
-        if (uid) {
-          const rolesList = x.user?.userRoles?.map((ur: any) => ur.role?.name as Role) || [];
-          if (rolesList.length > 0) {
-            map[uid] = rolesList;
+        const sid = x.id;
+        const email = (x.email || x.user?.email || "").toLowerCase();
+        const rolesList = (x.user?.userRoles?.map((ur: any) => ur.role?.name as Role) || []) as Role[];
+
+        if (
+          (sid && managerList.includes(sid)) ||
+          (uid && managerList.includes(uid)) ||
+          (email && managerList.includes(email))
+        ) {
+          if (!rolesList.includes("patient_account_manager" as Role)) {
+            rolesList.push("patient_account_manager" as Role);
           }
+        }
+
+        if (rolesList.length > 0) {
+          if (uid) map[uid] = rolesList;
+          if (sid) map[sid] = rolesList;
+          if (email) map[email] = rolesList;
         }
       });
       setRoles(map);
@@ -443,9 +458,18 @@ export default function AdminTeam() {
   };
 
   const resolveMemberRole = (m: Member): Role => {
-    const memberRoles = m.user_id ? (roles[m.user_id] ?? []) : [];
+    const memberRoles = (
+      (m.id ? roles[m.id] : undefined) ||
+      (m.user_id ? roles[m.user_id] : undefined) ||
+      (m.email ? roles[m.email.toLowerCase()] : undefined) ||
+      []
+    ) as string[];
 
-    const activeAssignedRole = memberRoles.find((r) => r !== ("staff" as any));
+    if (memberRoles.includes("front_desk")) {
+      return "front_desk";
+    }
+
+    const activeAssignedRole = memberRoles.find((r) => r !== ("staff" as any) && r !== ("patient_account_manager" as any));
     if (activeAssignedRole) {
       return activeAssignedRole as Role;
     }
@@ -453,10 +477,9 @@ export default function AdminTeam() {
     const explicitRole = (m as any).role || m.pending_role;
 
     if (explicitRole) {
-      // Normalize any legacy role strings
       const r = (explicitRole as string).toLowerCase();
       if (r === "provider" || r === "injector") return "rn_injector";
-      if (r === "receptionist" || r === "scheduler" || r === "staff") return "front_desk";
+      if (r === "receptionist" || r === "scheduler" || r === "staff" || r === "patient_account_manager") return "front_desk";
       if (r === "security_officer") return "privacy_officer";
       return explicitRole as Role;
     }
@@ -467,7 +490,7 @@ export default function AdminTeam() {
     if (titleLower.includes("nurse practitioner") || titleLower.includes("np")) return "nurse_practitioner";
     if (titleLower.includes("injector") || titleLower.includes("rn")) return "rn_injector";
     if (titleLower.includes("security") || titleLower.includes("privacy") || titleLower.includes("compliance")) return "privacy_officer";
-    if (titleLower.includes("front desk") || titleLower.includes("receptionist") || titleLower.includes("scheduler")) return "front_desk";
+    if (titleLower.includes("front desk") || titleLower.includes("receptionist") || titleLower.includes("scheduler") || titleLower.includes("patient account manager")) return "front_desk";
 
     return "front_desk";
   };
@@ -785,9 +808,26 @@ export default function AdminTeam() {
                       (user?.id && (m.user_id === user.id || m.id === user.id))
                     );
                     const isAdminMember = primaryRole === "admin";
-                    const isFrontDeskMember = primaryRole === "front_desk";
-                    const memberRoles = (roles[m.id] || []) as string[];
-                    const hasManagerRole = memberRoles.includes("patient_account_manager");
+                    const isFrontDeskMember =
+                      primaryRole === "front_desk" ||
+                      (primaryRole as string) === "patient_account_manager" ||
+                      (m.title && (m.title.toLowerCase().includes("front desk") || m.title.toLowerCase().includes("patient account manager"))) ||
+                      m.pending_role === "front_desk";
+
+                    const memberRoles = (
+                      (m.id ? roles[m.id] : undefined) ||
+                      (m.user_id ? roles[m.user_id] : undefined) ||
+                      (m.email ? roles[m.email.toLowerCase()] : undefined) ||
+                      []
+                    ) as string[];
+
+                    const managerList: string[] = JSON.parse(localStorage.getItem("rka_patient_account_managers") || "[]");
+                    const isSavedManager =
+                      managerList.includes(m.id) ||
+                      (!!m.user_id && managerList.includes(m.user_id)) ||
+                      (!!m.email && managerList.includes(m.email.toLowerCase()));
+
+                    const hasManagerRole = memberRoles.includes("patient_account_manager") || isSavedManager;
 
                     return (
                       <div className="flex items-center gap-1.5">
@@ -801,9 +841,18 @@ export default function AdminTeam() {
                                 try {
                                   await patientAccountService.revokeManagerAccess(m.id);
                                   toast.success(`Revoked Patient Account Manager access from ${m.full_name}`);
+                                  
+                                  const currentManagers: string[] = JSON.parse(localStorage.getItem("rka_patient_account_managers") || "[]");
+                                  const updatedManagers = currentManagers.filter(
+                                    (id) => id !== m.id && id !== m.user_id && (m.email ? id !== m.email.toLowerCase() : true)
+                                  );
+                                  localStorage.setItem("rka_patient_account_managers", JSON.stringify(updatedManagers));
+
                                   setRoles((prev) => ({
                                     ...prev,
                                     [m.id]: (prev[m.id] || []).filter((r) => (r as string) !== "patient_account_manager"),
+                                    ...(m.user_id ? { [m.user_id]: (prev[m.user_id] || []).filter((r) => (r as string) !== "patient_account_manager") } : {}),
+                                    ...(m.email ? { [m.email.toLowerCase()]: (prev[m.email.toLowerCase()] || []).filter((r) => (r as string) !== "patient_account_manager") } : {}),
                                   }));
                                 } catch (e: any) {
                                   toast.error(e.message || "Failed to revoke manager access");
@@ -826,9 +875,18 @@ export default function AdminTeam() {
                                 try {
                                   await patientAccountService.grantManagerAccess(m.id);
                                   toast.success(`Granted Patient Account Manager access to ${m.full_name}`);
+                                  
+                                  const currentManagers: string[] = JSON.parse(localStorage.getItem("rka_patient_account_managers") || "[]");
+                                  if (!currentManagers.includes(m.id)) currentManagers.push(m.id);
+                                  if (m.user_id && !currentManagers.includes(m.user_id)) currentManagers.push(m.user_id);
+                                  if (m.email && !currentManagers.includes(m.email.toLowerCase())) currentManagers.push(m.email.toLowerCase());
+                                  localStorage.setItem("rka_patient_account_managers", JSON.stringify(currentManagers));
+
                                   setRoles((prev) => ({
                                     ...prev,
                                     [m.id]: [...(prev[m.id] || []), "patient_account_manager" as any],
+                                    ...(m.user_id ? { [m.user_id]: [...(prev[m.user_id] || []), "patient_account_manager" as any] } : {}),
+                                    ...(m.email ? { [m.email.toLowerCase()]: [...(prev[m.email.toLowerCase()] || []), "patient_account_manager" as any] } : {}),
                                   }));
                                 } catch (e: any) {
                                   toast.error(e.message || "Failed to grant manager access");
