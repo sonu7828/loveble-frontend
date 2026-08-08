@@ -28,6 +28,12 @@ export function SharedConsentSigner({ defaultName, name, signaturePng, onNameCha
   signatureRef.current = signaturePng;
 
   useEffect(() => {
+    if (!name && defaultName && defaultName.trim()) {
+      onNameChange(defaultName.trim());
+    }
+  }, [defaultName, name, onNameChange]);
+
+  useEffect(() => {
     const resize = () => {
       const canvas = sigRef.current?.getCanvas();
       const wrap = containerRef.current;
@@ -53,28 +59,7 @@ export function SharedConsentSigner({ defaultName, name, signaturePng, onNameCha
     };
   }, []);
 
-  // Scroll lock while drawing
-  const scrollYRef = useRef(0);
-  const lockScroll = () => {
-    scrollYRef.current = window.scrollY;
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollYRef.current}px`;
-    document.body.style.left = "0";
-    document.body.style.right = "0";
-    document.body.style.width = "100%";
-  };
-  const unlockScroll = () => {
-    document.body.style.position = "";
-    document.body.style.top = "";
-    document.body.style.left = "";
-    document.body.style.right = "";
-    document.body.style.width = "";
-    window.scrollTo(0, scrollYRef.current);
-  };
-  useEffect(() => () => { unlockScroll(); }, []);
-
   const handleEnd = () => {
-    unlockScroll();
     if (!sigRef.current || sigRef.current.isEmpty()) return;
     try {
       onSignatureChange(sigRef.current.getCanvas().toDataURL("image/png"));
@@ -116,7 +101,6 @@ export function SharedConsentSigner({ defaultName, name, signaturePng, onNameCha
             penColor={penColor}
             minWidth={1.5}
             maxWidth={3.5}
-            onBegin={lockScroll}
             onEnd={handleEnd}
             canvasProps={{
               className: "w-full h-56 cursor-crosshair block",

@@ -159,8 +159,8 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       }
       if (p.data) setProviders(p.data as any);
 
-      const currentUser = sess?.user || sess?.session?.user;
-      if (currentUser) {
+      const currentUser = (sess?.user || sess?.session?.user) as any;
+      if (currentUser && (currentUser.role === "patient" || currentUser.is_patient || currentUser.roles?.includes?.("patient"))) {
         setClient(prev => ({
           ...prev,
           email: currentUser.email ?? "",
@@ -221,6 +221,12 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       return;
     }
     setFieldErrors({});
+
+    const fullName = `${client.firstName.trim()} ${client.lastName.trim()}`.trim();
+    if (fullName) {
+      setSharedName(fullName);
+    }
+
     setStep(5);
     setPayStep("consents");
   };
@@ -260,6 +266,9 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       return sum + p;
     }, 0);
 
+    const patientFullName = `${client.firstName.trim()} ${client.lastName.trim()}`.trim();
+    const finalSignedName = (sharedName.trim() || patientFullName);
+
     const newAppointmentPayload = {
       client_first_name: client.firstName,
       client_last_name: client.lastName,
@@ -269,6 +278,10 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       client_phone: client.phone,
       client_dob: client.dob || null,
       notes: client.notes || null,
+      signed_name: finalSignedName,
+      signature_png: sharedSig || null,
+      consents_signed: true,
+      consents_data: consentValues,
       status: "pending",
       start_at: slot,
       service_id: serviceIds[0] || "svc-01",
@@ -339,7 +352,9 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
           staffId: validStaffId,
           startAt: new Date(slot).toISOString(),
           notes: client.notes || null,
-        });
+          signedName: finalSignedName,
+          signaturePng: sharedSig || null,
+        } as any);
       } catch (apiErr) {
         console.warn("Backend public booking call failed, using local creation fallback:", apiErr);
       }
