@@ -16,7 +16,7 @@ import {
 import { z } from "zod";
 import { type CardOnFileHandle } from "@/components/CardOnFile";
 import { usePageMeta } from "@/hooks/usePageMeta";
-import { isClinicalProvider, formatStaffDisplayName } from "@/lib/unifiedStaff";
+import { isNurseOrInjector, formatStaffProviderLabel, formatStaffDisplayName } from "@/lib/unifiedStaff";
 
 import type { Step, Category, Service, Location, Staff, ProviderRow, ConsentForm } from "../book/types";
 import type { CompactValue } from "@/components/CompactConsentCard";
@@ -145,13 +145,13 @@ export const Book = ({ isEmbedded = false }: { isEmbedded?: boolean }) => {
       if (sp.data && Array.isArray(sp.data)) {
         const rawStaff = (sp.data as any[]).map(x => ({
           ...x,
-          full_name: formatStaffDisplayName(x.full_name || x.fullName || x.name || "Staff Member"),
+          full_name: formatStaffProviderLabel(x),
           title: x.title || "Licensed Specialist",
           color: x.color || "#8B6B5D",
           role: (x.role || x.pending_role || "").toLowerCase(),
         }));
 
-        const filtered = rawStaff.filter(isClinicalProvider);
+        const filtered = rawStaff.filter(isNurseOrInjector);
         setStaff(filtered);
         if (filtered.length > 0) {
           setStaffId(prev => prev || filtered[0].id);

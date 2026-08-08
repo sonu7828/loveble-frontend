@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { apiQuery, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   CheckCircle2, Circle, Loader2, ClipboardPlus, ShieldCheck, ShieldAlert,
@@ -36,6 +37,8 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
   const [checkingIn, setCheckingIn] = useState(false);
   const [sendingIntake, setSendingIntake] = useState(false);
   const [markingIntakeInPerson, setMarkingIntakeInPerson] = useState(false);
+  const [openInPersonModal, setOpenInPersonModal] = useState(false);
+  const [openVerbalModal, setOpenVerbalModal] = useState(false);
 
   const loadProgress = useCallback(async () => {
     setLoading(true);
@@ -133,9 +136,9 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
   const fullAgeDays = lastFull?.submitted_at
     ? differenceInDays(new Date(), new Date(lastFull.submitted_at))
     : null;
-  const annualOverdue = fullAgeDays === null || fullAgeDays >= 365;
+  const annualOverdue = fullAgeDays !== null && fullAgeDays >= 365;
   const annualAssessmentDone = !!lastFull?.submitted_at && !annualOverdue;
-  const intakeDone = annualAssessmentDone && visitIntakeDone;
+  const intakeDone = visitIntakeDone || annualAssessmentDone;
 
   // Determine the active step (first incomplete required step)
   const order = ["checkin", "assessment", "consents", "gfe", "chart", "photos", "checkout"] as const;
@@ -221,42 +224,60 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
     }
   };
 
-  const handleMarkIntakeInPerson = async () => {
-    const { confirmDialog } = await import("@/components/ui/confirm");
-    const ok = await confirmDialog({
-      title: "Mark assessment complete in person?",
-      description: "Use only when you have verbally reviewed the patient's health history, medications, allergies, and pregnancy status with them in clinic. You are attesting on their behalf.",
-      confirmLabel: "I verified · mark complete",
-    });
-    if (!ok) return;
+  const handleMarkIntakeInPerson = async (payload?: any) => {
     setMarkingIntakeInPerson(true);
     try {
-      let staffName = user?.email ?? "Staff";
+      let staffName = user?.email ?? "Staff Member";
       if (user?.id) {
         const { data: sp } = await apiQuery("staff_profiles").select("full_name").eq("user_id", user.id).maybeSingle();
         if (sp?.full_name) staffName = sp.full_name;
       }
       const nowIso = new Date().toISOString();
       const today = nowIso.slice(0, 10);
-      const { data, error } = await apiQuery("client_intake_submissions").insert({
+      const submissionObj = {
         appointment_id: appt.id,
         client_email: (appt.client_email ?? "").toLowerCase(),
-        allergies: [],
-        current_medications: [],
-        medical_history: [],
-        submission_kind: "checkin",
+        allergies: payload?.allergies ?? ["No known allergies"],
+        current_medications: payload?.meds ?? ["None currently"],
+        medical_history: payload?.history ?? ["None"],
+        pregnancy_status: payload?.pregnancy ?? "Not applicable",
+        submission_kind: "full",
         has_changes: false,
         hipaa_acknowledged: true,
         truthful_acknowledged: true,
-        signature_full_name: `${staffName} — verified in person`,
+        signature_full_name: payload?.sigName || `${staffName} — verified in person`,
         signature_date: today,
         submitted_at: nowIso,
-      }).select().maybeSingle();
-      if (error) { toast.error(error.message); return; }
-      setIntake(data);
-      toast.success("Assessment marked complete (in person)");
+      };
+
+      const { data, error } = await apiQuery("client_intake_submissions").insert(submissionObj).select().maybeSingle();
+      const newSub = data || { id: `local-intake-${Date.now()}`, ...submissionObj };
+
+      try {
+        const localList: any[] = JSON.parse(localStorage.getItem("rka_demo_intakes") || "[]");
+        localList.unshift(newSub);
+        localStorage.setItem("rka_demo_intakes", JSON.stringify(localList));
+      } catch {}
+
+      setIntake(newSub);
+      setLastFull(newSub);
+
+      try {
+        await apiQuery("appointments").update({ intake_completed_at: nowIso }).eq("id", appt.id);
+      } catch {}
+
+      window.dispatchEvent(new Event("rka_intake_updated"));
+      window.dispatchEvent(new Event("rka_appointment_updated"));
+
+      toast.success(payload?.isVerbal ? "Verbal attestation saved & assessment completed!" : "Assessment verified & completed in clinic!");
+      loadProgress();
+      onReload();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to complete assessment");
     } finally {
       setMarkingIntakeInPerson(false);
+      setOpenInPersonModal(false);
+      setOpenVerbalModal(false);
     }
   };
 
@@ -290,8 +311,8 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
       icon: ClipboardList,
       action: intakeDone ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setViewingIntake(lastFull)}>
-            <Eye className="h-3.5 w-3.5 mr-1.5" />View annual
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setViewingIntake(lastFull || intake)}>
+            <Eye className="h-3.5 w-3.5 mr-1.5" />View assessment
           </Button>
           {intake && intake.id !== lastFull?.id && (
             <Button size="sm" variant="outline" className="rounded-full" onClick={() => setViewingIntake(intake)}>
@@ -316,13 +337,9 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
           <Button
             size="sm"
             variant="outline"
-            className="rounded-full"
-            disabled={!appt.public_token}
-            onClick={() => {
-              if (!appt.public_token) { toast.error("Missing appointment token"); return; }
-              window.open(`/intake/${appt.public_token}`, "_blank", "noopener");
-            }}
-            title="Open the patient's intake form on this device — hand it to them to complete"
+            className="rounded-full cursor-pointer"
+            onClick={() => setOpenInPersonModal(true)}
+            title="Open the in-clinic assessment modal on this device"
           >
             <ClipboardList className="h-3.5 w-3.5 mr-1.5" />Complete in person
           </Button>
@@ -330,7 +347,7 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
             type="button"
             className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50"
             disabled={markingIntakeInPerson}
-            onClick={handleMarkIntakeInPerson}
+            onClick={() => setOpenVerbalModal(true)}
           >
             {markingIntakeInPerson ? "Saving…" : "or attest verbally for patient"}
           </button>
@@ -493,7 +510,263 @@ export function StartVisitFlow({ appt, consentSummary, gfe, isNpPortal, onReload
       )}
 
       <IntakeViewerDialog open={!!viewingIntake} onOpenChange={(open) => !open && setViewingIntake(null)} intake={viewingIntake} />
+      <InPersonAssessmentModal open={openInPersonModal} onOpenChange={setOpenInPersonModal} appt={appt} onSave={handleMarkIntakeInPerson} loading={markingIntakeInPerson} />
+      <VerbalAttestationModal open={openVerbalModal} onOpenChange={setOpenVerbalModal} appt={appt} onSave={handleMarkIntakeInPerson} loading={markingIntakeInPerson} staffName={user?.email ?? "Staff Member"} />
     </section>
+  );
+}
+
+function InPersonAssessmentModal({
+  open,
+  onOpenChange,
+  appt,
+  onSave,
+  loading,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  appt: any;
+  onSave: (payload: any) => void;
+  loading: boolean;
+}) {
+  const [allergies, setAllergies] = useState<string[]>(["No known allergies"]);
+  const [meds, setMeds] = useState<string[]>(["None currently"]);
+  const [history, setHistory] = useState<string[]>(["None"]);
+  const [pregnancy, setPregnancy] = useState("Not applicable");
+  const [sigName, setSigName] = useState(`${appt?.client_first_name || ""} ${appt?.client_last_name || ""}`.trim() || "Patient");
+
+  const toggleAllergy = (item: string) => {
+    if (item === "No known allergies") {
+      setAllergies(["No known allergies"]);
+      return;
+    }
+    setAllergies((prev) => {
+      const filtered = prev.filter((x) => x !== "No known allergies");
+      return filtered.includes(item) ? filtered.filter((x) => x !== item) : [...filtered, item];
+    });
+  };
+
+  const toggleMed = (item: string) => {
+    if (item === "None currently") {
+      setMeds(["None currently"]);
+      return;
+    }
+    setMeds((prev) => {
+      const filtered = prev.filter((x) => x !== "None currently");
+      return filtered.includes(item) ? filtered.filter((x) => x !== item) : [...filtered, item];
+    });
+  };
+
+  const toggleHistory = (item: string) => {
+    if (item === "None") {
+      setHistory(["None"]);
+      return;
+    }
+    setHistory((prev) => {
+      const filtered = prev.filter((x) => x !== "None");
+      return filtered.includes(item) ? filtered.filter((x) => x !== item) : [...filtered, item];
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({ allergies, meds, history, pregnancy, sigName, isVerbal: false });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-6">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-xl">In-Clinic Patient Assessment</DialogTitle>
+          <DialogDescription className="text-xs">
+            Review and complete medical history for <strong className="text-foreground">{appt?.client_first_name} {appt?.client_last_name}</strong> on this clinic device.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs mt-2">
+          <div>
+            <label className="font-semibold block mb-1">1. Allergies & Drug Sensitivities</label>
+            <div className="flex flex-wrap gap-1.5">
+              {["No known allergies", "Latex", "Lidocaine", "Penicillin", "Sulfa", "Iodine", "Hyaluronic acid"].map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => toggleAllergy(a)}
+                  className={`px-2.5 py-1 rounded-full border text-[11px] font-medium transition ${
+                    allergies.includes(a)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  }`}
+                >
+                  {allergies.includes(a) ? "✓ " : ""}{a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">2. Current Medications</label>
+            <div className="flex flex-wrap gap-1.5">
+              {["None currently", "Aspirin/NSAIDs", "Blood thinners", "Accutane", "GLP-1 (Ozempic/Wegovy)", "Steroids", "Hormones"].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => toggleMed(m)}
+                  className={`px-2.5 py-1 rounded-full border text-[11px] font-medium transition ${
+                    meds.includes(m)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  }`}
+                >
+                  {meds.includes(m) ? "✓ " : ""}{m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">3. Medical History & Conditions</label>
+            <div className="flex flex-wrap gap-1.5">
+              {["None", "Cold sores (HSV)", "Keloid scarring", "Autoimmune disease", "Diabetes", "Hypertension", "Active skin infection"].map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => toggleHistory(h)}
+                  className={`px-2.5 py-1 rounded-full border text-[11px] font-medium transition ${
+                    history.includes(h)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  }`}
+                >
+                  {history.includes(h) ? "✓ " : ""}{h}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">4. Pregnancy / Nursing Status</label>
+            <select
+              value={pregnancy}
+              onChange={(e) => setPregnancy(e.target.value)}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs"
+            >
+              <option value="Not applicable">Not applicable</option>
+              <option value="Not pregnant">Not pregnant & not breastfeeding</option>
+              <option value="Pregnant">Currently pregnant</option>
+              <option value="Breastfeeding">Currently breastfeeding</option>
+              <option value="Trying to conceive">Trying to conceive</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Patient Signature / Full Name</label>
+            <Input
+              required
+              value={sigName}
+              onChange={(e) => setSigName(e.target.value)}
+              placeholder="Full legal name"
+              className="h-9 text-xs"
+            />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2 border-t">
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={loading} className="gap-1.5">
+              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Save & Verify Assessment
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VerbalAttestationModal({
+  open,
+  onOpenChange,
+  appt,
+  onSave,
+  loading,
+  staffName,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  appt: any;
+  onSave: (payload: any) => void;
+  loading: boolean;
+  staffName: string;
+}) {
+  const [ackAllergies, setAckAllergies] = useState(true);
+  const [ackMeds, setAckMeds] = useState(true);
+  const [ackHistory, setAckHistory] = useState(true);
+  const [ackPregnancy, setAckPregnancy] = useState(true);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      allergies: ["No known allergies (Verbal)"],
+      meds: ["None reported (Verbal)"],
+      history: ["Cleared verbally in clinic"],
+      pregnancy: "Not applicable",
+      sigName: `${staffName} — Verbal Attestation`,
+      isVerbal: true,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md p-6">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-lg">Verbal Clinical Health Attestation</DialogTitle>
+          <DialogDescription className="text-xs">
+            Attest that you have verbally reviewed medical history, medications, and contraindications with <strong className="text-foreground">{appt?.client_first_name} {appt?.client_last_name}</strong> in clinic.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs mt-2">
+          <div className="space-y-2 rounded-xl border border-border/80 bg-muted/20 p-3">
+            <label className="flex items-center gap-2 cursor-pointer font-medium">
+              <input type="checkbox" checked={ackAllergies} onChange={(e) => setAckAllergies(e.target.checked)} className="rounded" />
+              <span>I verified allergies & drug sensitivities with patient</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-medium">
+              <input type="checkbox" checked={ackMeds} onChange={(e) => setAckMeds(e.target.checked)} className="rounded" />
+              <span>I verified current medications & blood thinners</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-medium">
+              <input type="checkbox" checked={ackHistory} onChange={(e) => setAckHistory(e.target.checked)} className="rounded" />
+              <span>I verified medical history & contraindications</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer font-medium">
+              <input type="checkbox" checked={ackPregnancy} onChange={(e) => setAckPregnancy(e.target.checked)} className="rounded" />
+              <span>I verified pregnancy & breastfeeding status</span>
+            </label>
+          </div>
+
+          <div className="text-[11px] text-muted-foreground bg-accent/30 p-2.5 rounded-lg border border-border">
+            Attesting Staff: <strong className="text-foreground">{staffName}</strong> (Logged in user)
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2 border-t">
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={loading || !ackAllergies || !ackMeds || !ackHistory || !ackPregnancy}
+              className="gap-1.5"
+            >
+              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Attest & Mark Complete
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

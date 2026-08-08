@@ -165,7 +165,10 @@ const App = () => (
               <Route path="/booking/:token" element={<BookingStatus />} />
               <Route path="/feedback/:token" element={<Feedback />} />
               <Route path="/photos/:token" element={<PhotoUpload />} />
+              <Route path="/intake" element={<PatientIntake />} />
               <Route path="/intake/:token" element={<PatientIntake />} />
+              <Route path="/account/intake" element={<PatientIntake />} />
+              <Route path="/account/intake/:token" element={<PatientIntake />} />
 
               <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="/staff/login" element={<StaffLogin />} />
