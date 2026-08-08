@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { formatPhone10 } from "@/lib/formatPhone";
 
 
-import { fetchUnifiedStaffMembers, formatStaffDisplayName, isClinicalProvider } from "@/lib/unifiedStaff";
+import { fetchUnifiedStaffMembers, formatStaffDisplayName, formatStaffProviderLabel, isNurseOrInjector } from "@/lib/unifiedStaff";
 
 export default function StaffNewAppointment() {
   const navigate = useNavigate();
@@ -30,7 +30,10 @@ export default function StaffNewAppointment() {
   const [staff, setStaff] = useState<any[]>([]);
   const [providers, setProviders] = useState<any[]>([]);
 
-  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [serviceIds, setServiceIds] = useState<string[]>(() => {
+    const svc = searchParams.get("serviceId");
+    return svc ? [svc] : [];
+  });
   const [staffIdSel, setStaffIdSel] = useState("");
   const [locationId, setLocationId] = useState("");
   const [pickedDate, setPickedDate] = useState<Date | undefined>(() => {
@@ -49,7 +52,7 @@ export default function StaffNewAppointment() {
     email: searchParams.get("email") ?? "",
     phone: searchParams.get("phone") ?? "",
     dob: searchParams.get("dob") ?? "",
-    notes: "",
+    notes: searchParams.get("notes") ?? "",
   });
   const [overrideConflict, setOverrideConflict] = useState(false);
   const [collectCard, setCollectCard] = useState(true);
@@ -117,44 +120,111 @@ export default function StaffNewAppointment() {
     });
   }, [canSeeAll, staffId]);
 
-  // Generate fallback demo clinic slots: 9 AM – 6 PM every 30 min on the chosen date
-  const generateFallbackSlots = (date: Date): string[] => {
-    const slots: string[] = [];
-    const start = 9 * 60;   // 9:00 AM
-    const end   = 18 * 60;  // 6:00 PM
-    for (let m = start; m < end; m += 30) {
-      const d = new Date(date);
-      d.setHours(Math.floor(m / 60), m % 60, 0, 0);
-      slots.push(d.toISOString());
-    }
-    return slots;
+  const totalMinutes = serviceIds.reduce((sum, id) => {
+    const s = services.find(x => x.id === id);
+    return sum + (s?.duration_minutes ?? 0);
+  }, 0);
+
+  // Generate clinic operating hours slots: 9:00 AM – 5:00 PM every 30 min on the chosen date
+  const generateClinicSlots = (date: Date): string[] => {
+    const ds = format(date, "yyyy-MM-dd");
+    const times = [
+      "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+      "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+      "15:00", "15:30", "16:00", "16:30", "17:00"
+    ];
+    return times.map((t) => `${ds}T${t}:00`);
   };
 
-  // Load slots when services+staff+location+date are set
+  // Load slots when services+staff+location+date are set, filtering out already booked appointments
   useEffect(() => {
     setPickedSlot("");
-    if (serviceIds.length === 0 || !staffIdSel || !locationId || !pickedDate) { setSlots([]); return; }
+    if (serviceIds.length === 0 || !staffIdSel || !locationId || !pickedDate) {
+      setSlots([]);
+      return;
+    }
     setLoadingSlots(true);
     const dateStr = format(pickedDate, "yyyy-MM-dd");
-    ApiClient.post("get-availability", {
-      serviceIds, staffId: staffIdSel, locationId, date: dateStr, includeConflicts: canOverride && overrideConflict
-    }).then(({ data }) => {
-      const returned: string[] = data?.slots ?? [];
-      // If no slots came back (demo/local staff with no DB schedule), generate fallback clinic hours
-      setSlots(returned.length > 0 ? returned : generateFallbackSlots(pickedDate));
-      setLoadingSlots(false);
-    }).catch(() => {
-      // Edge function unreachable — still show fallback slots
-      setSlots(generateFallbackSlots(pickedDate));
-      setLoadingSlots(false);
-    });
-  }, [serviceIds, staffIdSel, locationId, pickedDate, overrideConflict, canOverride]);
 
-  // Valid combos: only eligible clinical providers (Medical Director, Nurse Practitioner, RN/Injector) are selectable
+    const fetchAvailability = async () => {
+      let rawSlots: string[] = [];
+      try {
+        const { data } = await ApiClient.post("get-availability", {
+          serviceIds, staffId: staffIdSel, locationId, date: dateStr, includeConflicts: canOverride && overrideConflict
+        });
+        if (data?.slots && Array.isArray(data.slots) && data.slots.length > 0) {
+          rawSlots = data.slots;
+        }
+      } catch {}
+
+      if (rawSlots.length === 0) {
+        rawSlots = generateClinicSlots(pickedDate);
+      }
+
+      // Fetch existing appointments for this provider & date to filter out already booked slots
+      let bookedRanges: { start: number; end: number }[] = [];
+      try {
+        // 1. Fetch DB appointments
+        const { data: dbAppts } = await apiQuery("appointments")
+          .select("start_at, end_at, status, staff_id")
+          .order("start_at");
+
+        const matchingDb = (dbAppts ?? []).filter((a: any) => {
+          if (!a.start_at || a.status === "cancelled" || a.status === "no_show") return false;
+          if (staffIdSel && a.staff_id && String(a.staff_id) !== String(staffIdSel)) return false;
+          const aDate = format(new Date(a.start_at), "yyyy-MM-dd");
+          return aDate === dateStr;
+        });
+
+        matchingDb.forEach((a: any) => {
+          const st = new Date(a.start_at).getTime();
+          const et = a.end_at ? new Date(a.end_at).getTime() : st + (totalMinutes || 30) * 60000;
+          bookedRanges.push({ start: st, end: et });
+        });
+      } catch {}
+
+      try {
+        // 2. Fetch local storage appointments
+        const localAppts: any[] = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const matchingLocal = localAppts.filter((a: any) => {
+          if (!a.start_at || a.status === "cancelled" || a.status === "no_show") return false;
+          if (staffIdSel && a.staff_id && String(a.staff_id) !== String(staffIdSel)) return false;
+          const aDate = format(new Date(a.start_at), "yyyy-MM-dd");
+          return aDate === dateStr;
+        });
+
+        matchingLocal.forEach((a: any) => {
+          const st = new Date(a.start_at).getTime();
+          const et = a.end_at ? new Date(a.end_at).getTime() : st + (totalMinutes || 30) * 60000;
+          bookedRanges.push({ start: st, end: et });
+        });
+      } catch {}
+
+      // If overrideConflict is NOT checked, filter out any booked slot
+      let availableSlots = rawSlots;
+      if (!overrideConflict && bookedRanges.length > 0) {
+        availableSlots = rawSlots.filter((slotIso) => {
+          const slotTime = new Date(slotIso).getTime();
+          const slotEnd = slotTime + (totalMinutes || 30) * 60000;
+          const isOverlapping = bookedRanges.some((b) => {
+            return (slotTime >= b.start && slotTime < b.end) || (slotEnd > b.start && slotEnd <= b.end);
+          });
+          return !isOverlapping;
+        });
+      }
+
+      setSlots(availableSlots);
+      setLoadingSlots(false);
+    };
+
+    fetchAvailability();
+  }, [serviceIds, staffIdSel, locationId, pickedDate, overrideConflict, canOverride, totalMinutes]);
+
+  // Valid combos: only eligible clinical providers (Nurse Practitioner, RN/Injector) are selectable
   const validStaffIds = useMemo(() => {
     return new Set(
       staff
-        .filter(isClinicalProvider)
+        .filter(isNurseOrInjector)
         .map((s) => s.id)
     );
   }, [staff]);
@@ -182,10 +252,6 @@ export default function StaffNewAppointment() {
     }
   }, [locationId, locations]);
 
-  const totalMinutes = serviceIds.reduce((sum, id) => {
-    const s = services.find(x => x.id === id);
-    return sum + (s?.duration_minutes ?? 0);
-  }, 0);
 
   const addService = (id: string) => {
     if (!id || serviceIds.includes(id)) return;
@@ -289,6 +355,15 @@ export default function StaffNewAppointment() {
         window.dispatchEvent(new Event("rka_demo_appointments_updated"));
       } catch { }
 
+      const waitlistId = searchParams.get("waitlistId");
+      if (waitlistId) {
+        try {
+          await apiQuery("waitlist_entries").update({ status: "booked", appointmentId: createdId }).eq("id", waitlistId);
+        } catch (e) {
+          console.error("Failed to update waitlist entry status", e);
+        }
+      }
+
       toast.success("Appointment created");
       navigate(`/staff/appointments/${createdId}`);
     } catch (err: any) {
@@ -356,7 +431,7 @@ export default function StaffNewAppointment() {
                 disabled={!canSeeAll || serviceIds.length === 0}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">{serviceIds.length === 0 ? "Pick service first" : "Select provider…"}</option>
-                {staff.filter(s => validStaffIds.has(s.id)).map((s, idx) => <option key={`${s.id}-${idx}`} value={s.id}>{formatStaffDisplayName(s.full_name)}</option>)}
+                {staff.filter(s => validStaffIds.has(s.id)).map((s, idx) => <option key={`${s.id}-${idx}`} value={s.id}>{formatStaffProviderLabel(s)}</option>)}
               </select>
             </div>
           </div>
@@ -412,11 +487,15 @@ export default function StaffNewAppointment() {
                   <option value="">
                     {!pickedDate ? "Pick a date first" : loadingSlots ? "Loading…" : slots.length === 0 ? (overrideConflict ? "No slots even with override" : "No availability this day") : `Select time… (${slots.length} slots${overrideConflict ? " incl. conflicts" : ""})`}
                   </option>
-                  {slots.map((iso) => (
-                    <option key={iso} value={iso}>
-                      {new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })} PT
-                    </option>
-                  ))}
+                  {slots.map((iso) => {
+                    const d = new Date(iso);
+                    const timeLabel = isNaN(d.getTime()) ? iso : format(d, "h:mm a");
+                    return (
+                      <option key={iso} value={iso}>
+                        {timeLabel}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>

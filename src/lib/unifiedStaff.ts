@@ -60,16 +60,94 @@ export function isClinicalProvider(x: any): boolean {
   return false;
 }
 
+export function isNurseOrInjector(x: any): boolean {
+  if (!x) return false;
+  const r = (x.role || "").toLowerCase().trim();
+  const t = (x.title || "").toLowerCase().trim();
+  const n = (x.full_name || x.fullName || x.name || "").toLowerCase().trim();
+
+  // Exclude Medical Director, Admins, Schedulers, Front Desk, Security
+  if (r === "medical_director" || r === "admin" || r === "system_admin" || r === "front_desk" || r === "privacy_officer") {
+    return false;
+  }
+  if (t.includes("medical director") || t.includes("admin") || t.includes("receptionist")) {
+    return false;
+  }
+  if (n === "medical director" || n === "medicaldirector") {
+    return false;
+  }
+
+  // Include Nurse Practitioner & RN Injector
+  if (
+    r === "nurse_practitioner" ||
+    r === "rn_injector" ||
+    r === "nurse" ||
+    r === "injector"
+  ) {
+    return true;
+  }
+
+  if (
+    t.includes("nurse") ||
+    t.includes("injector") ||
+    t.includes("practitioner") ||
+    t.includes("rn") ||
+    t.includes("np")
+  ) {
+    return true;
+  }
+
+  if (
+    n.includes("nurse") ||
+    n.includes("injector") ||
+    n.includes("practitioner") ||
+    n.includes("rn") ||
+    n.includes("np")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function formatStaffProviderLabel(s: any): string {
+  if (!s) return "Provider";
+  const name = typeof s === "string" ? s.trim() : (s.full_name || s.fullName || s.name || "").trim();
+  const role = (s?.role || "").toLowerCase().trim();
+  const title = (s?.title || "").trim();
+
+  let roleLabel = "";
+  if (role === "nurse_practitioner" || role === "nursepractitioner" || name.toLowerCase().includes("practitioner") || title.toLowerCase().includes("practitioner")) {
+    roleLabel = "Nurse Practitioner (NP)";
+  } else if (role === "rn_injector" || role === "injector" || name.toLowerCase().includes("injector") || title.toLowerCase().includes("rn")) {
+    roleLabel = "RN Injector";
+  } else if (title) {
+    roleLabel = title;
+  }
+
+  const key = name.toLowerCase().replace(/[\s_-]/g, "");
+  const genericKeys = new Set(["medicaldirector", "nursepractitioner", "nurseprectitioner", "rninjector", "injector", "provider"]);
+
+  if (genericKeys.has(key) || !name) {
+    return roleLabel || "Nurse Practitioner (NP)";
+  }
+
+  if (roleLabel && !name.toLowerCase().includes(roleLabel.toLowerCase())) {
+    return `${name} (${roleLabel})`;
+  }
+  return name;
+}
+
 export function formatStaffDisplayName(rawName?: string | null): string {
   if (!rawName || !rawName.trim()) return "Staff Member";
   const name = rawName.trim();
   const roleNameMap: Record<string, string> = {
     medicaldirector: "Medical Director",
-    nursepractitioner: "Nurse Practitioner",
-    nurseprectitioner: "Nurse Practitioner",
-    injector: "RN / Injector",
-    rninjector: "RN / Injector",
-    rn_injector: "RN / Injector",
+    nursepractitioner: "Nurse Practitioner (NP)",
+    nurseprectitioner: "Nurse Practitioner (NP)",
+    injector: "RN Injector",
+    rninjector: "RN Injector",
+    rn_injector: "RN Injector",
     provider: "Clinical Provider",
     systemadmin: "System Admin",
     admin: "System Admin",

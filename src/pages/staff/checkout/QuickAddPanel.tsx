@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,14 +20,28 @@ type Props = {
   setCustomPrice: (v: string) => void;
 };
 
+const DEFAULT_CLINIC_SERVICES = [
+  { id: "svc-glp1", name: "GLP-1 Wellness Management — Televisit", price_cents: 15000 },
+  { id: "svc-hrt", name: "Hormone Replacement Therapy", price_cents: 15000 },
+  { id: "svc-botox", name: "Neurotoxin / Botox", price_cents: 14000 },
+  { id: "svc-facial", name: "Custom Medical Facial", price_cents: 12000 },
+  { id: "svc-laser", name: "CO2 Laser Resurfacing", price_cents: 35000 },
+  { id: "svc-microneedle", name: "RF Microneedling", price_cents: 25000 },
+];
+
 export function QuickAddPanel(p: Props) {
-  const { services, unitServices, products, addService, addUnit, addProduct, addCustom,
+  const { services: rawServices, unitServices, products, addService, addUnit, addProduct, addCustom,
     searchQ, setSearchQ, customLabel, setCustomLabel, customPrice, setCustomPrice } = p;
+
+  const services = rawServices.length > 0 ? rawServices : DEFAULT_CLINIC_SERVICES;
 
   type Tile = { key: string; label: string; sub: string; onClick: () => void };
   const tiles: Tile[] = [];
+  
   const featured = services.filter((s: any) => s.is_featured);
-  for (const s of featured) {
+  const displayServices = featured.length > 0 ? featured : services;
+
+  for (const s of displayServices) {
     const u = unitServices.find((x) => x.service_id === s.id);
     if (u) {
       tiles.push({
@@ -46,36 +59,20 @@ export function QuickAddPanel(p: Props) {
       });
     }
   }
-  if (tiles.length === 0) {
-    const FEATURED = ["neurotoxin", "pen microneedling", "co2 laser", "rf microneedling"];
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-    for (const term of FEATURED) {
-      const u = unitServices.find((x) => norm(x.services?.name ?? "").includes(term));
-      if (u) { tiles.push({ key: `u-${u.service_id}`, label: u.services?.name, sub: `${fmt(u.price_per_unit_cents)}/${u.unit_label}`, onClick: () => addUnit(u.service_id) }); continue; }
-      const s = services.find((x) => norm(x.name).includes(term));
-      if (s) { tiles.push({ key: `s-${s.id}`, label: s.name, sub: s.price_cents ? fmt(s.price_cents) : "Price varies", onClick: () => addService(s.id) }); continue; }
-      const prod = products.find((x) => norm(x.name).includes(term));
-      if (prod) { tiles.push({ key: `p-${prod.id}`, label: prod.name, sub: `${fmt(prod.price_cents)} · ${prod.kind}`, onClick: () => addProduct(prod.id) }); }
-    }
-  }
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
       <h2 className="text-xs uppercase tracking-wider text-muted-foreground">Quick add</h2>
 
-      {tiles.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No featured items. Mark services as <span className="font-medium">Featured</span> on <Link to="/staff/services" className="underline">Services & Pricing →</Link></p>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {tiles.slice(0, 8).map((t) => (
-            <button key={t.key} onClick={t.onClick}
-              className="text-left p-3 rounded-xl border border-border bg-background/50 hover:bg-secondary/60 hover:border-primary/40 transition">
-              <div className="text-sm font-medium truncate">{t.label}</div>
-              <div className="text-[11px] text-muted-foreground">{t.sub}</div>
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {tiles.slice(0, 8).map((t) => (
+          <button key={t.key} onClick={t.onClick}
+            className="text-left p-3 rounded-xl border border-border bg-background/50 hover:bg-secondary/60 hover:border-primary/40 transition cursor-pointer">
+            <div className="text-sm font-medium truncate">{t.label}</div>
+            <div className="text-[11px] text-muted-foreground">{t.sub}</div>
+          </button>
+        ))}
+      </div>
 
       <div className="pt-2">
         <div className="relative">

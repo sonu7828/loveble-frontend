@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiQuery, authService, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addMonths, startOfDay, isBefore } from "date-fns";
 import { Loader2, ChevronLeft, ChevronRight, MapPin, Plus, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -630,6 +630,7 @@ export default function StaffCalendar() {
               const inMonth = day.getMonth() === monthDate.getMonth();
               const isToday = isSameDay(day, new Date());
               const dateParam = format(day, "yyyy-MM-dd");
+              const isPastDate = isBefore(startOfDay(day), startOfDay(new Date()));
               return (
                 <div
                   key={day.toISOString()}
@@ -672,13 +673,13 @@ export default function StaffCalendar() {
                       </button>
                     )}
                   </div>
-                  {dayAppts.length === 0 && dayOver.length === 0 && inMonth && (
+                  {!isPastDate && dayAppts.length === 0 && dayOver.length === 0 && inMonth && (
                     <button
                       type="button"
                       onClick={() => navigate(`/staff/appointments/new?date=${dateParam}`)}
-                      className="mt-auto text-[10px] text-muted-foreground hover:text-foreground opacity-0 hover:opacity-100 transition-opacity"
+                      className="mt-auto self-center text-xs font-semibold px-3 py-1 rounded-md border border-border/80 bg-background text-foreground hover:bg-primary hover:text-primary-foreground shadow-2xs transition-colors flex items-center gap-1"
                     >
-                      + Book
+                      <Plus className="h-3 w-3" /> Book
                     </button>
                   )}
                 </div>
@@ -758,7 +759,7 @@ export default function StaffCalendar() {
                       </button>
                     );
                   })}
-                  {dayAppts.length === 0 && dayOver.length === 0 && (
+                  {!isBefore(startOfDay(day), startOfDay(new Date())) && dayAppts.length === 0 && dayOver.length === 0 && (
                     <button
                       type="button"
                       onClick={goBook}

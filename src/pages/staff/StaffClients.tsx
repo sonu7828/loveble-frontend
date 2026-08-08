@@ -648,7 +648,27 @@ export default function StaffClients() {
   };
 
   const isGarbageTestClient = (c: { email?: string; first_name?: string; last_name?: string }) => {
-    return isTestPatient(c);
+    if (isTestPatient(c)) return true;
+    if (!c.email) return false;
+    const em = c.email.toLowerCase().trim();
+    const staffKeywords = [
+      "admin",
+      "nurse",
+      "frontdesk",
+      "medical",
+      "injector",
+      "practitioner",
+      "director",
+      "security",
+      "receptionist",
+      "provider",
+      "staff",
+      "thor",
+      "thomas",
+      "phase1-",
+    ];
+    if (em.endsWith("@radiantilyk.com") || staffKeywords.some((k) => em.includes(k))) return true;
+    return false;
   };
 
   const allClients = useMemo<UnifiedClient[]>(() => {
@@ -806,6 +826,35 @@ export default function StaffClients() {
         sort_at: lc.created_at ? new Date(lc.created_at).getTime() : Date.now(),
       });
     }
+
+    // Merge demo users (e.g. user@gmail.com)
+    try {
+      const demoUsers: any[] = JSON.parse(localStorage.getItem("rka_demo_users") || "[]");
+      for (const du of demoUsers) {
+        if (isGarbageTestClient({ email: du.email, first_name: du.first_name, last_name: du.last_name })) continue;
+        const email = (du.email || "").trim().toLowerCase();
+        if (!email) continue;
+        const fn = (du.first_name || du.firstName || "Demo").trim();
+        const ln = (du.last_name || du.lastName || "Patient").trim();
+        const nameKey = `${fn.toLowerCase()} ${ln.toLowerCase()}`.trim();
+        const key = nameKey.length > 1 ? nameKey : email;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            first_name: fn,
+            last_name: ln,
+            email: du.email,
+            phone: du.phone || null,
+            dob: du.dob || null,
+            appt_count: 0,
+            last_appt: null,
+            imported_id: null,
+            invited_at: null,
+            sort_at: Date.now(),
+          });
+        }
+      }
+    } catch {}
 
     return [...map.values()].sort((a, b) => b.sort_at - a.sort_at || (a.last_name || "").localeCompare(b.last_name || ""));
   }, [items, imported, leads, clientProfiles, localClients]);
