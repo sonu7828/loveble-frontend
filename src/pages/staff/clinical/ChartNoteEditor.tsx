@@ -1704,6 +1704,14 @@ export default function ChartNoteEditor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isViewMode, canSubmit, saving]); // submit is stable enough; canSubmit gates it
 
+  const handleBack = () => {
+    const apptId = sp.get("appointment") || (note as any)?.appointment_id || (note as any)?.appointmentId || appointmentId;
+    if (apptId) {
+      navigate(`/staff/appointments/${apptId}`);
+    } else {
+      navigate(-1);
+    }
+  };
 
   if (!isClinicalStaff) {
     return (
@@ -1721,7 +1729,7 @@ export default function ChartNoteEditor() {
     return (
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
+          <Button variant="ghost" size="sm" onClick={handleBack}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
           <Button onClick={downloadPdf} disabled={pdfBusy} size="sm">
             {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />} PDF
           </Button>

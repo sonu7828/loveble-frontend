@@ -674,11 +674,22 @@ export default function GFEForm() {
 
       toast.success("GFE signed and saved successfully");
       autosave.clear();
-      navigate(`/staff/clinical/gfe/${savedId}`, { replace: true });
+      const apptParam = sp.get("appointment")?.trim();
+      const apptQuery = apptParam ? `?appointment=${encodeURIComponent(apptParam)}` : "";
+      navigate(`/staff/clinical/gfe/${savedId}${apptQuery}`, { replace: true });
     } catch (e: any) {
       toast.error(e.message ?? "Failed to save GFE");
     } finally { setSaving(false); }
   }
+
+  const handleBack = () => {
+    const appointmentId = sp.get("appointment") || record?.appointment_id || record?.appointmentId;
+    if (appointmentId) {
+      navigate(`/staff/appointments/${appointmentId}`);
+    } else {
+      navigate(-1);
+    }
+  };
 
   async function downloadPdf() {
     if (!record) return;
@@ -704,7 +715,7 @@ export default function GFEForm() {
     return (
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/staff/today")}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
+          <Button variant="ghost" size="sm" onClick={handleBack}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -715,6 +726,8 @@ export default function GFEForm() {
                 if (record.client_last_name) params.set("last", record.client_last_name);
                 if (record.client_dob) params.set("dob", record.client_dob.slice(0, 10));
                 params.set("gfeId", record.id);
+                const apptId = sp.get("appointment") || record.appointment_id || record.appointmentId;
+                if (apptId) params.set("appointment", apptId);
                 navigate(`/staff/clinical/notes/new?${params.toString()}`);
               }}
             >

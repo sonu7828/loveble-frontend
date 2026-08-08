@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiQuery, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
+import { isTestPatient, purgeLocalTestPatients } from "@/lib/testPatientFilter";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Check, X, Loader2, MapPin, Clock, User as UserIcon, Mail, Phone, ChevronRight, Inbox as InboxIcon, Keyboard } from "lucide-react";
@@ -41,11 +42,12 @@ export default function StaffInbox() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    purgeLocalTestPatients();
     let aq = apiQuery("appointments").select("*").eq("status", "pending").order("created_at", { ascending: true });
     if (!canSeeAll && staffId) aq = aq.eq("staff_id", staffId);
 
     const a = await aq;
-    const fetchedAppts = (a.data ?? []) as Appt[];
+    const fetchedAppts = ((a.data ?? []) as Appt[]).filter((x) => !isTestPatient(x));
     setAppts(fetchedAppts);
 
     const sids = [...new Set(fetchedAppts.map((x: any) => x.service_id).filter(Boolean))];
@@ -91,6 +93,17 @@ export default function StaffInbox() {
     toast.success(action === "approve" ? "Appointment Approved!" : "Appointment Denied!");
     setDenyFor(null);
     setDenyReason("");
+    setAppts(prev => prev.filter(x => x.id !== id));
+    try {
+      const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+      const updated = local.map((item: any) => (item.id === id ? { ...item, status: targetStatus } : item));
+      localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+    } catch {}
+    window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+    window.dispatchEvent(new Event("rka_appointment_updated"));
+    if (action === "approve") {
+      window.dispatchEvent(new Event("rka_appointment_confirmed"));
+    }
     load();
   }, [load]);
 
