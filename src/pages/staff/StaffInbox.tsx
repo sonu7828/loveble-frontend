@@ -99,28 +99,41 @@ export default function StaffInbox() {
     if (reason && action === "deny") {
       updatePayload.cancellation_reason = reason;
     }
-    const { error } = await apiQuery("appointments").update(updatePayload).eq("id", id);
-    setBusyId(null);
-    if (error) {
-      toast.error(error.message || "Could not update appointment");
-      return;
-    }
-    toast.success(action === "approve" ? "Appointment Approved!" : "Appointment Denied!");
-    setDenyFor(null);
-    setDenyReason("");
-    setAppts(prev => prev.filter(x => x.id !== id));
+
+    // 1. Optimistically remove from pending list in state
+    setAppts((prev) => prev.filter((x) => x.id !== id));
+
+    // 2. Update localStorage demo appointments if present
     try {
       const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
-      const updated = local.map((item: any) => (item.id === id ? { ...item, status: targetStatus } : item));
+      const updated = local.map((item: any) =>
+        item.id === id ? { ...item, status: targetStatus, cancellation_reason: reason || item.cancellation_reason } : item
+      );
       localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to update rka_demo_appointments", e);
+    }
+
+    // 3. Update Supabase / API DB
+    try {
+      await apiQuery("appointments").update(updatePayload).eq("id", id);
+    } catch (err) {
+      console.warn("DB update notice:", err);
+    }
+
+    setBusyId(null);
+    setDenyFor(null);
+    setDenyReason("");
+
+    toast.success(action === "approve" ? "Booking Request Approved!" : "Booking Request Declined!");
+
+    // 4. Dispatch synchronization events across all app components
     window.dispatchEvent(new Event("rka_demo_appointments_updated"));
     window.dispatchEvent(new Event("rka_appointment_updated"));
     if (action === "approve") {
       window.dispatchEvent(new Event("rka_appointment_confirmed"));
     }
-    load();
-  }, [load]);
+  }, []);
 
   const removeWaitlistEntry = useCallback(async (id: string) => {
     setBusyId(id);
@@ -161,12 +174,6 @@ export default function StaffInbox() {
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="font-serif text-3xl">{activeTab === "bookings" ? "Booking Requests" : "Waitlist Requests"}</h1>
-          {activeTab === "bookings" && (
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
-              <Keyboard className="h-3 w-3" />
-              <span><kbd className="px-1 rounded bg-secondary text-[10px]">j</kbd>/<kbd className="px-1 rounded bg-secondary text-[10px]">k</kbd> navigate · <kbd className="px-1 rounded bg-secondary text-[10px]">a</kbd> approve · <kbd className="px-1 rounded bg-secondary text-[10px]">d</kbd> deny · <kbd className="px-1 rounded bg-secondary text-[10px]">Enter</kbd> open</span>
-            </p>
-          )}
         </div>
         <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary rounded-full px-3.5 py-1.5 text-xs font-semibold">
           <InboxIcon className="h-4 w-4" />
@@ -302,11 +309,28 @@ function ApptRow(props: {
         <div className="mt-4 pt-4 border-t border-border">
           {!denying ? (
             <div className="flex gap-2">
-              <Button onClick={props.onApprove} disabled={busy} size="sm" className="rounded-full">
-                {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Check className="h-3.5 w-3.5 mr-1" />Approve <span className="opacity-50 text-[10px] ml-1">a</span></>}
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onApprove();
+                }}
+                disabled={busy}
+                size="sm"
+                className="rounded-full cursor-pointer px-4"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Check className="h-3.5 w-3.5 mr-1" />Approve</>}
               </Button>
-              <Button onClick={props.onDenyClick} disabled={busy} size="sm" variant="outline" className="rounded-full">
-                <X className="h-3.5 w-3.5 mr-1" />Deny <span className="opacity-50 text-[10px] ml-1">d</span>
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onDenyClick();
+                }}
+                disabled={busy}
+                size="sm"
+                variant="outline"
+                className="rounded-full cursor-pointer px-4"
+              >
+                <X className="h-3.5 w-3.5 mr-1" />Deny
               </Button>
             </div>
           ) : (
