@@ -9,6 +9,7 @@ import { z } from "zod";
 import GoogleCalendarConnect from "@/components/staff/GoogleCalendarConnect";
 import { useAuth } from "@/hooks/useAuth";
 import { SavedSignatureCard } from "@/components/staff/SavedSignatureCard";
+import { AdminBookingHoursAndHolidays } from "@/components/admin/AdminBookingHoursAndHolidays";
 
 const schema = z.object({
   full_name: z.string().trim().min(1, "Name required").max(120),
@@ -419,6 +420,12 @@ export default function UserProfile() {
           </div>
         )}
       </div>
+
+      {isAdmin && (
+        <div className="mt-8">
+          <AdminBookingHoursAndHolidays />
+        </div>
+      )}
 
       {staffId && (
         <SavedSignatureCard staffId={staffId} defaultName={form.full_name} />
