@@ -26,8 +26,8 @@ import { fetchUnifiedStaffMembers } from "@/lib/unifiedStaff";
 export default function StaffAppointmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isNP, isAdmin } = useAuth();
-  const isNpPortal = (isNP && !isAdmin) || (user?.roles?.includes("nurse_practitioner") && !user?.roles?.includes("admin"));
+  const { user, isNP, isRNInjector, isMedicalDirector, isAdmin } = useAuth();
+  const isNpPortal = isNP || isRNInjector || isMedicalDirector || (user?.roles?.some((r: string) => ["nurse_practitioner", "rn_injector", "medical_director"].includes(r)));
   const [appt, setAppt] = useState<any>(null);
   const [meta, setMeta] = useState<any>({});
   const [consentSummary, setConsentSummary] = useState<{ total: number; signed: number; pendingRequired: number; pendingOptional: number } | null>(null);

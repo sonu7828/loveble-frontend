@@ -77,16 +77,15 @@ export default function GFEForm() {
   const { id } = useParams();
   const [sp] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isNP, staffId } = useAuth();
+  const { user, isNP, isRNInjector, isMedicalDirector, staffId } = useAuth();
   const [initialDraftSuffix] = useState(() => {
     const appointmentId = sp.get("appointment")?.trim();
     const initialEmail = sp.get("email")?.trim().toLowerCase();
     return initialEmail || (appointmentId ? `appointment:${appointmentId}` : "_new");
   });
   const isViewMode = !!id;
-  // CA B&P §2242: only a licensed clinician (NP/PA/MD) may perform a GFE.
-  // Admins without an NP role must not be able to sign — DB RLS also enforces this.
-  const canSign = isNP;
+  // Licensed clinician (NP/RN Injector/MD) may perform and sign a GFE.
+  const canSign = isNP || isRNInjector || isMedicalDirector || (user?.roles?.some((r: string) => ["nurse_practitioner", "rn_injector", "medical_director"].includes(r)));
 
   const [loading, setLoading] = useState(isViewMode);
   const [saving, setSaving] = useState(false);
@@ -796,8 +795,8 @@ export default function GFEForm() {
     return (
       <div className="max-w-md mx-auto p-10 text-center space-y-3">
         <ShieldAlert className="h-10 w-10 mx-auto text-warning" />
-        <h2 className="text-lg font-medium">Restricted to nurse practitioners</h2>
-        <p className="text-sm text-muted-foreground">California law (B&P Code §2242) requires GFEs to be performed by a qualified clinician. Ask an admin to add the Nurse Practitioner role to your account if you should have access.</p>
+        <h2 className="text-lg font-medium">Restricted to clinical providers</h2>
+        <p className="text-sm text-muted-foreground">Good Faith Exams (GFEs) must be performed by an authorized clinical provider (Nurse Practitioner or RN Injector).</p>
         <Button variant="outline" onClick={() => navigate(-1)}>Back</Button>
       </div>
     );
