@@ -671,13 +671,21 @@ function StandardStaffToday() {
     setApprovingId(apptId);
     try {
       const { error } = await apiQuery("appointments")
-        .update({ status: "approved" })
+        .update({ status: "confirmed" })
         .eq("id", apptId);
       if (error) throw error;
       setAppts((prev) =>
-        prev.map((a) => (a.id === apptId ? { ...a, status: "approved" } : a))
+        prev.map((a) => (a.id === apptId ? { ...a, status: "confirmed" } : a))
       );
-      toast.success("Appointment approved!");
+      try {
+        const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+        const updated = local.map((item: any) => (item.id === apptId ? { ...item, status: "confirmed" } : item));
+        localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+      } catch {}
+      window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+      window.dispatchEvent(new Event("rka_appointment_updated"));
+      window.dispatchEvent(new Event("rka_appointment_confirmed"));
+      toast.success("Appointment confirmed!");
     } catch (e: any) {
       toast.error(e.message ?? "Failed to approve appointment");
     } finally {

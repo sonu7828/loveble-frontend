@@ -588,6 +588,15 @@ export default function StaffAppointmentDetail() {
                   appointment_id: appt.id, action: "confirmed_by_staff",
                   from_status: "pending", to_status: "confirmed" as any,
                 });
+                setAppt((prev: any) => (prev ? { ...prev, status: "confirmed" } : prev));
+                try {
+                  const local = JSON.parse(localStorage.getItem("rka_demo_appointments") || "[]");
+                  const updated = local.map((item: any) => (item.id === appt.id ? { ...item, status: "confirmed" } : item));
+                  localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
+                } catch {}
+                window.dispatchEvent(new Event("rka_demo_appointments_updated"));
+                window.dispatchEvent(new Event("rka_appointment_updated"));
+                window.dispatchEvent(new Event("rka_appointment_confirmed"));
                 toast.success("Appointment confirmed!");
                 load();
               }}
