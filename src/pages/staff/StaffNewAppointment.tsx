@@ -30,7 +30,10 @@ export default function StaffNewAppointment() {
   const [staff, setStaff] = useState<any[]>([]);
   const [providers, setProviders] = useState<any[]>([]);
 
-  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [serviceIds, setServiceIds] = useState<string[]>(() => {
+    const svc = searchParams.get("serviceId");
+    return svc ? [svc] : [];
+  });
   const [staffIdSel, setStaffIdSel] = useState("");
   const [locationId, setLocationId] = useState("");
   const [pickedDate, setPickedDate] = useState<Date | undefined>(() => {
@@ -49,7 +52,7 @@ export default function StaffNewAppointment() {
     email: searchParams.get("email") ?? "",
     phone: searchParams.get("phone") ?? "",
     dob: searchParams.get("dob") ?? "",
-    notes: "",
+    notes: searchParams.get("notes") ?? "",
   });
   const [overrideConflict, setOverrideConflict] = useState(false);
   const [collectCard, setCollectCard] = useState(true);
@@ -288,6 +291,15 @@ export default function StaffNewAppointment() {
         localStorage.setItem("rka_demo_appointments", JSON.stringify(updated));
         window.dispatchEvent(new Event("rka_demo_appointments_updated"));
       } catch { }
+
+      const waitlistId = searchParams.get("waitlistId");
+      if (waitlistId) {
+        try {
+          await apiQuery("waitlist_entries").update({ status: "booked", appointmentId: createdId }).eq("id", waitlistId);
+        } catch (e) {
+          console.error("Failed to update waitlist entry status", e);
+        }
+      }
 
       toast.success("Appointment created");
       navigate(`/staff/appointments/${createdId}`);

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { apiQuery, ApiClient } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchApptServiceNames, combinedServiceLabel } from "@/lib/apptServices";
@@ -27,9 +27,12 @@ interface Appt {
 
 export default function StaffInbox() {
   const navigate = useNavigate();
-  const { canSeeAll, staffId } = useAuth();
+  const { canSeeAll, staffId, isAdmin, isFrontDesk, isScheduler, isNP, isRNInjector, isMedicalDirector, isPrivacyOfficer } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") === "waitlist" ? "waitlist" : "bookings";
+
+  // Enforce role permissions: Privacy Officer cannot manage.
+  const canManage = (isAdmin || isFrontDesk || isScheduler || isNP || isRNInjector || isMedicalDirector) && !isPrivacyOfficer;
 
   const [appts, setAppts] = useState<Appt[]>([]);
   const [waitlist, setWaitlist] = useState<any[]>([]);
@@ -227,6 +230,7 @@ export default function StaffInbox() {
           services={allServices}
           onRemove={removeWaitlistEntry}
           busyId={busyId}
+          canManage={canManage}
         />
       )}
     </div>
@@ -326,8 +330,9 @@ function WaitlistTab(props: {
   services: any[];
   onRemove: (id: string) => void;
   busyId: string | null;
+  canManage: boolean;
 }) {
-  const { entries, services, onRemove, busyId } = props;
+  const { entries, services, onRemove, busyId, canManage } = props;
 
   if (entries.length === 0) {
     return <div className="rounded-2xl border border-dashed border-border p-16 text-center text-sm text-muted-foreground">Waitlist is currently empty.</div>;
@@ -365,9 +370,20 @@ function WaitlistTab(props: {
               </div>
 
               <div className="mt-4 pt-4 border-t border-border flex gap-2">
+                {canManage && (
+                  <Button
+                    asChild
+                    size="sm"
+                    className="rounded-full shadow-xs"
+                  >
+                    <Link to={`/staff/appointments/new?firstName=${encodeURIComponent(w.client_first_name || "")}&lastName=${encodeURIComponent(w.client_last_name || "")}&email=${encodeURIComponent(w.client_email || "")}&phone=${encodeURIComponent(w.client_phone || "")}&serviceId=${w.service_id || ""}&notes=${encodeURIComponent(w.notes || "")}&waitlistId=${w.id}`}>
+                      Book Appointment
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   onClick={() => onRemove(w.id)}
-                  disabled={busyId === w.id}
+                  disabled={busyId === w.id || !canManage}
                   size="sm"
                   variant="outline"
                   className="rounded-full border-destructive/30 hover:border-destructive hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
